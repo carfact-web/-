@@ -132,8 +132,8 @@ export default function Home() {
       return;
     }
 
-    const encodedValue = encodeURIComponent(value);
-    router.push(`/car/${encodedValue}/setup`);
+    console.log("go", value);
+    router.push(`/car/${encodeURIComponent(value)}/setup`);
   };
 
   return (
