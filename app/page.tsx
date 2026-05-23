@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import type { FormEvent } from "react";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 
@@ -110,27 +112,8 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
     .slice(0, 5);
 };
 
-const hasCompleteVehicleInfo = (vehicleJson: string | null) => {
-  if (!vehicleJson) {
-    return false;
-  }
-
-  try {
-    const vehicle = JSON.parse(vehicleJson) as Vehicle;
-
-    return Boolean(
-      vehicle.plateNumber &&
-        vehicle.brand &&
-        vehicle.model &&
-        vehicle.generation &&
-        vehicle.year
-    );
-  } catch {
-    return false;
-  }
-};
-
 export default function Home() {
+  const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
@@ -139,7 +122,9 @@ export default function Home() {
   );
   const recentFacts = getRecentFacts(recentReviewsSnapshot);
 
-  const goToReport = () => {
+  const goToReport = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     const value = carNumber.trim();
 
     if (!value) {
@@ -148,11 +133,7 @@ export default function Home() {
     }
 
     const encodedValue = encodeURIComponent(value);
-    const vehicle = localStorage.getItem(getVehicleStorageKey(value));
-
-    window.location.href = hasCompleteVehicleInfo(vehicle)
-      ? `/car/${encodedValue}`
-      : `/car/${encodedValue}/setup`;
+    router.push(`/car/${encodedValue}/setup`);
   };
 
   return (
@@ -182,7 +163,7 @@ export default function Home() {
           </p>
         </section>
 
-        <div className={panelClassName}>
+        <form className={panelClassName} onSubmit={goToReport}>
           <input
             value={carNumber}
             onChange={(e) => setCarNumber(e.target.value)}
@@ -191,14 +172,10 @@ export default function Home() {
             className={inputClassName}
           />
 
-          <button
-            type="button"
-            onClick={goToReport}
-            className={primaryButtonClassName}
-          >
+          <button type="submit" className={primaryButtonClassName}>
             차량 이야기 보기
           </button>
-        </div>
+        </form>
 
         <section className={recentSectionClassName}>
           <div className="mb-3">
