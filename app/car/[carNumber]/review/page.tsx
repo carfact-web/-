@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import type { Review } from "@/types/review";
 
-const pageClassName = cn("min-h-screen bg-black p-10 text-white");
+const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const homeButtonClassName = cn(
+  "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
+  "hover:opacity-75"
+);
 const tagButtonClassName = cn("rounded-full px-4 py-2 text-sm transition");
 const textareaClassName = cn(
   "h-40 w-full rounded-xl bg-zinc-800 p-4 text-white"
@@ -20,6 +24,7 @@ const submitButtonClassName = cn(
 
 export default function ReviewPage() {
   const params = useParams();
+  const router = useRouter();
   const carNumber = decodeURIComponent(params.carNumber as string);
   const [review, setReview] = useState("");
   const { addReview } = useReviews(carNumber);
@@ -80,6 +85,14 @@ export default function ReviewPage() {
 
   return (
     <main className={pageClassName}>
+      <button
+        type="button"
+        onClick={() => router.push("/")}
+        className={homeButtonClassName}
+      >
+        ← 홈으로
+      </button>
+
       <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
 
       <p className="text-2xl text-gray-300 mb-10">

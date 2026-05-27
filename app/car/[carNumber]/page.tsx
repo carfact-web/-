@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
+import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -13,6 +14,10 @@ import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const homeButtonClassName = cn(
+  "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
+  "hover:opacity-75"
+);
 const actionLinkClassName = cn(
   "block w-full rounded-xl bg-red-500 p-4 text-center font-bold transition",
   "hover:bg-red-600"
@@ -87,6 +92,7 @@ const getTimelineItems = (reviews: Review[]): TimelineItem[] =>
 
 export default function CarReportPage() {
   const params = useParams();
+  const router = useRouter();
   const carNumber = decodeURIComponent(params.carNumber as string);
 
   const { reviews } = useReviews(carNumber);
@@ -107,11 +113,21 @@ export default function CarReportPage() {
 
   return (
     <main className={pageClassName}>
+      <button
+        type="button"
+        onClick={() => router.push("/")}
+        className={homeButtonClassName}
+      >
+        ← 홈으로
+      </button>
+
       <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
 
       <p className="text-2xl text-gray-300 mb-10">
         차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
       </p>
+
+      <CarViewEventToast carNumber={carNumber} />
 
       <div className={panelClassName}>
         {!hasVehicleInfo ? (

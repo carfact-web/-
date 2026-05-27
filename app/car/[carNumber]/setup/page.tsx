@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { carData } from "@/data/carData";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -10,6 +10,10 @@ import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const homeButtonClassName = cn(
+  "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
+  "hover:opacity-75"
+);
 const formControlClassName = cn("w-full rounded-xl bg-zinc-800 p-3 text-white");
 const primaryButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
@@ -20,6 +24,7 @@ const fuelTypes = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "�
 
 export default function VehicleSetupPage() {
   const params = useParams();
+  const router = useRouter();
   const carNumber = decodeURIComponent(params.carNumber as string);
   const { vehicle, saveVehicle } = useVehicle(carNumber);
 
@@ -66,6 +71,14 @@ export default function VehicleSetupPage() {
 
   return (
     <main className={pageClassName}>
+      <button
+        type="button"
+        onClick={() => router.push("/")}
+        className={homeButtonClassName}
+      >
+        ← 홈으로
+      </button>
+
       <h1 className="text-5xl font-bold mb-6">차량 정보 등록</h1>
 
       <CarViewEventToast
