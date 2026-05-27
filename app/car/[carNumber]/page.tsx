@@ -125,6 +125,7 @@ export default function CarReportPage() {
     fuelType,
   });
   const timelineItems = getTimelineItems(reviews);
+  const visibleTimelineItems = timelineItems.slice(0, 3);
   const totalReviewPages = Math.max(1, Math.ceil(reviews.length / reviewsPerPage));
   const currentReviewPage = Math.min(reviewPage, totalReviewPages);
   const visibleReviews = reviews.slice(
@@ -203,7 +204,7 @@ export default function CarReportPage() {
                 </p>
               ) : (
                 <div className={timelineListClassName}>
-                  {timelineItems.map((item) => {
+                  {visibleTimelineItems.map((item) => {
                     const tags = item.review.tags ?? [];
 
                     return (
