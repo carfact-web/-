@@ -5,6 +5,7 @@ export interface Review {
   authorNickname?: string;
   content: string;
   tags?: string[];
+  helpfulCount?: number;
   createdAt: string;
   vehicleSnapshot?: Vehicle;
 }

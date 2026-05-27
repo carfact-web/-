@@ -257,7 +257,11 @@ export default function CarReportPage() {
             ) : (
               <div className="space-y-4 mb-8">
                 {visibleReviews.map((review) => (
-                  <ReviewCard key={review.id} review={review} />
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    reviewKey={`${carNumber}-${review.id}`}
+                  />
                 ))}
               </div>
             )}
