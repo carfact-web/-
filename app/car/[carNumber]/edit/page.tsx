@@ -6,6 +6,10 @@ import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { carData } from "@/data/carData";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import {
+  sanitizeMileage,
+  sanitizeVehiclePlateNumber,
+} from "@/utils/inputSanitizer";
 import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -25,7 +29,9 @@ const fuelTypes = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "�
 export default function VehicleEditPage() {
   const params = useParams();
   const router = useRouter();
-  const carNumber = decodeURIComponent(params.carNumber as string);
+  const carNumber = sanitizeVehiclePlateNumber(
+    decodeURIComponent(params.carNumber as string)
+  );
   const { vehicle, saveVehicle } = useVehicle(carNumber);
 
   const [brand, setBrand] = useState(vehicle?.brand ?? "");
@@ -61,7 +67,7 @@ export default function VehicleEditPage() {
       model,
       generation,
       year,
-      mileage,
+      mileage: sanitizeMileage(mileage),
       fuelType,
     };
 
@@ -168,8 +174,9 @@ export default function VehicleEditPage() {
 
           <input
             value={mileage}
-            onChange={(e) => setMileage(e.target.value)}
+            onChange={(e) => setMileage(sanitizeMileage(e.target.value))}
             placeholder="주행거리 입력 (예: 120000)"
+            inputMode="numeric"
             className={formControlClassName}
           />
         </div>

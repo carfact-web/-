@@ -10,6 +10,7 @@ import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { getAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
+import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 
@@ -108,7 +109,9 @@ export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
   const [reviewPage, setReviewPage] = useState(1);
-  const carNumber = decodeURIComponent(params.carNumber as string);
+  const carNumber = sanitizeVehiclePlateNumber(
+    decodeURIComponent(params.carNumber as string)
+  );
 
   const { reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);

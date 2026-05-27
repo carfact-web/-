@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { validateReviewContent } from "@/utils/reviewValidation";
 import type { Review } from "@/types/review";
 
@@ -29,7 +30,9 @@ const submitButtonClassName = cn(
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
-  const carNumber = decodeURIComponent(params.carNumber as string);
+  const carNumber = sanitizeVehiclePlateNumber(
+    decodeURIComponent(params.carNumber as string)
+  );
   const [review, setReview] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
   const { addReview } = useReviews(carNumber);
@@ -154,6 +157,7 @@ export default function ReviewPage() {
           className={textareaClassName}
           aria-invalid={Boolean(validationMessage)}
           aria-describedby={validationMessage ? "review-validation" : undefined}
+          maxLength={500}
         />
         {validationMessage && (
           <p

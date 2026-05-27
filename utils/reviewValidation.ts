@@ -1,4 +1,5 @@
 import { bannedReviewWords } from "@/data/bannedWords";
+import { sanitizeUserText } from "@/utils/inputSanitizer";
 import type { Review } from "@/types/review";
 
 export interface ReviewValidationResult {
@@ -8,8 +9,10 @@ export interface ReviewValidationResult {
 }
 
 const minimumReviewLength = 5;
+const maximumReviewLength = 500;
 const emptyReviewMessage = "후기 내용을 입력해주세요.";
 export const minimumReviewLengthMessage = "후기는 최소 5자 이상 작성해주세요.";
+export const maximumReviewLengthMessage = "후기는 500자 이하로 작성해주세요.";
 export const inappropriateReviewMessage =
   "부적절한 표현이 포함되어 있어요. 내용을 수정해주세요.";
 
@@ -19,7 +22,7 @@ const normalizeForFilter = (value: string) =>
 export const validateReviewContent = (
   content: string
 ): ReviewValidationResult => {
-  const trimmedContent = content.trim();
+  const trimmedContent = sanitizeUserText(content);
 
   if (!trimmedContent) {
     return {
@@ -46,6 +49,14 @@ export const validateReviewContent = (
     return {
       isValid: false,
       message: minimumReviewLengthMessage,
+      content: trimmedContent,
+    };
+  }
+
+  if (Array.from(trimmedContent).length > maximumReviewLength) {
+    return {
+      isValid: false,
+      message: maximumReviewLengthMessage,
       content: trimmedContent,
     };
   }

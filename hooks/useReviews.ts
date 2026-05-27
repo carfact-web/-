@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { mockReviews } from "@/data/mockReviews";
+import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
   filterValidReviews,
   validateReviewContent,
@@ -18,7 +19,7 @@ const fallbackReviewsJson = JSON.stringify(mockReviews);
 export const reviewsChangeEventName = "reviews-change";
 
 export const getReviewStorageKey = (carNumber: string) =>
-  `reviews-${carNumber}`;
+  "reviews-" + sanitizeVehiclePlateNumber(carNumber);
 
 const parseReviews = (reviewsJson: string): Review[] => {
   try {

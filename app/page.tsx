@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { filterValidReviews } from "@/utils/reviewValidation";
 import type { FormEvent } from "react";
 import type { Review } from "@/types/review";
@@ -135,7 +136,7 @@ export default function Home() {
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const value = carNumber.trim();
+    const value = sanitizeVehiclePlateNumber(carNumber);
 
     if (!value) {
       alert("차량번호를 입력해주세요.");
@@ -176,7 +177,9 @@ export default function Home() {
         <form className={panelClassName} onSubmit={goToReport}>
           <input
             value={carNumber}
-            onChange={(e) => setCarNumber(e.target.value)}
+            onChange={(e) =>
+              setCarNumber(sanitizeVehiclePlateNumber(e.target.value))
+            }
             type="text"
             placeholder="예) 123가4567"
             className={inputClassName}

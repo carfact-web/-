@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import {
+  sanitizeMileage,
+  sanitizeUserText,
+  sanitizeVehiclePlateNumber,
+} from "@/utils/inputSanitizer";
 import type { Vehicle } from "@/types/vehicle";
 
 interface UseVehicleResult {
@@ -13,7 +18,17 @@ interface UseVehicleResult {
 const vehiclesChangeEventName = "vehicles-change";
 
 export const getVehicleStorageKey = (plateNumber: string) =>
-  `vehicle-${plateNumber}`;
+  "vehicle-" + sanitizeVehiclePlateNumber(plateNumber);
+
+const sanitizeVehicle = (vehicle: Vehicle): Vehicle => ({
+  plateNumber: sanitizeVehiclePlateNumber(vehicle.plateNumber),
+  brand: sanitizeUserText(vehicle.brand),
+  model: sanitizeUserText(vehicle.model),
+  generation: sanitizeUserText(vehicle.generation),
+  year: sanitizeUserText(vehicle.year),
+  mileage: sanitizeMileage(vehicle.mileage),
+  fuelType: sanitizeUserText(vehicle.fuelType),
+});
 
 const parseVehicle = (vehicleJson: string | null): Vehicle | null => {
   if (!vehicleJson) {
@@ -21,7 +36,7 @@ const parseVehicle = (vehicleJson: string | null): Vehicle | null => {
   }
 
   try {
-    return JSON.parse(vehicleJson) as Vehicle;
+    return sanitizeVehicle(JSON.parse(vehicleJson) as Vehicle);
   } catch {
     return null;
   }
@@ -38,7 +53,8 @@ const subscribeToVehicles = (onStoreChange: () => void) => {
 };
 
 export function useVehicle(plateNumber: string): UseVehicleResult {
-  const vehicleStorageKey = getVehicleStorageKey(plateNumber);
+  const sanitizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+  const vehicleStorageKey = getVehicleStorageKey(sanitizedPlateNumber);
   const vehicleJson = useSyncExternalStore(
     subscribeToVehicles,
     () => localStorage.getItem(vehicleStorageKey),
@@ -48,7 +64,10 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
 
   const saveVehicle = useCallback(
     (nextVehicle: Vehicle) => {
-      localStorage.setItem(vehicleStorageKey, JSON.stringify(nextVehicle));
+      localStorage.setItem(
+        vehicleStorageKey,
+        JSON.stringify(sanitizeVehicle(nextVehicle))
+      );
       window.dispatchEvent(new Event(vehiclesChangeEventName));
     },
     [vehicleStorageKey]
