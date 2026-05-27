@@ -57,10 +57,10 @@ const reviewHeaderClassName = cn(
   "mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
 );
 const sortControlClassName = cn(
-  "inline-flex rounded-lg border border-zinc-700 bg-zinc-950 p-1"
+  "inline-flex w-full rounded-lg border border-zinc-700 bg-zinc-950 p-1 sm:w-auto"
 );
 const sortButtonClassName = cn(
-  "rounded-md px-3 py-2 text-sm font-semibold text-gray-400 transition",
+  "flex-1 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-gray-400 transition sm:flex-none",
   "hover:bg-zinc-800 hover:text-white active:scale-[0.98]"
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
@@ -78,7 +78,7 @@ interface TimelineItem {
 }
 
 const reviewsPerPage = 5;
-type ReviewSortOption = "latest" | "helpful";
+type ReviewSortOption = "latest" | "helpful" | "photo";
 
 const getParsedTime = (dateLabel: string, fallbackTime: number) => {
   const parsedTime = Date.parse(dateLabel);
@@ -174,6 +174,17 @@ export default function CarReportPage() {
             rightHelpfulCount - leftHelpfulCount ||
             rightCreatedTime - leftCreatedTime
           );
+        }
+
+        if (reviewSort === "photo") {
+          const leftHasImages = (left.images?.length ?? 0) > 0;
+          const rightHasImages = (right.images?.length ?? 0) > 0;
+
+          if (leftHasImages !== rightHasImages) {
+            return Number(rightHasImages) - Number(leftHasImages);
+          }
+
+          return rightCreatedTime - leftCreatedTime;
         }
 
         return rightCreatedTime - leftCreatedTime;
@@ -332,6 +343,17 @@ export default function CarReportPage() {
                   )}
                 >
                   도움순
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeReviewSort("photo")}
+                  aria-pressed={reviewSort === "photo"}
+                  className={cn(
+                    sortButtonClassName,
+                    reviewSort === "photo" && activeSortButtonClassName
+                  )}
+                >
+                  사진순
                 </button>
               </div>
             </div>

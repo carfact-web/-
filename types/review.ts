@@ -14,6 +14,7 @@ export interface Review {
   content: string;
   tags?: string[];
   helpfulCount?: number;
+  reportCount?: number;
   images?: ReviewImageAttachment[];
   hasImages?: boolean;
   createdAt: string;
