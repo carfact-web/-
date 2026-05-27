@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useSyncExternalStore } from "react";
 import type { Review } from "@/types/review";
 import { cn } from "@/utils/cn";
@@ -27,6 +28,10 @@ const tagClassName = cn(
   "ring-1 ring-red-500/25"
 );
 const contentClassName = cn("mb-4 whitespace-pre-wrap text-sm leading-6 text-gray-100");
+const imageGridClassName = cn("mb-4 grid grid-cols-3 gap-2 sm:max-w-sm");
+const imageThumbnailClassName = cn(
+  "relative aspect-square overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900"
+);
 const snapshotClassName = cn(
   "border-t border-zinc-700 pt-3 text-xs leading-5 text-gray-500"
 );
@@ -56,6 +61,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
     [helpfulSnapshotJson, initialHelpfulCount]
   );
   const vehicleSnapshot = review.vehicleSnapshot;
+  const reviewImages = review.images ?? [];
   const vehicleSnapshotText = vehicleSnapshot
     ? [
         vehicleSnapshot.brand,
@@ -93,6 +99,23 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
       </div>
 
       <p className={contentClassName}>{review.content}</p>
+
+      {reviewImages.length > 0 && (
+        <div className={imageGridClassName}>
+          {reviewImages.map((image) => (
+            <div key={image.id} className={imageThumbnailClassName}>
+              <Image
+                src={image.dataUrl}
+                alt={image.name}
+                fill
+                unoptimized
+                sizes="120px"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {vehicleSnapshotText && (
         <p className={snapshotClassName}>{vehicleSnapshotText}</p>
