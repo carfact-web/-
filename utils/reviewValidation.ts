@@ -1,0 +1,60 @@
+import { bannedReviewWords } from "@/data/bannedWords";
+import type { Review } from "@/types/review";
+
+export interface ReviewValidationResult {
+  isValid: boolean;
+  message?: string;
+  content: string;
+}
+
+const minimumReviewLength = 5;
+const emptyReviewMessage = "후기 내용을 입력해주세요.";
+export const minimumReviewLengthMessage = "후기는 최소 5자 이상 작성해주세요.";
+export const inappropriateReviewMessage =
+  "부적절한 표현이 포함되어 있어요. 내용을 수정해주세요.";
+
+const normalizeForFilter = (value: string) =>
+  value.toLowerCase().replace(/[^0-9a-zㄱ-ㅎ가-힣]+/g, "");
+
+export const validateReviewContent = (
+  content: string
+): ReviewValidationResult => {
+  const trimmedContent = content.trim();
+
+  if (!trimmedContent) {
+    return {
+      isValid: false,
+      message: emptyReviewMessage,
+      content: trimmedContent,
+    };
+  }
+
+  const normalizedContent = normalizeForFilter(trimmedContent);
+  const hasBannedWord = bannedReviewWords.some((word) =>
+    normalizedContent.includes(normalizeForFilter(word))
+  );
+
+  if (hasBannedWord) {
+    return {
+      isValid: false,
+      message: inappropriateReviewMessage,
+      content: trimmedContent,
+    };
+  }
+
+  if (Array.from(trimmedContent).length < minimumReviewLength) {
+    return {
+      isValid: false,
+      message: minimumReviewLengthMessage,
+      content: trimmedContent,
+    };
+  }
+
+  return {
+    isValid: true,
+    content: trimmedContent,
+  };
+};
+
+export const filterValidReviews = (reviews: Review[]) =>
+  reviews.filter((review) => validateReviewContent(review.content).isValid);

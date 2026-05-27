@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import { filterValidReviews } from "@/utils/reviewValidation";
 import type { FormEvent } from "react";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
@@ -100,7 +101,7 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
   return Object.entries(reviewsByCar)
     .flatMap(([storageKey, reviewsJson]) => {
       const carNumber = storageKey.slice(reviewStorageKeyPrefix.length);
-      const reviews = parseJson<Review[]>(reviewsJson) ?? [];
+      const reviews = filterValidReviews(parseJson<Review[]>(reviewsJson) ?? []);
       const savedVehicle = parseJson<Vehicle>(
         localStorage.getItem(getVehicleStorageKey(carNumber))
       );

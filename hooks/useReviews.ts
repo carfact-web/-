@@ -2,11 +2,16 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { mockReviews } from "@/data/mockReviews";
+import {
+  filterValidReviews,
+  validateReviewContent,
+  type ReviewValidationResult,
+} from "@/utils/reviewValidation";
 import type { Review } from "@/types/review";
 
 interface UseReviewsResult {
   reviews: Review[];
-  addReview: (review: Review) => void;
+  addReview: (review: Review) => ReviewValidationResult;
 }
 
 const fallbackReviewsJson = JSON.stringify(mockReviews);
@@ -17,9 +22,9 @@ export const getReviewStorageKey = (carNumber: string) =>
 
 const parseReviews = (reviewsJson: string): Review[] => {
   try {
-    return JSON.parse(reviewsJson) as Review[];
+    return filterValidReviews(JSON.parse(reviewsJson) as Review[]);
   } catch {
-    return mockReviews;
+    return filterValidReviews(mockReviews);
   }
 };
 
@@ -44,15 +49,27 @@ export function useReviews(carNumber: string): UseReviewsResult {
 
   const addReview = useCallback(
     (review: Review) => {
+      const validation = validateReviewContent(review.content);
+
+      if (!validation.isValid) {
+        return validation;
+      }
+
       const savedReviews = parseReviews(
         localStorage.getItem(reviewStorageKey) || fallbackReviewsJson
       );
+      const nextReview = {
+        ...review,
+        content: validation.content,
+      };
 
       localStorage.setItem(
         reviewStorageKey,
-        JSON.stringify([review, ...savedReviews])
+        JSON.stringify([nextReview, ...savedReviews])
       );
       window.dispatchEvent(new Event(reviewsChangeEventName));
+
+      return validation;
     },
     [reviewStorageKey]
   );

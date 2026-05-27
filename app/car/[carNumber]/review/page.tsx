@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
+import { validateReviewContent } from "@/utils/reviewValidation";
 import type { Review } from "@/types/review";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -17,6 +18,9 @@ const tagButtonClassName = cn("rounded-full px-4 py-2 text-sm transition");
 const textareaClassName = cn(
   "h-40 w-full rounded-xl bg-zinc-800 p-4 text-white"
 );
+const validationMessageClassName = cn(
+  "mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+);
 const submitButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
   "hover:bg-red-600"
@@ -27,6 +31,7 @@ export default function ReviewPage() {
   const router = useRouter();
   const carNumber = decodeURIComponent(params.carNumber as string);
   const [review, setReview] = useState("");
+  const [validationMessage, setValidationMessage] = useState("");
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -63,21 +68,30 @@ export default function ReviewPage() {
   };
 
   const saveReview = () => {
-    if (!review.trim()) {
-      alert("후기를 입력해주세요.");
+    const validation = validateReviewContent(review);
+
+    if (!validation.isValid) {
+      setValidationMessage(validation.message ?? "후기를 다시 확인해주세요.");
       return;
     }
+
+    setValidationMessage("");
 
     const newReview: Review = {
       id: Date.now(),
       authorNickname: "익명 사용자",
-      content: review,
+      content: validation.content,
       tags: selectedTags,
       createdAt: new Date().toLocaleString(),
       vehicleSnapshot: vehicle ?? undefined,
     };
 
-    addReview(newReview);
+    const saveResult = addReview(newReview);
+
+    if (!saveResult.isValid) {
+      setValidationMessage(saveResult.message ?? "후기를 다시 확인해주세요.");
+      return;
+    }
 
     alert("후기가 등록되었습니다.");
     window.location.href = `/car/${encodeURIComponent(carNumber)}`;
@@ -132,12 +146,30 @@ export default function ReviewPage() {
         </div>
         <textarea
           value={review}
-          onChange={(e) => setReview(e.target.value)}
+          onChange={(e) => {
+            setReview(e.target.value);
+            setValidationMessage("");
+          }}
           placeholder="예: 사진보다 외판 상태가 별로였고, 엔진 소음이 있었습니다."
           className={textareaClassName}
+          aria-invalid={Boolean(validationMessage)}
+          aria-describedby={validationMessage ? "review-validation" : undefined}
         />
+        {validationMessage && (
+          <p
+            id="review-validation"
+            className={validationMessageClassName}
+            aria-live="polite"
+          >
+            {validationMessage}
+          </p>
+        )}
 
-        <button onClick={saveReview} className={submitButtonClassName}>
+        <button
+          type="button"
+          onClick={saveReview}
+          className={submitButtonClassName}
+        >
           후기 등록하기
         </button>
       </div>
