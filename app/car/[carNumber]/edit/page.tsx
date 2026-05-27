@@ -23,6 +23,9 @@ const primaryButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
   "hover:bg-red-600"
 );
+const validationMessageClassName = cn(
+  "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+);
 
 const fuelTypes = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "수소"];
 
@@ -40,6 +43,7 @@ export default function VehicleEditPage() {
   const [year, setYear] = useState(vehicle?.year ?? "");
   const [mileage, setMileage] = useState(vehicle?.mileage ?? "");
   const [fuelType, setFuelType] = useState(vehicle?.fuelType ?? "");
+  const [validationMessage, setValidationMessage] = useState("");
 
   const brands = Object.keys(carData);
   const models = brand ? Object.keys(carData[brand]) : [];
@@ -57,10 +61,11 @@ export default function VehicleEditPage() {
 
   const saveAndGoToReport = () => {
     if (!brand || !model || !generation || !year) {
-      alert("제조사, 모델, 세대, 연식을 선택해주세요.");
+      setValidationMessage("제조사, 모델, 세대, 연식을 선택해주세요.");
       return;
     }
 
+    setValidationMessage("");
     const nextVehicle: Vehicle = {
       plateNumber: carNumber,
       brand,
@@ -102,6 +107,7 @@ export default function VehicleEditPage() {
               setModel("");
               setGeneration("");
               setYear("");
+              setValidationMessage("");
             }}
             className={formControlClassName}
           >
@@ -119,6 +125,7 @@ export default function VehicleEditPage() {
               setModel(e.target.value);
               setGeneration("");
               setYear("");
+              setValidationMessage("");
             }}
             className={formControlClassName}
           >
@@ -135,6 +142,7 @@ export default function VehicleEditPage() {
             onChange={(e) => {
               setGeneration(e.target.value);
               setYear("");
+              setValidationMessage("");
             }}
             className={formControlClassName}
           >
@@ -148,7 +156,10 @@ export default function VehicleEditPage() {
 
           <select
             value={year}
-            onChange={(e) => setYear(e.target.value)}
+            onChange={(e) => {
+              setYear(e.target.value);
+              setValidationMessage("");
+            }}
             className={formControlClassName}
           >
             <option value="">연식 선택</option>
@@ -180,6 +191,12 @@ export default function VehicleEditPage() {
             className={formControlClassName}
           />
         </div>
+
+        {validationMessage && (
+          <p className={validationMessageClassName} aria-live="polite">
+            {validationMessage}
+          </p>
+        )}
 
         <button
           type="button"

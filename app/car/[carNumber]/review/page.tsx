@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -41,9 +41,15 @@ const removeImageButtonClassName = cn(
 const validationMessageClassName = cn(
   "mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
 );
+const successToastClassName = cn(
+  "fixed left-1/2 top-4 z-[9999] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-xl border border-white/10",
+  "bg-zinc-900/90 px-4 py-3 text-sm text-zinc-200 shadow-lg shadow-black/25",
+  "backdrop-blur transition-all duration-500 ease-out sm:top-6 sm:inline-flex sm:w-auto sm:items-center"
+);
 const submitButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
-  "hover:bg-red-600"
+  "hover:bg-red-600 active:scale-[0.99]",
+  "disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:hover:bg-zinc-700 disabled:active:scale-100"
 );
 const maxReviewImages = 3;
 const maxImageSizeBytes = 3 * 1024 * 1024;
@@ -82,8 +88,11 @@ export default function ReviewPage() {
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
+  const reviewInputRef = useRef<HTMLTextAreaElement>(null);
   const [review, setReview] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [reviewImages, setReviewImages] = useState<ReviewImageAttachment[]>([]);
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
@@ -169,7 +178,12 @@ export default function ReviewPage() {
   };
 
   const saveReview = () => {
-    const validation = validateReviewContent(review);
+    if (isSubmitting) {
+      return;
+    }
+
+    const reviewContent = reviewInputRef.current?.value ?? review;
+    const validation = validateReviewContent(reviewContent);
 
     if (!validation.isValid) {
       setValidationMessage(validation.message ?? "후기를 다시 확인해주세요.");
@@ -177,6 +191,7 @@ export default function ReviewPage() {
     }
 
     setValidationMessage("");
+    setIsSubmitting(true);
 
     const newReview: Review = {
       id: Date.now(),
@@ -194,6 +209,7 @@ export default function ReviewPage() {
     try {
       saveResult = addReview(newReview);
     } catch {
+      setIsSubmitting(false);
       setValidationMessage(
         "이미지 저장 공간이 부족해요. 이미지를 줄인 뒤 다시 시도해주세요."
       );
@@ -201,12 +217,20 @@ export default function ReviewPage() {
     }
 
     if (!saveResult.isValid) {
+      setIsSubmitting(false);
       setValidationMessage(saveResult.message ?? "후기를 다시 확인해주세요.");
       return;
     }
 
-    alert("후기가 등록되었습니다.");
-    window.location.href = `/car/${encodeURIComponent(carNumber)}`;
+    setShowSuccessToast(true);
+
+    window.setTimeout(() => {
+      setShowSuccessToast(false);
+    }, 2000);
+
+    window.setTimeout(() => {
+      router.push("/car/" + encodeURIComponent(carNumber));
+    }, 850);
   };
 
   return (
@@ -224,6 +248,19 @@ export default function ReviewPage() {
       <p className="text-2xl text-gray-300 mb-10">
         차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
       </p>
+
+      <div
+        aria-live="polite"
+        className={cn(
+          successToastClassName,
+          showSuccessToast
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0"
+        )}
+      >
+        <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]" />
+        <span>차량 이야기가 등록되었어요.</span>
+      </div>
 
       <div className={panelClassName}>
         <div className="rounded-xl bg-zinc-800 p-4 mb-6">
@@ -257,6 +294,7 @@ export default function ReviewPage() {
           ))}
         </div>
         <textarea
+          ref={reviewInputRef}
           value={review}
           onChange={(e) => {
             setReview(e.target.value);
@@ -329,9 +367,10 @@ export default function ReviewPage() {
         <button
           type="button"
           onClick={saveReview}
+          disabled={isSubmitting}
           className={submitButtonClassName}
         >
-          후기 등록하기
+          {isSubmitting ? "등록 중..." : "후기 등록하기"}
         </button>
       </div>
     </main>

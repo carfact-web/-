@@ -30,6 +30,9 @@ const primaryButtonClassName = cn(
   "mt-3 w-full rounded-lg bg-red-600 px-4 py-4 text-base font-bold text-white transition",
   "hover:bg-red-500 active:scale-[0.99]"
 );
+const formMessageClassName = cn(
+  "mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+);
 const recentSectionClassName = cn("max-w-3xl");
 const recentListClassName = cn("space-y-3");
 const recentCardClassName = cn(
@@ -121,6 +124,7 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
 export default function Home() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
+  const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
@@ -139,11 +143,11 @@ export default function Home() {
     const value = sanitizeVehiclePlateNumber(carNumber);
 
     if (!value) {
-      alert("차량번호를 입력해주세요.");
+      setFormMessage("차량번호를 입력해주세요.");
       return;
     }
 
-    console.log("go", value);
+    setFormMessage("");
     router.push(`/car/${encodeURIComponent(value)}/setup`);
   };
 
@@ -177,13 +181,26 @@ export default function Home() {
         <form className={panelClassName} onSubmit={goToReport}>
           <input
             value={carNumber}
-            onChange={(e) =>
-              setCarNumber(sanitizeVehiclePlateNumber(e.target.value))
-            }
+            onChange={(e) => {
+              setCarNumber(sanitizeVehiclePlateNumber(e.target.value));
+              setFormMessage("");
+            }}
             type="text"
             placeholder="예) 123가4567"
             className={inputClassName}
+            aria-invalid={Boolean(formMessage)}
+            aria-describedby={formMessage ? "plate-validation" : undefined}
           />
+
+          {formMessage && (
+            <p
+              id="plate-validation"
+              className={formMessageClassName}
+              aria-live="polite"
+            >
+              {formMessage}
+            </p>
+          )}
 
           <button type="submit" className={primaryButtonClassName}>
             차량 이야기 보기
