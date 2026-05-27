@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
+import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { carData } from "@/data/carData";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import type { Vehicle } from "@/types/vehicle";
 
-const pageClassName = cn("min-h-screen bg-black p-10 text-white");
+const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
 const formControlClassName = cn("w-full rounded-xl bg-zinc-800 p-3 text-white");
 const primaryButtonClassName = cn(
@@ -66,6 +67,11 @@ export default function VehicleSetupPage() {
   return (
     <main className={pageClassName}>
       <h1 className="text-5xl font-bold mb-6">차량 정보 등록</h1>
+
+      <CarViewEventToast
+        carNumber={carNumber}
+        className="sticky top-4 z-[9999]"
+      />
 
       <p className="text-2xl text-gray-300 mb-10">
         차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
