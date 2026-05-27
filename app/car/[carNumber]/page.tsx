@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
@@ -34,6 +35,17 @@ const timelineCardClassName = cn("rounded-xl border border-zinc-800 bg-zinc-800/
 const timelineTagClassName = cn(
   "rounded-full bg-zinc-700 px-2.5 py-1 text-xs text-gray-300"
 );
+const reviewPaginationClassName = cn(
+  "mb-8 flex flex-wrap items-center justify-center gap-2"
+);
+const reviewPageButtonClassName = cn(
+  "rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-300 transition",
+  "hover:border-zinc-500 hover:bg-zinc-800 hover:text-white active:scale-[0.98]",
+  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700 disabled:hover:bg-transparent disabled:hover:text-gray-300"
+);
+const activeReviewPageButtonClassName = cn(
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500"
+);
 
 type VehicleSnapshotWithCreatedAt = Vehicle & {
   createdAt?: string;
@@ -46,6 +58,8 @@ interface TimelineItem {
   snapshotLabel: string;
   sortTime: number;
 }
+
+const reviewsPerPage = 5;
 
 const getParsedTime = (dateLabel: string, fallbackTime: number) => {
   const parsedTime = Date.parse(dateLabel);
@@ -93,6 +107,7 @@ const getTimelineItems = (reviews: Review[]): TimelineItem[] =>
 export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
+  const [reviewPage, setReviewPage] = useState(1);
   const carNumber = decodeURIComponent(params.carNumber as string);
 
   const { reviews } = useReviews(carNumber);
@@ -110,6 +125,12 @@ export default function CarReportPage() {
     fuelType,
   });
   const timelineItems = getTimelineItems(reviews);
+  const totalReviewPages = Math.max(1, Math.ceil(reviews.length / reviewsPerPage));
+  const currentReviewPage = Math.min(reviewPage, totalReviewPages);
+  const visibleReviews = reviews.slice(
+    (currentReviewPage - 1) * reviewsPerPage,
+    currentReviewPage * reviewsPerPage
+  );
 
   return (
     <main className={pageClassName}>
@@ -231,9 +252,59 @@ export default function CarReportPage() {
               <p className="text-gray-400 mb-8">아직 등록된 후기가 없습니다.</p>
             ) : (
               <div className="space-y-4 mb-8">
-                {reviews.map((review) => (
+                {visibleReviews.map((review) => (
                   <ReviewCard key={review.id} review={review} />
                 ))}
+              </div>
+            )}
+
+            {reviews.length > reviewsPerPage && (
+              <div className={reviewPaginationClassName} aria-label="후기 페이지">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setReviewPage(Math.max(1, currentReviewPage - 1))
+                  }
+                  disabled={currentReviewPage === 1}
+                  className={reviewPageButtonClassName}
+                >
+                  이전
+                </button>
+
+                {Array.from({ length: totalReviewPages }, (_, index) => {
+                  const page = index + 1;
+
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setReviewPage(page)}
+                      aria-current={
+                        currentReviewPage === page ? "page" : undefined
+                      }
+                      className={cn(
+                        reviewPageButtonClassName,
+                        currentReviewPage === page &&
+                          activeReviewPageButtonClassName
+                      )}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setReviewPage(
+                      Math.min(totalReviewPages, currentReviewPage + 1)
+                    )
+                  }
+                  disabled={currentReviewPage === totalReviewPages}
+                  className={reviewPageButtonClassName}
+                >
+                  다음
+                </button>
               </div>
             )}
 

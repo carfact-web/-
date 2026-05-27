@@ -37,6 +37,10 @@ const recentCardClassName = cn(
 const recentMetaClassName = cn(
   "mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500"
 );
+const recentToggleButtonClassName = cn(
+  "mt-4 inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-zinc-300 transition",
+  "hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
+);
 
 interface RecentFact {
   id: number;
@@ -48,6 +52,7 @@ interface RecentFact {
 
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
+const recentPreviewCount = 3;
 
 const parseJson = <T,>(json: string | null): T | null => {
   if (!json) {
@@ -108,19 +113,23 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
         createdAt: review.createdAt,
       }));
     })
-    .sort((left, right) => right.id - left.id)
-    .slice(0, 5);
+    .sort((left, right) => right.id - left.id);
 };
 
 export default function Home() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
+  const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
     getRecentReviewsSnapshot,
     getServerRecentReviewsSnapshot
   );
   const recentFacts = getRecentFacts(recentReviewsSnapshot);
+  const displayedRecentFacts = showAllRecentFacts
+    ? recentFacts
+    : recentFacts.slice(0, recentPreviewCount);
+  const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -193,7 +202,7 @@ export default function Home() {
             </div>
           ) : (
             <div className={recentListClassName}>
-              {recentFacts.map((fact) => {
+              {displayedRecentFacts.map((fact) => {
                 const vehicleTitle = fact.vehicle
                   ? [fact.vehicle.brand, fact.vehicle.model]
                       .filter(Boolean)
@@ -236,6 +245,15 @@ export default function Home() {
                   </Link>
                 );
               })}
+              {hasHiddenRecentFacts && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRecentFacts((value) => !value)}
+                  className={recentToggleButtonClassName}
+                >
+                  {showAllRecentFacts ? "최근 3개만 보기" : "전체 이야기 보기 →"}
+                </button>
+              )}
             </div>
           )}
         </section>
