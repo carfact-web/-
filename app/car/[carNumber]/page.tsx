@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
@@ -11,6 +11,12 @@ import { useVehicle } from "@/hooks/useVehicle";
 import { getAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import {
+  getHelpfulCountsSnapshot,
+  getServerHelpfulCountsSnapshot,
+  parseHelpfulJson,
+  subscribeToHelpfulChanges,
+} from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 
@@ -47,6 +53,17 @@ const reviewPageButtonClassName = cn(
 const activeReviewPageButtonClassName = cn(
   "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500"
 );
+const reviewHeaderClassName = cn(
+  "mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+);
+const sortControlClassName = cn(
+  "inline-flex rounded-lg border border-zinc-700 bg-zinc-950 p-1"
+);
+const sortButtonClassName = cn(
+  "rounded-md px-3 py-2 text-sm font-semibold text-gray-400 transition",
+  "hover:bg-zinc-800 hover:text-white active:scale-[0.98]"
+);
+const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 
 type VehicleSnapshotWithCreatedAt = Vehicle & {
   createdAt?: string;
@@ -61,6 +78,7 @@ interface TimelineItem {
 }
 
 const reviewsPerPage = 5;
+type ReviewSortOption = "latest" | "helpful";
 
 const getParsedTime = (dateLabel: string, fallbackTime: number) => {
   const parsedTime = Date.parse(dateLabel);
@@ -109,6 +127,7 @@ export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
   const [reviewPage, setReviewPage] = useState(1);
+  const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
@@ -129,12 +148,51 @@ export default function CarReportPage() {
   });
   const timelineItems = getTimelineItems(reviews);
   const visibleTimelineItems = timelineItems.slice(0, 3);
-  const totalReviewPages = Math.max(1, Math.ceil(reviews.length / reviewsPerPage));
+  const helpfulCountsSnapshot = useSyncExternalStore(
+    subscribeToHelpfulChanges,
+    getHelpfulCountsSnapshot,
+    getServerHelpfulCountsSnapshot
+  );
+  const helpfulCounts = useMemo(
+    () => parseHelpfulJson<Record<string, number>>(helpfulCountsSnapshot, {}),
+    [helpfulCountsSnapshot]
+  );
+  const sortedReviews = useMemo(
+    () =>
+      [...reviews].sort((left, right) => {
+        const leftHelpfulCount =
+          helpfulCounts[`${carNumber}-${left.id}`] ?? left.helpfulCount ?? 0;
+        const rightHelpfulCount =
+          helpfulCounts[`${carNumber}-${right.id}`] ??
+          right.helpfulCount ??
+          0;
+        const leftCreatedTime = getParsedTime(left.createdAt, left.id);
+        const rightCreatedTime = getParsedTime(right.createdAt, right.id);
+
+        if (reviewSort === "helpful") {
+          return (
+            rightHelpfulCount - leftHelpfulCount ||
+            rightCreatedTime - leftCreatedTime
+          );
+        }
+
+        return rightCreatedTime - leftCreatedTime;
+      }),
+    [carNumber, helpfulCounts, reviewSort, reviews]
+  );
+  const totalReviewPages = Math.max(
+    1,
+    Math.ceil(sortedReviews.length / reviewsPerPage)
+  );
   const currentReviewPage = Math.min(reviewPage, totalReviewPages);
-  const visibleReviews = reviews.slice(
+  const visibleReviews = sortedReviews.slice(
     (currentReviewPage - 1) * reviewsPerPage,
     currentReviewPage * reviewsPerPage
   );
+  const changeReviewSort = (nextSort: ReviewSortOption) => {
+    setReviewSort(nextSort);
+    setReviewPage(1);
+  };
 
   return (
     <main className={pageClassName}>
@@ -250,7 +308,33 @@ export default function CarReportPage() {
               )}
             </section>
 
-            <h2 className="text-3xl font-bold mb-6">등록된 팩트</h2>
+            <div className={reviewHeaderClassName}>
+              <h2 className="text-3xl font-bold">등록된 팩트</h2>
+              <div className={sortControlClassName} aria-label="후기 정렬">
+                <button
+                  type="button"
+                  onClick={() => changeReviewSort("latest")}
+                  aria-pressed={reviewSort === "latest"}
+                  className={cn(
+                    sortButtonClassName,
+                    reviewSort === "latest" && activeSortButtonClassName
+                  )}
+                >
+                  최신순
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeReviewSort("helpful")}
+                  aria-pressed={reviewSort === "helpful"}
+                  className={cn(
+                    sortButtonClassName,
+                    reviewSort === "helpful" && activeSortButtonClassName
+                  )}
+                >
+                  도움순
+                </button>
+              </div>
+            </div>
 
             {reviews.length === 0 ? (
               <p className="text-gray-400 mb-8">아직 등록된 후기가 없습니다.</p>

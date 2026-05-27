@@ -3,6 +3,14 @@
 import { useMemo, useSyncExternalStore } from "react";
 import type { Review } from "@/types/review";
 import { cn } from "@/utils/cn";
+import {
+  addHelpfulVote,
+  getHelpfulSnapshot,
+  getServerHelpfulSnapshot,
+  parseHelpfulJson,
+  subscribeToHelpfulChanges,
+  type HelpfulSnapshot,
+} from "@/utils/reviewHelpful";
 
 interface ReviewCardProps {
   review: Review;
@@ -31,61 +39,6 @@ const helpfulButtonClassName = cn(
   "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500"
 );
 
-const helpfulCountsStorageKey = "reviewHelpfulCounts";
-const helpfulVotesStorageKey = "reviewHelpfulVotes";
-const helpfulChangeEventName = "review-helpful-change";
-
-interface HelpfulSnapshot {
-  count: number;
-  isVoted: boolean;
-}
-
-const parseJson = <T,>(value: string | null, fallback: T): T => {
-  if (!value) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-};
-
-const getHelpfulSnapshot = (
-  storageKey: string,
-  initialCount: number
-): HelpfulSnapshot => {
-  const helpfulCounts = parseJson<Record<string, number>>(
-    localStorage.getItem(helpfulCountsStorageKey),
-    {}
-  );
-  const helpfulVotes = parseJson<Record<string, boolean>>(
-    localStorage.getItem(helpfulVotesStorageKey),
-    {}
-  );
-
-  return {
-    count: helpfulCounts[storageKey] ?? initialCount,
-    isVoted: Boolean(helpfulVotes[storageKey]),
-  };
-};
-
-const getServerHelpfulSnapshot = (initialCount: number): HelpfulSnapshot => ({
-  count: initialCount,
-  isVoted: false,
-});
-
-const subscribeToHelpfulChanges = (onStoreChange: () => void) => {
-  window.addEventListener("storage", onStoreChange);
-  window.addEventListener(helpfulChangeEventName, onStoreChange);
-
-  return () => {
-    window.removeEventListener("storage", onStoreChange);
-    window.removeEventListener(helpfulChangeEventName, onStoreChange);
-  };
-};
-
 export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
   const authorNickname = review.authorNickname || "익명 사용자";
   const storageKey = reviewKey ?? String(review.id);
@@ -96,7 +49,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
     () => JSON.stringify(getServerHelpfulSnapshot(initialHelpfulCount))
   );
   const helpfulSnapshot = useMemo(
-    () => parseJson<HelpfulSnapshot>(helpfulSnapshotJson, {
+    () => parseHelpfulJson<HelpfulSnapshot>(helpfulSnapshotJson, {
       count: initialHelpfulCount,
       isVoted: false,
     }),
@@ -121,30 +74,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
       return;
     }
 
-    const helpfulCounts = parseJson<Record<string, number>>(
-      localStorage.getItem(helpfulCountsStorageKey),
-      {}
-    );
-    const helpfulVotes = parseJson<Record<string, boolean>>(
-      localStorage.getItem(helpfulVotesStorageKey),
-      {}
-    );
-
-    localStorage.setItem(
-      helpfulCountsStorageKey,
-      JSON.stringify({
-        ...helpfulCounts,
-        [storageKey]: (helpfulCounts[storageKey] ?? initialHelpfulCount) + 1,
-      })
-    );
-    localStorage.setItem(
-      helpfulVotesStorageKey,
-      JSON.stringify({
-        ...helpfulVotes,
-        [storageKey]: true,
-      })
-    );
-    window.dispatchEvent(new Event(helpfulChangeEventName));
+    addHelpfulVote(storageKey, initialHelpfulCount);
   };
 
   return (
