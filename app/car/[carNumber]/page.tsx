@@ -121,7 +121,7 @@ export default function CarReportPage() {
         ← 홈으로
       </button>
 
-      <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
+      <h1 className="text-5xl font-bold mb-6">카플래닛 리포트</h1>
 
       <p className="text-2xl text-gray-300 mb-10">
         차량번호: <span className="text-red-400 font-bold">{carNumber}</span>

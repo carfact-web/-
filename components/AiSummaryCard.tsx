@@ -11,7 +11,7 @@ const titleClassName = cn("mb-4 text-2xl font-bold text-red-400");
 
 export function AiSummaryCard({
   summaries,
-  title = "카팩트 AI 분석",
+  title = "카플래닛 AI 분석",
   emptyMessage = "차량 정보를 입력하면 AI 분석이 표시됩니다.",
 }: AiSummaryCardProps) {
   return (

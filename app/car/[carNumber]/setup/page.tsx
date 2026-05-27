@@ -92,7 +92,7 @@ export default function VehicleSetupPage() {
 
       <div className={panelClassName}>
         <p className="text-gray-300 mb-6">
-          카팩트에 처음 등록되는 차량입니다. 차량 정보를 알려주세요!
+          카플래닛에 처음 등록되는 차량입니다. 차량 정보를 알려주세요!
         </p>
 
         <div className="space-y-3">
