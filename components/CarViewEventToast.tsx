@@ -83,6 +83,30 @@ const getStoredViewCount = (carNumber: string) => {
   return sevenDayViewCount;
 };
 
+const getToastMessage = (viewCount: number) => {
+  if (viewCount <= 5) {
+    return "최근 이 차량을 찾는 사람이 조금씩 늘고 있어요 👀";
+  }
+
+  if (viewCount <= 9) {
+    return (
+      <>
+        최근 7일간{" "}
+        <strong className="font-semibold text-white">{viewCount}명</strong>이 이
+        차량 후기를 확인했어요 👀
+      </>
+    );
+  }
+
+  return (
+    <>
+      최근 7일간{" "}
+      <strong className="font-semibold text-white">{viewCount}명</strong>이 이
+      차량 이야기를 확인하고 있어요 🔥
+    </>
+  );
+};
+
 export function CarViewEventToast({
   carNumber,
   className,
@@ -127,6 +151,8 @@ export function CarViewEventToast({
     return null;
   }
 
+  const toastMessage = getToastMessage(viewCount);
+
   return (
     <div
       aria-live="polite"
@@ -137,11 +163,7 @@ export function CarViewEventToast({
       )}
     >
       <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]" />
-      <span>
-        최근 7일간{" "}
-        <strong className="font-semibold text-white">{viewCount}명</strong>이 이
-        차량 이야기를 확인했어요.
-      </span>
+      <span>{toastMessage}</span>
     </div>
   );
 }
