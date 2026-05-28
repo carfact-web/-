@@ -9,6 +9,7 @@ import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { validateReviewContent } from "@/utils/reviewValidation";
+import { compressImage } from "@/utils/imageCompression";
 import type { Review } from "@/types/review";
 import type { ReviewImageAttachment } from "@/types/review";
 
@@ -30,31 +31,6 @@ const imagePickerButtonClassName = cn(
   "inline-flex cursor-pointer rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-200 transition",
   "hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.98]"
 );
-const imagePreviewGridClassName = cn(
-  "mt-3 grid grid-cols-3 gap-2 sm:max-w-sm"
-);
-const imagePreviewItemClassName = cn(
-  "relative aspect-square overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800"
-);
-const removeImageButtonClassName = cn(
-  "absolute right-1 top-1 rounded-md bg-black/70 px-2 py-1 text-xs font-bold text-white transition",
-  "hover:bg-red-500 active:scale-[0.96]"
-);
-const validationMessageClassName = cn(
-  "mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
-);
-const successToastClassName = cn(
-  "fixed left-1/2 top-4 z-[9999] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-xl border border-white/10",
-  "bg-zinc-900/90 px-4 py-3 text-sm text-zinc-200 shadow-lg shadow-black/25",
-  "backdrop-blur transition-all duration-500 ease-out sm:top-6 sm:inline-flex sm:w-auto sm:items-center"
-);
-const submitButtonClassName = cn(
-  "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
-  "hover:bg-red-600 active:scale-[0.99]",
-  "disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:hover:bg-zinc-700 disabled:active:scale-100"
-);
-const maxReviewImages = 3;
-const maxImageSizeBytes = 3 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 
 const isAllowedImageType = (
@@ -62,27 +38,53 @@ const isAllowedImageType = (
 ): type is ReviewImageAttachment["type"] =>
   allowedImageTypes.includes(type as ReviewImageAttachment["type"]);
 
-const readImageFile = (file: File): Promise<ReviewImageAttachment> =>
-  new Promise((resolve, reject) => {
+const readImageFile = async (
+  file: File
+): Promise<ReviewImageAttachment | null> => {
+  // 이미지 압축
+  const compressionResult = await compressImage(file);
+
+  // 실패 케이스 체크
+  if ("type" in compressionResult && compressionResult.type) {
+    throw new Error(compressionResult.message);
+  }
+
+  // 성공 케이스 확인
+  if (!("blob" in compressionResult)) {
+    throw new Error("이미지 압축에 실패했습니다");
+  }
+
+  const { blob } = compressionResult as {
+    success: true;
+    blob: Blob;
+    originalSize: number;
+    compressedSize: number;
+    compressionRatio: number;
+  };
+
+  // Blob → DataURL 변환
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = () => {
-      if (typeof reader.result !== "string" || !isAllowedImageType(file.type)) {
+      if (typeof reader.result !== "string") {
         reject(new Error("invalid-image"));
         return;
       }
 
       resolve({
-        id: [file.name, file.size, file.lastModified].join("-"),
+        id: [file.name, blob.size, Date.now()].join("-"),
         name: file.name,
-        type: file.type,
+        type: (blob.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/webp",
         dataUrl: reader.result,
-        size: file.size,
+        size: blob.size,
       });
     };
+
     reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+};
 
 export default function ReviewPage() {
   const params = useParams();
@@ -162,19 +164,27 @@ export default function ReviewPage() {
       return;
     }
 
-    if (nextFiles.some((file) => file.size > maxImageSizeBytes)) {
-      setValidationMessage("이미지는 1장당 3MB 이하만 첨부할 수 있어요.");
-      return;
-    }
-
     try {
-      const nextImages = await Promise.all(nextFiles.map(readImageFile));
-
-      setReviewImages((currentImages) =>
-        [...currentImages, ...nextImages].slice(0, maxReviewImages)
+      const nextImages = await Promise.all(
+        nextFiles.map(async (file) => {
+          try {
+            return await readImageFile(file);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "이미지 압축 실패";
+            throw new Error(message);
+          }
+        })
       );
-    } catch {
-      setValidationMessage("이미지를 불러오지 못했어요. 다시 선택해주세요.");
+
+      const successImages = nextImages.filter((img) => img !== null) as ReviewImageAttachment[];
+      setReviewImages((currentImages) =>
+        [...currentImages, ...successImages].slice(0, maxReviewImages)
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "이미지를 불러오지 못했어요.";
+      setValidationMessage(`이미지 처리 오류: ${message} 다시 선택해주세요.`);
     }
   };
 

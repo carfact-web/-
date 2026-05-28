@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Review } from "@/types/review";
 import { cn } from "@/utils/cn";
 import {
@@ -204,10 +204,11 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
       setIsReportToastMounted(false);
     }, 2500);
   };
-  const closeImageModal = () => {
+  const closeImageModal = useCallback(() => {
     setSelectedImageIndex(null);
-  };
-  const showPreviousImage = () => {
+  }, []);
+
+  const showPreviousImage = useCallback(() => {
     setSelectedImageIndex((currentIndex) => {
       if (currentIndex === null) {
         return currentIndex;
@@ -215,8 +216,9 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
 
       return currentIndex === 0 ? reviewImages.length - 1 : currentIndex - 1;
     });
-  };
-  const showNextImage = () => {
+  }, [reviewImages.length]);
+
+  const showNextImage = useCallback(() => {
     setSelectedImageIndex((currentIndex) => {
       if (currentIndex === null) {
         return currentIndex;
@@ -224,7 +226,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
 
       return currentIndex === reviewImages.length - 1 ? 0 : currentIndex + 1;
     });
-  };
+  }, [reviewImages.length]);
 
   useEffect(() => {
     if (selectedImageIndex === null) {
@@ -250,7 +252,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [hasMultipleImages, selectedImageIndex]);
+  }, [hasMultipleImages, selectedImageIndex, closeImageModal, showNextImage, showPreviousImage]);
 
   useEffect(() => {
     if (!isReportModalOpen) {

@@ -1,6 +1,6 @@
 import { cn } from "@/utils/cn";
 
-const pageClassName = cn("min-h-screen bg-black px-4 py-8 text-white sm:px-6");
+const pageClassName = cn("min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
 const panelClassName = cn(
   "rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-sm leading-6 text-zinc-400"
