@@ -186,7 +186,7 @@ export default function Home() {
           </p>
 
           <p className="mt-4 text-sm leading-6 text-zinc-400 sm:text-base">
-            차량번호로 실제 차주들의 이야기를 확인하세요.
+            차량번호로 실제 매물 후기와 이야기를 확인하세요.
           </p>
         </section>
 
