@@ -20,7 +20,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/lookup",
-    label: "차량조회",
+    label: "최근조회",
     icon: "search",
     isActive: (pathname) => pathname === "/lookup" || pathname.startsWith("/car"),
   },
