@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState, useSyncExternalStore } from "react";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
+import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { getAiSummary } from "@/utils/aiSummary";
@@ -141,6 +142,7 @@ export default function CarReportPage() {
 
   const { reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
+  const { saveRecentView } = useRecentViews();
   const brand = vehicle?.brand ?? "";
   const model = vehicle?.model ?? "";
   const generation = vehicle?.generation ?? "";
@@ -211,6 +213,11 @@ export default function CarReportPage() {
     setReviewSort(nextSort);
     setReviewPage(1);
   };
+  const recentTitle = [brand, model, generation].filter(Boolean).join(" ") || carNumber;
+
+  useEffect(() => {
+    saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
+  }, [carNumber, recentTitle, vehicle, saveRecentView]);
 
   return (
     <main className={pageClassName}>

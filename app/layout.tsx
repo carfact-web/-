@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { BottomTabNavigation } from "@/components/BottomTabNavigation";
+import { BottomTabNav } from "@/components/BottomTabNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,9 +29,9 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col pb-20 md:pb-0">
-        {children}
-        <BottomTabNavigation />
+      <body className="min-h-full flex flex-col">
+        <div className="flex-1 pb-24">{children}</div>
+        <BottomTabNav />
       </body>
     </html>
   );

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { carData } from "@/data/carData";
+import { useRecentViews } from "@/hooks/useRecentViews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import {
@@ -37,6 +38,7 @@ export default function VehicleSetupPage() {
     decodeURIComponent(params.carNumber as string)
   );
   const { vehicle, saveVehicle } = useVehicle(carNumber);
+  const { saveRecentView } = useRecentViews();
 
   const [brand, setBrand] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
@@ -67,6 +69,13 @@ export default function VehicleSetupPage() {
         (_, i) => String(selectedGeneration.endYear - i)
       )
     : [];
+
+  useEffect(() => {
+    const recentTitle = [brandValue, modelValue, generationValue]
+      .filter(Boolean)
+      .join(" ") || carNumber;
+    saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
+  }, [carNumber, brandValue, generationValue, modelValue, saveRecentView, vehicle]);
 
   const saveAndGoToReport = async () => {
     if (!brandValue || !modelValue || !generationValue || !yearValue) {

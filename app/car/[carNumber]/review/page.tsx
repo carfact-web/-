@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
@@ -97,6 +98,7 @@ export default function ReviewPage() {
   const [reviewImages, setReviewImages] = useState<ReviewImageAttachment[]>([]);
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
+  const { saveRecentView } = useRecentViews();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const vehicleTitle = vehicle
     ? [vehicle.brand, vehicle.model, vehicle.generation]
@@ -121,6 +123,11 @@ export default function ReviewPage() {
     "실매물 확인",
     "하체 부식",
   ];
+
+  useEffect(() => {
+    const recentTitle = vehicleTitle || carNumber;
+    saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
+  }, [carNumber, saveRecentView, vehicle, vehicleTitle]);
 
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
