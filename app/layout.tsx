@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "카플래닛",
-  description: "차주가 알려주지 않는 이야기",
+  title: "카팩트",
+  description: "카팩트 - 차주가 알려주지 않는 이야기",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

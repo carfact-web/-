@@ -48,7 +48,7 @@ const recentToggleButtonClassName = cn(
 );
 
 interface RecentFact {
-  id: number;
+  id: number | string;
   carNumber: string;
   vehicle: Vehicle | null;
   content: string;
@@ -118,7 +118,19 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
         createdAt: review.createdAt,
       }));
     })
-    .sort((left, right) => right.id - left.id);
+    .sort((left, right) => getRecentFactTime(right) - getRecentFactTime(left));
+};
+
+const getRecentFactTime = (fact: RecentFact) => {
+  const createdTime = Date.parse(fact.createdAt);
+
+  if (!Number.isNaN(createdTime)) {
+    return createdTime;
+  }
+
+  const idTime = Number(fact.id);
+
+  return Number.isNaN(idTime) ? 0 : idTime;
 };
 
 export default function Home() {
@@ -159,10 +171,10 @@ export default function Home() {
             <p className="text-xs font-semibold text-red-500">
               차주가 알려주지 않는 이야기
             </p>
-            <h1 className="mt-1 text-2xl font-black text-white">카플래닛</h1>
+            <h1 className="mt-1 text-2xl font-black text-white">카팩트</h1>
           </div>
           <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400">
-            CarPlanet
+            CarFact
           </span>
         </header>
 

@@ -13,7 +13,8 @@ import {
 import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
-const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const shellClassName = cn("mx-auto w-full max-w-3xl");
+const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
   "hover:opacity-75"
@@ -37,21 +38,29 @@ export default function VehicleSetupPage() {
   );
   const { vehicle, saveVehicle } = useVehicle(carNumber);
 
-  const [brand, setBrand] = useState(vehicle?.brand ?? "");
-  const [model, setModel] = useState(vehicle?.model ?? "");
-  const [generation, setGeneration] = useState(vehicle?.generation ?? "");
-  const [year, setYear] = useState(vehicle?.year ?? "");
-  const [mileage, setMileage] = useState(vehicle?.mileage ?? "");
-  const [fuelType, setFuelType] = useState(vehicle?.fuelType ?? "");
+  const [brand, setBrand] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
+  const [generation, setGeneration] = useState<string | null>(null);
+  const [year, setYear] = useState<string | null>(null);
+  const [mileage, setMileage] = useState<string | null>(null);
+  const [fuelType, setFuelType] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState("");
+  const brandValue = brand ?? vehicle?.brand ?? "";
+  const modelValue = model ?? vehicle?.model ?? "";
+  const generationValue = generation ?? vehicle?.generation ?? "";
+  const yearValue = year ?? vehicle?.year ?? "";
+  const mileageValue = mileage ?? vehicle?.mileage ?? "";
+  const fuelTypeValue = fuelType ?? vehicle?.fuelType ?? "";
 
   const brands = Object.keys(carData);
-  const models = brand ? Object.keys(carData[brand]) : [];
+  const models = brandValue ? Object.keys(carData[brandValue]) : [];
   const generations =
-    brand && model
-      ? carData[brand]?.[model] || []
+    brandValue && modelValue
+      ? carData[brandValue]?.[modelValue] || []
       : [];
-  const selectedGeneration = generations.find((item) => item.name === generation);
+  const selectedGeneration = generations.find(
+    (item) => item.name === generationValue
+  );
   const years = selectedGeneration
     ? Array.from(
         { length: selectedGeneration.endYear - selectedGeneration.startYear + 1 },
@@ -59,8 +68,8 @@ export default function VehicleSetupPage() {
       )
     : [];
 
-  const saveAndGoToReport = () => {
-    if (!brand || !model || !generation || !year) {
+  const saveAndGoToReport = async () => {
+    if (!brandValue || !modelValue || !generationValue || !yearValue) {
       setValidationMessage("제조사, 모델, 세대, 연식을 선택해주세요.");
       return;
     }
@@ -68,47 +77,48 @@ export default function VehicleSetupPage() {
     setValidationMessage("");
     const nextVehicle: Vehicle = {
       plateNumber: carNumber,
-      brand,
-      model,
-      generation,
-      year,
-      mileage: sanitizeMileage(mileage),
-      fuelType,
+      brand: brandValue,
+      model: modelValue,
+      generation: generationValue,
+      year: yearValue,
+      mileage: sanitizeMileage(mileageValue),
+      fuelType: fuelTypeValue,
     };
 
-    saveVehicle(nextVehicle);
+    await saveVehicle(nextVehicle);
     window.location.href = `/car/${encodeURIComponent(carNumber)}`;
   };
 
   return (
     <main className={pageClassName}>
-      <button
-        type="button"
-        onClick={() => router.push("/")}
-        className={homeButtonClassName}
-      >
-        ← 홈으로
-      </button>
+      <div className={shellClassName}>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className={homeButtonClassName}
+        >
+          ← 홈으로
+        </button>
 
-      <h1 className="text-5xl font-bold mb-6">차량 정보 등록</h1>
+        <h1 className="text-5xl font-bold mb-6">차량 정보 등록</h1>
 
-      <CarViewEventToast
-        carNumber={carNumber}
-        className="sticky top-4 z-[9999]"
-      />
+        <CarViewEventToast
+          carNumber={carNumber}
+          className="sticky top-4 z-[9999]"
+        />
 
-      <p className="text-2xl text-gray-300 mb-10">
-        차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
-      </p>
+        <p className="text-2xl text-gray-300 mb-10">
+          차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
+        </p>
 
-      <div className={panelClassName}>
+        <div className={panelClassName}>
         <p className="text-gray-300 mb-6">
-          카플래닛에 처음 등록되는 차량입니다. 차량 정보를 알려주세요!
+          카팩트에 처음 등록되는 차량입니다. 차량 정보를 알려주세요!
         </p>
 
         <div className="space-y-3">
           <select
-            value={brand}
+            value={brandValue}
             onChange={(e) => {
               setBrand(e.target.value);
               setModel("");
@@ -127,7 +137,7 @@ export default function VehicleSetupPage() {
           </select>
 
           <select
-            value={model}
+            value={modelValue}
             onChange={(e) => {
               setModel(e.target.value);
               setGeneration("");
@@ -145,7 +155,7 @@ export default function VehicleSetupPage() {
           </select>
 
           <select
-            value={generation}
+            value={generationValue}
             onChange={(e) => {
               setGeneration(e.target.value);
               setYear("");
@@ -162,7 +172,7 @@ export default function VehicleSetupPage() {
           </select>
 
           <select
-            value={year}
+            value={yearValue}
             onChange={(e) => {
               setYear(e.target.value);
               setValidationMessage("");
@@ -178,7 +188,7 @@ export default function VehicleSetupPage() {
           </select>
 
           <select
-            value={fuelType}
+            value={fuelTypeValue}
             onChange={(e) => setFuelType(e.target.value)}
             className={formControlClassName}
           >
@@ -191,7 +201,7 @@ export default function VehicleSetupPage() {
           </select>
 
           <input
-            value={mileage}
+            value={mileageValue}
             onChange={(e) => setMileage(sanitizeMileage(e.target.value))}
             placeholder="주행거리 입력 (예: 120000)"
             inputMode="numeric"
@@ -212,6 +222,7 @@ export default function VehicleSetupPage() {
         >
           차량 정보 저장 후 리포트 보기
         </button>
+        </div>
       </div>
     </main>
   );

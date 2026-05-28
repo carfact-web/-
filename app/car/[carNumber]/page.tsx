@@ -21,7 +21,8 @@ import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
-const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const shellClassName = cn("mx-auto w-full max-w-3xl");
+const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
   "hover:opacity-75"
@@ -80,10 +81,16 @@ interface TimelineItem {
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 
-const getParsedTime = (dateLabel: string, fallbackTime: number) => {
+const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   const parsedTime = Date.parse(dateLabel);
 
-  return Number.isNaN(parsedTime) ? fallbackTime : parsedTime;
+  if (!Number.isNaN(parsedTime)) {
+    return parsedTime;
+  }
+
+  const fallbackNumber = Number(fallbackTime);
+
+  return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
 };
 
 const getVehicleSnapshotLabel = (snapshot?: Vehicle) => {
@@ -207,27 +214,28 @@ export default function CarReportPage() {
 
   return (
     <main className={pageClassName}>
-      <button
-        type="button"
-        onClick={() => router.push("/")}
-        className={homeButtonClassName}
-      >
-        ← 홈으로
-      </button>
+      <div className={shellClassName}>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className={homeButtonClassName}
+        >
+          ← 홈으로
+        </button>
 
-      <h1 className="text-5xl font-bold mb-6">카플래닛 리포트</h1>
+        <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
 
-      <p className="text-2xl text-gray-300 mb-10">
-        차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
-      </p>
+        <p className="text-2xl text-gray-300 mb-10">
+          차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
+        </p>
 
-      <CarViewEventToast carNumber={carNumber} />
+        <CarViewEventToast carNumber={carNumber} />
 
-      <div className={panelClassName}>
+        <div className={panelClassName}>
         {!hasVehicleInfo ? (
           <>
             <p className="text-gray-300 mb-6">
-              등록된 차량 정보가 없습니다. 차량 정보를 먼저 입력해주세요.
+              차량 정보를 찾지 못했어요. 직접 차량 정보를 등록해주세요.
             </p>
 
             <Link
@@ -430,6 +438,7 @@ export default function CarReportPage() {
             </Link>
           </>
         )}
+        </div>
       </div>
     </main>
   );

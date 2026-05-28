@@ -12,7 +12,8 @@ import type { Review } from "@/types/review";
 import type { ReviewImageAttachment } from "@/types/review";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
-const panelClassName = cn("max-w-2xl rounded-2xl bg-zinc-900 p-6");
+const shellClassName = cn("mx-auto w-full max-w-3xl");
+const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
   "hover:opacity-75"
@@ -177,7 +178,7 @@ export default function ReviewPage() {
     setValidationMessage("");
   };
 
-  const saveReview = () => {
+  const saveReview = async () => {
     if (isSubmitting) {
       return;
     }
@@ -207,7 +208,7 @@ export default function ReviewPage() {
     let saveResult;
 
     try {
-      saveResult = addReview(newReview);
+      saveResult = await addReview(newReview);
     } catch {
       setIsSubmitting(false);
       setValidationMessage(
@@ -235,34 +236,35 @@ export default function ReviewPage() {
 
   return (
     <main className={pageClassName}>
-      <button
-        type="button"
-        onClick={() => router.push("/")}
-        className={homeButtonClassName}
-      >
-        ← 홈으로
-      </button>
+      <div className={shellClassName}>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className={homeButtonClassName}
+        >
+          ← 홈으로
+        </button>
 
-      <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
+        <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
 
-      <p className="text-2xl text-gray-300 mb-10">
-        차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
-      </p>
+        <p className="text-2xl text-gray-300 mb-10">
+          차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
+        </p>
 
-      <div
-        aria-live="polite"
-        className={cn(
-          successToastClassName,
-          showSuccessToast
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none -translate-y-2 opacity-0"
-        )}
-      >
-        <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]" />
-        <span>차량 이야기가 등록되었어요.</span>
-      </div>
+        <div
+          aria-live="polite"
+          className={cn(
+            successToastClassName,
+            showSuccessToast
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-2 opacity-0"
+          )}
+        >
+          <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]" />
+          <span>차량 이야기가 등록되었어요.</span>
+        </div>
 
-      <div className={panelClassName}>
+        <div className={panelClassName}>
         <div className="rounded-xl bg-zinc-800 p-4 mb-6">
           <p className="text-gray-300">
             차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
@@ -334,7 +336,7 @@ export default function ReviewPage() {
               {reviewImages.map((image) => (
                 <div key={image.id} className={imagePreviewItemClassName}>
                   <Image
-                    src={image.dataUrl}
+                    src={image.dataUrl ?? image.url ?? ""}
                     alt={image.name}
                     fill
                     unoptimized
@@ -372,6 +374,7 @@ export default function ReviewPage() {
         >
           {isSubmitting ? "등록 중..." : "후기 등록하기"}
         </button>
+        </div>
       </div>
     </main>
   );

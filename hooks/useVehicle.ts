@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  fetchSupabaseVehicle,
+  saveSupabaseVehicle,
+} from "@/lib/supabaseData";
 import {
   sanitizeMileage,
   sanitizeUserText,
@@ -11,7 +15,7 @@ import type { Vehicle } from "@/types/vehicle";
 interface UseVehicleResult {
   vehicle: Vehicle | null;
   isNewVehicle: boolean;
-  saveVehicle: (vehicle: Vehicle) => void;
+  saveVehicle: (vehicle: Vehicle) => Promise<void>;
   removeVehicle: () => void;
 }
 
@@ -21,6 +25,7 @@ export const getVehicleStorageKey = (plateNumber: string) =>
   "vehicle-" + sanitizeVehiclePlateNumber(plateNumber);
 
 const sanitizeVehicle = (vehicle: Vehicle): Vehicle => ({
+  id: vehicle.id,
   plateNumber: sanitizeVehiclePlateNumber(vehicle.plateNumber),
   brand: sanitizeUserText(vehicle.brand),
   model: sanitizeUserText(vehicle.model),
@@ -28,6 +33,8 @@ const sanitizeVehicle = (vehicle: Vehicle): Vehicle => ({
   year: sanitizeUserText(vehicle.year),
   mileage: sanitizeMileage(vehicle.mileage),
   fuelType: sanitizeUserText(vehicle.fuelType),
+  createdAt: vehicle.createdAt,
+  updatedAt: vehicle.updatedAt,
 });
 
 const parseVehicle = (vehicleJson: string | null): Vehicle | null => {
@@ -52,6 +59,11 @@ const subscribeToVehicles = (onStoreChange: () => void) => {
   };
 };
 
+const cacheVehicle = (storageKey: string, vehicle: Vehicle) => {
+  localStorage.setItem(storageKey, JSON.stringify(sanitizeVehicle(vehicle)));
+  window.dispatchEvent(new Event(vehiclesChangeEventName));
+};
+
 export function useVehicle(plateNumber: string): UseVehicleResult {
   const sanitizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
   const vehicleStorageKey = getVehicleStorageKey(sanitizedPlateNumber);
@@ -60,23 +72,91 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
     () => localStorage.getItem(vehicleStorageKey),
     () => null
   );
-  const vehicle = useMemo(() => parseVehicle(vehicleJson), [vehicleJson]);
+  const localVehicle = useMemo(() => parseVehicle(vehicleJson), [vehicleJson]);
+  const [remoteVehicleSnapshot, setRemoteVehicleSnapshot] = useState<{
+    plateNumber: string;
+    vehicle: Vehicle | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!sanitizedPlateNumber) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchSupabaseVehicle(sanitizedPlateNumber)
+      .then((vehicle) => {
+        if (!isActive || !vehicle) {
+          return;
+        }
+
+        setRemoteVehicleSnapshot({
+          plateNumber: sanitizedPlateNumber,
+          vehicle,
+        });
+        cacheVehicle(vehicleStorageKey, vehicle);
+      })
+      .catch(() => {
+        if (isActive) {
+          setRemoteVehicleSnapshot({
+            plateNumber: sanitizedPlateNumber,
+            vehicle: null,
+          });
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [sanitizedPlateNumber, vehicleStorageKey]);
 
   const saveVehicle = useCallback(
-    (nextVehicle: Vehicle) => {
-      localStorage.setItem(
-        vehicleStorageKey,
-        JSON.stringify(sanitizeVehicle(nextVehicle))
-      );
-      window.dispatchEvent(new Event(vehiclesChangeEventName));
+    async (nextVehicle: Vehicle) => {
+      const sanitizedVehicle = sanitizeVehicle(nextVehicle);
+
+      cacheVehicle(vehicleStorageKey, sanitizedVehicle);
+      setRemoteVehicleSnapshot({
+        plateNumber: sanitizedPlateNumber,
+        vehicle: sanitizedVehicle,
+      });
+
+      try {
+        const savedVehicle = await saveSupabaseVehicle(sanitizedVehicle);
+
+        if (savedVehicle) {
+          cacheVehicle(vehicleStorageKey, savedVehicle);
+          setRemoteVehicleSnapshot({
+            plateNumber: sanitizedPlateNumber,
+            vehicle: savedVehicle,
+          });
+        }
+      } catch {
+        setRemoteVehicleSnapshot({
+          plateNumber: sanitizedPlateNumber,
+          vehicle: sanitizedVehicle,
+        });
+      }
     },
-    [vehicleStorageKey]
+    [sanitizedPlateNumber, vehicleStorageKey]
   );
 
   const removeVehicle = useCallback(() => {
     localStorage.removeItem(vehicleStorageKey);
+    setRemoteVehicleSnapshot({
+      plateNumber: sanitizedPlateNumber,
+      vehicle: null,
+    });
     window.dispatchEvent(new Event(vehiclesChangeEventName));
-  }, [vehicleStorageKey]);
+  }, [sanitizedPlateNumber, vehicleStorageKey]);
+
+  const remoteVehicle =
+    remoteVehicleSnapshot?.plateNumber === sanitizedPlateNumber
+      ? remoteVehicleSnapshot.vehicle
+      : null;
+  const vehicle = remoteVehicle ?? localVehicle;
 
   return {
     vehicle,

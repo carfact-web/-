@@ -325,14 +325,16 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
               className={imageThumbnailClassName}
               aria-label={image.name + " 이미지 확대"}
             >
-              <Image
-                src={image.dataUrl}
-                alt={image.name}
-                fill
-                unoptimized
-                sizes="120px"
-                className="object-cover"
-              />
+              {(image.url || image.dataUrl) && (
+                <Image
+                  src={image.url ?? image.dataUrl ?? ""}
+                  alt={image.name}
+                  fill
+                  unoptimized
+                  sizes="120px"
+                  className="object-cover"
+                />
+              )}
             </button>
           ))}
         </div>
@@ -451,7 +453,7 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
 
             <div className={modalImageWrapClassName}>
               <Image
-                src={selectedImage.dataUrl}
+                src={selectedImage.url ?? selectedImage.dataUrl ?? ""}
                 alt={selectedImage.name}
                 fill
                 unoptimized
