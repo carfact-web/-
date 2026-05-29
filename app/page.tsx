@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
@@ -45,6 +46,10 @@ const recentMetaClassName = cn(
 const recentToggleButtonClassName = cn(
   "mt-4 inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-zinc-300 transition",
   "hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
+);
+const authButtonClassName = cn(
+  "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
+  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
 );
 
 interface RecentFact {
@@ -135,6 +140,7 @@ const getRecentFactTime = (fact: RecentFact) => {
 
 export default function Home() {
   const router = useRouter();
+  const { isAuthenticated, isAuthReady, signOut } = useAuth();
   const [carNumber, setCarNumber] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
@@ -169,13 +175,25 @@ export default function Home() {
         <header className={headerClassName}>
           <div>
             <p className="text-xs font-semibold text-red-500">
-              차주가 알려주지 않는 이야기
+              이 차량을 본 사람들이 남긴 이야기
             </p>
             <h1 className="mt-1 text-2xl font-black text-white">카팩트</h1>
           </div>
-          <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400">
-            CarFact
-          </span>
+          {isAuthReady && isAuthenticated ? (
+            <button
+              type="button"
+              className={authButtonClassName}
+              onClick={() => {
+                void signOut();
+              }}
+            >
+              로그아웃
+            </button>
+          ) : (
+            <Link href="/login" className={authButtonClassName}>
+              로그인
+            </Link>
+          )}
         </header>
 
         <section className="pt-3">

@@ -15,8 +15,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "카팩트",
-  description: "카팩트 - 차주가 알려주지 않는 이야기",
+  description: "카팩트 - 이 차량을 본 사람들이 남긴 이야기",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "카팩트",
+    description: "이 차량을 본 사람들이 남긴 이야기",
+    siteName: "카팩트",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "카팩트",
+    description: "이 차량을 본 사람들이 남긴 이야기",
+  },
 };
 
 export default function RootLayout({

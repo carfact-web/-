@@ -42,7 +42,7 @@ export default function MyPage() {
       <div className={shellClassName}>
         <h1 className="text-3xl font-black text-white">마이</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Google 계정으로 로그인하고 후기 작성 권한을 유지합니다.
+          Google 계정으로 로그인 상태를 확인합니다.
         </p>
 
         <section className={cn(panelClassName, "mt-6 space-y-4")}>
@@ -74,8 +74,8 @@ export default function MyPage() {
             ) : (
               <>
                 <p className={statusClassName}>
-                  조회 기능은 로그인 없이 사용할 수 있습니다. 후기를 작성하려면
-                  Google 로그인이 필요합니다.
+                  조회와 후기 작성은 현재 로그인 없이 사용할 수 있습니다. 도움돼요와
+                  신고 제한은 다음 단계에서 연결할 수 있게 준비합니다.
                 </p>
 
                 <button

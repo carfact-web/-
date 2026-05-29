@@ -10,7 +10,7 @@ interface UseAuthResult {
   isAuthReady: boolean;
   isSupabaseConfigured: boolean;
   session: Session | null;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
   user: User | null;
   userLabel: string;
@@ -86,7 +86,7 @@ export function useAuth(): UseAuthResult {
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     if (!supabase) {
       setAuthError("Supabase Auth 설정이 필요합니다.");
       return;
@@ -97,7 +97,7 @@ export function useAuth(): UseAuthResult {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.href,
+        redirectTo: redirectTo ?? window.location.href,
         queryParams: {
           prompt: "select_account",
         },
