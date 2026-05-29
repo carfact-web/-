@@ -1,8 +1,9 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
@@ -51,6 +52,9 @@ const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
   "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
 );
+const rotatingCopyClassName = cn(
+  "mt-4 flex h-16 items-start overflow-hidden text-sm leading-6 text-zinc-400 sm:h-16 sm:text-base"
+);
 
 interface RecentFact {
   id: number | string;
@@ -63,6 +67,12 @@ interface RecentFact {
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentPreviewCount = 3;
+const rotatingCopyIntervalMs = 4000;
+const rotatingCopyLines = [
+  ["광고에는 없는 이야기,", "차량번호에는 남아 있습니다."],
+  ["판매글에서는 보이지 않는 이야기,", "카팩트에서 확인하세요."],
+  ["이 차량을 본 사람들이 남긴 이야기,", "카팩트에서 확인하세요."],
+];
 
 const parseJson = <T,>(json: string | null): T | null => {
   if (!json) {
@@ -144,6 +154,7 @@ export default function Home() {
   const [carNumber, setCarNumber] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
+  const [rotatingCopyIndex, setRotatingCopyIndex] = useState(0);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
     getRecentReviewsSnapshot,
@@ -154,6 +165,17 @@ export default function Home() {
     ? recentFacts
     : recentFacts.slice(0, recentPreviewCount);
   const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
+  const rotatingCopy = rotatingCopyLines[rotatingCopyIndex];
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRotatingCopyIndex((currentIndex) => {
+        return (currentIndex + 1) % rotatingCopyLines.length;
+      });
+    }, rotatingCopyIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -203,9 +225,23 @@ export default function Home() {
             안 좋은 차도 이유가 있습니다.
           </p>
 
-          <p className="mt-4 text-sm leading-6 text-zinc-400 sm:text-base">
-            차량번호로 실제 매물 후기와 이야기를 확인하세요.
-          </p>
+          <div className={rotatingCopyClassName} aria-live="polite">
+            <AnimatePresence mode="wait" initial>
+              <motion.p
+                key={rotatingCopyIndex}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+              >
+                {rotatingCopy.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
+              </motion.p>
+            </AnimatePresence>
+          </div>
         </section>
 
         <form className={panelClassName} onSubmit={goToReport}>
