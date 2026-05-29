@@ -1,4 +1,5 @@
 create extension if not exists "pgcrypto";
+create extension if not exists "pg_trgm";
 
 create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
@@ -32,6 +33,33 @@ create table if not exists public.review_reports (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.vehicle_master (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'carmanager',
+  source_maker_no integer,
+  source_model_no integer,
+  source_model_detail_no integer,
+  manufacturer text not null,
+  model text not null,
+  model_detail text not null,
+  aliases text[] not null default '{}'::text[],
+  search_text text not null,
+  search_text_normalized text not null,
+  country text,
+  maker_code text,
+  model_code text,
+  model_detail_code text,
+  kind_code text,
+  kind_sub_code text,
+  sort_order integer,
+  active_car_count integer,
+  source_created_at_text text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint vehicle_master_source_detail_unique unique (source, source_model_detail_no),
+  constraint vehicle_master_name_unique unique (manufacturer, model, model_detail)
+);
+
 create index if not exists vehicles_car_number_idx
   on public.vehicles (car_number);
 
@@ -41,9 +69,28 @@ create index if not exists reviews_vehicle_id_created_at_idx
 create index if not exists review_reports_review_id_idx
   on public.review_reports (review_id);
 
+create index if not exists vehicle_master_manufacturer_idx
+  on public.vehicle_master (manufacturer);
+
+create index if not exists vehicle_master_model_idx
+  on public.vehicle_master (model);
+
+create index if not exists vehicle_master_model_detail_idx
+  on public.vehicle_master (model_detail);
+
+create index if not exists vehicle_master_aliases_gin_idx
+  on public.vehicle_master using gin (aliases);
+
+create index if not exists vehicle_master_search_text_trgm_idx
+  on public.vehicle_master using gin (search_text gin_trgm_ops);
+
+create index if not exists vehicle_master_search_text_normalized_trgm_idx
+  on public.vehicle_master using gin (search_text_normalized gin_trgm_ops);
+
 alter table public.vehicles enable row level security;
 alter table public.reviews enable row level security;
 alter table public.review_reports enable row level security;
+alter table public.vehicle_master enable row level security;
 
 drop policy if exists "Public read vehicles" on public.vehicles;
 create policy "Public read vehicles"
@@ -75,6 +122,11 @@ drop policy if exists "Public insert review reports" on public.review_reports;
 create policy "Public insert review reports"
   on public.review_reports for insert
   with check (true);
+
+drop policy if exists "Public read vehicle master" on public.vehicle_master;
+create policy "Public read vehicle master"
+  on public.vehicle_master for select
+  using (true);
 
 insert into storage.buckets (id, name, public)
 values ('review-images', 'review-images', true)
