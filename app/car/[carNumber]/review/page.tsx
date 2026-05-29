@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -16,6 +17,9 @@ import type { ReviewImageAttachment } from "@/types/review";
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
 const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
+const authPanelClassName = cn(
+  "w-full rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl shadow-black/20"
+);
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
   "hover:opacity-75"
@@ -48,6 +52,10 @@ const validationMessageClassName = cn(
 const submitButtonClassName = cn(
   "mt-6 w-full rounded-xl bg-red-600 px-4 py-4 text-base font-bold text-white transition",
   "hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-zinc-700"
+);
+const loginButtonClassName = cn(
+  "mt-5 inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-4 text-base font-bold text-white transition",
+  "hover:bg-red-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 sm:w-auto"
 );
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 const maxReviewImages = 3;
@@ -117,6 +125,14 @@ export default function ReviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [reviewImages, setReviewImages] = useState<ReviewImageAttachment[]>([]);
+  const {
+    authError,
+    isAuthenticated,
+    isAuthReady,
+    isSupabaseConfigured,
+    signInWithGoogle,
+    userLabel,
+  } = useAuth();
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -219,6 +235,11 @@ export default function ReviewPage() {
       return;
     }
 
+    if (!isAuthenticated) {
+      setValidationMessage("후기를 작성하려면 Google 로그인이 필요합니다.");
+      return;
+    }
+
     const reviewContent = reviewInputRef.current?.value ?? review;
     const validation = validateReviewContent(reviewContent);
 
@@ -232,7 +253,7 @@ export default function ReviewPage() {
 
     const newReview: Review = {
       id: Date.now(),
-      authorNickname: "익명 사용자",
+      authorNickname: userLabel || "Google 사용자",
       content: validation.content,
       tags: selectedTags,
       images: reviewImages,
@@ -300,7 +321,47 @@ export default function ReviewPage() {
           <span>차량 이야기가 등록되었어요.</span>
         </div>
 
-        <div className={panelClassName}>
+        {!isAuthReady ? (
+          <section className={authPanelClassName}>
+            <p className="text-sm font-semibold text-zinc-200">
+              로그인 상태 확인 중...
+            </p>
+          </section>
+        ) : !isAuthenticated ? (
+          <section className={authPanelClassName}>
+            <p className="text-xs font-semibold text-red-500">로그인 필요</p>
+            <h2 className="mt-2 text-2xl font-black text-white">
+              후기는 Google 로그인 후 작성할 수 있습니다.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-zinc-400">
+              차량 조회는 로그인 없이 계속 사용할 수 있습니다.
+            </p>
+
+            <button
+              type="button"
+              className={loginButtonClassName}
+              onClick={() => {
+                void signInWithGoogle();
+              }}
+              disabled={!isSupabaseConfigured}
+            >
+              Google로 로그인
+            </button>
+
+            {!isSupabaseConfigured ? (
+              <p className={cn(validationMessageClassName, "mt-4")}>
+                Supabase Auth 설정이 필요합니다.
+              </p>
+            ) : null}
+
+            {authError ? (
+              <p className={cn(validationMessageClassName, "mt-4")}>
+                {authError}
+              </p>
+            ) : null}
+          </section>
+        ) : (
+          <div className={panelClassName}>
         <div className="rounded-xl bg-zinc-800 p-4 mb-6">
           <p className="text-gray-300">
             차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
@@ -411,6 +472,7 @@ export default function ReviewPage() {
           {isSubmitting ? "등록 중..." : "후기 등록하기"}
         </button>
         </div>
+        )}
       </div>
     </main>
   );
