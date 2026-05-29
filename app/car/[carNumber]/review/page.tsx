@@ -31,7 +31,26 @@ const imagePickerButtonClassName = cn(
   "inline-flex cursor-pointer rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-200 transition",
   "hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.98]"
 );
+const successToastClassName = cn(
+  "mb-6 inline-flex items-center rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-100 transition"
+);
+const imagePreviewGridClassName = cn("mt-4 grid grid-cols-3 gap-3");
+const imagePreviewItemClassName = cn(
+  "relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+);
+const removeImageButtonClassName = cn(
+  "absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-semibold text-white transition",
+  "hover:bg-black"
+);
+const validationMessageClassName = cn(
+  "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+);
+const submitButtonClassName = cn(
+  "mt-6 w-full rounded-xl bg-red-600 px-4 py-4 text-base font-bold text-white transition",
+  "hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-zinc-700"
+);
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+const maxReviewImages = 3;
 
 const isAllowedImageType = (
   type: string

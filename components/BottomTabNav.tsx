@@ -8,10 +8,10 @@ const navClassName = cn(
   "fixed inset-x-0 bottom-0 z-50 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
 );
 const navInnerClassName = cn(
-  "mx-auto flex max-w-3xl items-center justify-around px-2 py-2"
+  "mx-auto grid max-w-3xl grid-cols-4 gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
 );
 const tabButtonClassName = cn(
-  "inline-flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs font-semibold transition",
+  "inline-flex w-full flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold transition",
   "text-zinc-400 hover:text-white"
 );
 const activeTabButtonClassName = cn(
