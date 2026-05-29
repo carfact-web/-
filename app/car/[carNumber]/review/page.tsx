@@ -349,7 +349,7 @@ export default function ReviewPage() {
             <div>
               <p className="text-sm font-semibold text-gray-200">사진 첨부</p>
               <p className="mt-1 text-xs text-gray-500">
-                jpg, png, webp / 최대 3장 / 1장당 3MB 이하
+                jpg, png, webp / 최대 3장 / 자동 압축
               </p>
             </div>
             <label className={imagePickerButtonClassName}>
