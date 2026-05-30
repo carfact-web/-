@@ -15,6 +15,7 @@ import type { Vehicle } from "@/types/vehicle";
 interface UseVehicleResult {
   vehicle: Vehicle | null;
   isNewVehicle: boolean;
+  isLoadedFromExistingRegistration: boolean;
   saveVehicle: (vehicle: Vehicle) => Promise<void>;
   removeVehicle: () => void;
 }
@@ -76,6 +77,7 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
   const [remoteVehicleSnapshot, setRemoteVehicleSnapshot] = useState<{
     plateNumber: string;
     vehicle: Vehicle | null;
+    source: "existing-registration" | "save" | "not-found";
   } | null>(null);
 
   useEffect(() => {
@@ -96,6 +98,7 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
         setRemoteVehicleSnapshot({
           plateNumber: sanitizedPlateNumber,
           vehicle,
+          source: "existing-registration",
         });
         cacheVehicle(vehicleStorageKey, vehicle);
       })
@@ -104,6 +107,7 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
           setRemoteVehicleSnapshot({
             plateNumber: sanitizedPlateNumber,
             vehicle: null,
+            source: "not-found",
           });
         }
       });
@@ -121,6 +125,7 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
       setRemoteVehicleSnapshot({
         plateNumber: sanitizedPlateNumber,
         vehicle: sanitizedVehicle,
+        source: "save",
       });
 
       try {
@@ -131,12 +136,14 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
           setRemoteVehicleSnapshot({
             plateNumber: sanitizedPlateNumber,
             vehicle: savedVehicle,
+            source: "save",
           });
         }
       } catch {
         setRemoteVehicleSnapshot({
           plateNumber: sanitizedPlateNumber,
           vehicle: sanitizedVehicle,
+          source: "save",
         });
       }
     },
@@ -148,6 +155,7 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
     setRemoteVehicleSnapshot({
       plateNumber: sanitizedPlateNumber,
       vehicle: null,
+      source: "not-found",
     });
     window.dispatchEvent(new Event(vehiclesChangeEventName));
   }, [sanitizedPlateNumber, vehicleStorageKey]);
@@ -157,10 +165,15 @@ export function useVehicle(plateNumber: string): UseVehicleResult {
       ? remoteVehicleSnapshot.vehicle
       : null;
   const vehicle = remoteVehicle ?? localVehicle;
+  const isLoadedFromExistingRegistration =
+    remoteVehicleSnapshot?.plateNumber === sanitizedPlateNumber &&
+    remoteVehicleSnapshot.source === "existing-registration" &&
+    Boolean(remoteVehicleSnapshot.vehicle);
 
   return {
     vehicle,
     isNewVehicle: vehicle === null,
+    isLoadedFromExistingRegistration,
     saveVehicle,
     removeVehicle,
   };

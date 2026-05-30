@@ -27,6 +27,9 @@ const primaryButtonClassName = cn(
 const validationMessageClassName = cn(
   "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
 );
+const historyToastClassName = cn(
+  "mb-4 rounded-xl border border-zinc-700 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-100 shadow-lg shadow-black/25"
+);
 
 const fuelTypes = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "수소"];
 
@@ -36,7 +39,11 @@ export default function VehicleSetupPage() {
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
-  const { vehicle, saveVehicle } = useVehicle(carNumber);
+  const {
+    vehicle,
+    saveVehicle,
+    isLoadedFromExistingRegistration,
+  } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
 
   const [brand, setBrand] = useState<string | null>(null);
@@ -98,6 +105,12 @@ export default function VehicleSetupPage() {
           carNumber={carNumber}
           className="sticky top-4 z-[9999]"
         />
+
+        {isLoadedFromExistingRegistration && (
+          <p className={historyToastClassName} aria-live="polite">
+            기존 등록 이력을 바탕으로 차량 정보를 불러왔습니다.
+          </p>
+        )}
 
         <p className="text-2xl text-gray-300 mb-10">
           차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
