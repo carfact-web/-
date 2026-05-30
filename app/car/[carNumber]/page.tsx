@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
+import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { ReviewCard } from "@/components/ReviewCard";
+import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -139,6 +141,12 @@ export default function CarReportPage() {
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
+  const {
+    isAllowed: isGuestReportAllowed,
+    isBlocked: isGuestReportBlocked,
+    isChecking: isGuestReportChecking,
+    signInWithGoogle,
+  } = useGuestReportAccess(carNumber);
 
   const { reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
@@ -216,8 +224,61 @@ export default function CarReportPage() {
   const recentTitle = [brand, model, generation].filter(Boolean).join(" ") || carNumber;
 
   useEffect(() => {
+    if (!isGuestReportAllowed) {
+      return;
+    }
+
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
-  }, [carNumber, recentTitle, vehicle, saveRecentView]);
+  }, [carNumber, isGuestReportAllowed, recentTitle, vehicle, saveRecentView]);
+
+  const loginFromCurrentPage = () => {
+    void signInWithGoogle(window.location.href);
+  };
+
+  if (isGuestReportChecking) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+
+          <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
+
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400">로그인 상태를 확인하고 있습니다.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (isGuestReportBlocked) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+
+          <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
+
+          <LoginRequiredPanel
+            onHome={() => router.push("/")}
+            onLogin={loginFromCurrentPage}
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={pageClassName}>

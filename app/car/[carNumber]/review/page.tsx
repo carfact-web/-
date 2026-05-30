@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
+import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -117,6 +119,11 @@ export default function ReviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [reviewImages, setReviewImages] = useState<ReviewImageAttachment[]>([]);
+  const {
+    isAuthenticated,
+    isAuthReady,
+    signInWithGoogle,
+  } = useAuth();
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -146,9 +153,13 @@ export default function ReviewPage() {
   ];
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     const recentTitle = vehicleTitle || carNumber;
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
-  }, [carNumber, saveRecentView, vehicle, vehicleTitle]);
+  }, [carNumber, isAuthenticated, saveRecentView, vehicle, vehicleTitle]);
 
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -215,6 +226,10 @@ export default function ReviewPage() {
   };
 
   const saveReview = async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     if (isSubmitting) {
       return;
     }
@@ -269,6 +284,55 @@ export default function ReviewPage() {
       router.push("/car/" + encodeURIComponent(carNumber));
     }, 850);
   };
+
+  const loginFromCurrentPage = () => {
+    void signInWithGoogle(window.location.href);
+  };
+
+  if (!isAuthReady) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+
+          <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
+
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400">로그인 상태를 확인하고 있습니다.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+
+          <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
+
+          <LoginRequiredPanel
+            onHome={() => router.push("/")}
+            onLogin={loginFromCurrentPage}
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={pageClassName}>
