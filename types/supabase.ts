@@ -121,6 +121,50 @@ export interface Database {
           }
         ];
       };
+      user_profiles: {
+        Row: {
+          user_id: string;
+          email: string | null;
+          display_name: string | null;
+          auth_provider: string | null;
+          provider_user_id: string | null;
+          kakao_provider_id: string | null;
+          google_provider_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          email?: string | null;
+          display_name?: string | null;
+          auth_provider?: string | null;
+          provider_user_id?: string | null;
+          kakao_provider_id?: string | null;
+          google_provider_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          email?: string | null;
+          display_name?: string | null;
+          auth_provider?: string | null;
+          provider_user_id?: string | null;
+          kakao_provider_id?: string | null;
+          google_provider_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       vehicle_master: {
         Row: {
           id: string;

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 
+type OAuthProvider = "google" | "kakao";
+
 interface UseAuthResult {
   authError: string;
   isAuthenticated: boolean;
@@ -11,6 +13,7 @@ interface UseAuthResult {
   isSupabaseConfigured: boolean;
   session: Session | null;
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
+  signInWithKakao: (redirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
   user: User | null;
   userLabel: string;
@@ -35,10 +38,62 @@ const getUserLabel = (user: User | null) => {
   return user.email ?? "로그인 사용자";
 };
 
+const getProviderUserId = (user: User | null, provider: OAuthProvider) => {
+  const identity = user?.identities?.find((item) => item.provider === provider);
+  const identityData = identity?.identity_data;
+  const providerId = identityData?.provider_id;
+  const sub = identityData?.sub;
+
+  if (typeof providerId === "string" && providerId.trim()) {
+    return providerId;
+  }
+
+  if (typeof sub === "string" && sub.trim()) {
+    return sub;
+  }
+
+  return identity?.id ?? null;
+};
+
+const syncUserProfile = async (user: User | null) => {
+  if (!supabase || !user) {
+    return;
+  }
+
+  const provider =
+    typeof user.app_metadata.provider === "string"
+      ? user.app_metadata.provider
+      : null;
+  const kakaoProviderId = getProviderUserId(user, "kakao");
+  const googleProviderId = getProviderUserId(user, "google");
+  const providerUserId =
+    provider === "kakao"
+      ? kakaoProviderId
+      : provider === "google"
+        ? googleProviderId
+        : null;
+
+  await supabase.from("user_profiles").upsert(
+    {
+      user_id: user.id,
+      email: user.email ?? null,
+      display_name: getUserLabel(user),
+      auth_provider: provider,
+      provider_user_id: providerUserId,
+      kakao_provider_id: kakaoProviderId,
+      google_provider_id: googleProviderId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+};
+
 export function useAuth(): UseAuthResult {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(!isSupabaseConfigured);
   const [authError, setAuthError] = useState("");
+  const user = session?.user ?? null;
+  const userLabel = useMemo(() => getUserLabel(user), [user]);
 
   useEffect(() => {
     if (!supabase) {
@@ -86,7 +141,21 @@ export function useAuth(): UseAuthResult {
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async (redirectTo?: string) => {
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    syncUserProfile(user).catch(() => {
+      // Profile persistence is additive for Kakao channel/AlimTalk readiness.
+      // Auth must continue even if the table has not been applied yet.
+    });
+  }, [user]);
+
+  const signInWithProvider = useCallback(async (
+    provider: OAuthProvider,
+    redirectTo?: string
+  ) => {
     if (!supabase) {
       setAuthError("Supabase Auth 설정이 필요합니다.");
       return;
@@ -95,12 +164,15 @@ export function useAuth(): UseAuthResult {
     setAuthError("");
 
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: {
         redirectTo: redirectTo ?? window.location.href,
-        queryParams: {
-          prompt: "select_account",
-        },
+        queryParams:
+          provider === "google"
+            ? {
+                prompt: "select_account",
+              }
+            : undefined,
       },
     });
 
@@ -108,6 +180,16 @@ export function useAuth(): UseAuthResult {
       setAuthError(error.message);
     }
   }, []);
+
+  const signInWithGoogle = useCallback(
+    async (redirectTo?: string) => signInWithProvider("google", redirectTo),
+    [signInWithProvider]
+  );
+
+  const signInWithKakao = useCallback(
+    async (redirectTo?: string) => signInWithProvider("kakao", redirectTo),
+    [signInWithProvider]
+  );
 
   const signOut = useCallback(async () => {
     if (!supabase) {
@@ -127,9 +209,6 @@ export function useAuth(): UseAuthResult {
     setSession(null);
   }, []);
 
-  const user = session?.user ?? null;
-  const userLabel = useMemo(() => getUserLabel(user), [user]);
-
   return {
     authError,
     isAuthenticated: Boolean(user),
@@ -137,6 +216,7 @@ export function useAuth(): UseAuthResult {
     isSupabaseConfigured,
     session,
     signInWithGoogle,
+    signInWithKakao,
     signOut,
     user,
     userLabel,

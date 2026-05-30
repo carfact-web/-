@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
@@ -40,17 +40,39 @@ export default function LoginPage() {
     isAuthReady,
     isSupabaseConfigured,
     signInWithGoogle,
+    signInWithKakao,
   } = useAuth();
   const [authMethod, setAuthMethod] = useState<AuthMethod>("google");
 
+  const getRedirectTo = useCallback(() =>
+    new URLSearchParams(window.location.search).get("redirectTo") ||
+    window.location.origin + "/", []);
+  const getRedirectPath = useCallback(() => {
+    try {
+      const url = new URL(getRedirectTo(), window.location.origin);
+
+      if (url.origin !== window.location.origin) {
+        return "/";
+      }
+
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return "/";
+    }
+  }, [getRedirectTo]);
+
   useEffect(() => {
     if (isAuthReady && isAuthenticated) {
-      router.replace("/");
+      router.replace(getRedirectPath());
     }
-  }, [isAuthenticated, isAuthReady, router]);
+  }, [getRedirectPath, isAuthenticated, isAuthReady, router]);
+
+  const startKakaoLogin = () => {
+    void signInWithKakao(getRedirectTo());
+  };
 
   const startGoogleLogin = () => {
-    void signInWithGoogle(window.location.origin + "/");
+    void signInWithGoogle(getRedirectTo());
   };
 
   return (
@@ -62,13 +84,22 @@ export default function LoginPage() {
             로그인 방식을 선택하세요.
           </h1>
           <p className="mt-3 text-sm leading-6 text-zinc-400">
-            1단계에서는 Google 로그인을 우선 연결하고, 이메일 로그인은 같은
-            구조에서 확장할 수 있게 준비합니다.
+            카카오 계정으로 로그인하면 차량 리포트를 제한 없이 확인하고
+            후기를 작성할 수 있습니다.
           </p>
         </header>
 
         <section className={panelClassName}>
-          <div className="flex gap-2">
+          <button
+            type="button"
+            className={primaryButtonClassName}
+            onClick={startKakaoLogin}
+            disabled={!isSupabaseConfigured || !isAuthReady}
+          >
+            카카오로 로그인
+          </button>
+
+          <div className="mt-4 flex gap-2">
             <button
               type="button"
               className={cn(
@@ -95,7 +126,7 @@ export default function LoginPage() {
             <>
               <button
                 type="button"
-                className={primaryButtonClassName}
+                className={cn(primaryButtonClassName, "bg-zinc-800 hover:bg-zinc-700")}
                 onClick={startGoogleLogin}
                 disabled={!isSupabaseConfigured || !isAuthReady}
               >
@@ -103,16 +134,14 @@ export default function LoginPage() {
               </button>
 
               <p className={cn(infoClassName, "mt-4")}>
-                Supabase Dashboard에서 Authentication &gt; Providers &gt;
-                Google을 활성화하고 Google OAuth Client ID/Secret 및 redirect
-                URL을 설정해야 실제 로그인이 완료됩니다.
+                카카오 로그인은 Supabase Authentication Providers의 Kakao
+                설정을 사용합니다. Google은 운영 보조 로그인 수단으로 남겨둡니다.
               </p>
             </>
           ) : (
             <div className={cn(infoClassName, "mt-4")}>
-              이메일 로그인은 다음 단계에서 같은 인증 훅에 연결할 수 있도록
-              방식만 분리해 두었습니다. 이번 1단계에서는 Google 로그인을
-              우선 사용합니다.
+              이메일 로그인은 현재 비활성화되어 있습니다. 카팩트 기본 로그인은
+              카카오 OAuth입니다.
             </div>
           )}
 

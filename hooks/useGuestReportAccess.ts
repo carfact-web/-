@@ -60,7 +60,7 @@ export const useGuestReportAccess = (carNumber: string) => {
   const {
     isAuthenticated,
     isAuthReady,
-    signInWithGoogle,
+    signInWithKakao,
   } = useAuth();
   const sanitizedCarNumber = sanitizeVehiclePlateNumber(carNumber);
   const snapshot = useSyncExternalStore(
@@ -107,6 +107,6 @@ export const useGuestReportAccess = (carNumber: string) => {
     isAllowed,
     isBlocked,
     isChecking: !isAuthReady,
-    signInWithGoogle,
+    signInWithKakao,
   };
 };

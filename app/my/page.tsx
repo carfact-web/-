@@ -31,7 +31,7 @@ export default function MyPage() {
     isAuthenticated,
     isAuthReady,
     isSupabaseConfigured,
-    signInWithGoogle,
+    signInWithKakao,
     signOut,
     user,
     userLabel,
@@ -42,7 +42,7 @@ export default function MyPage() {
       <div className={shellClassName}>
         <h1 className="text-3xl font-black text-white">마이</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Google 계정으로 로그인 상태를 확인합니다.
+          카카오 계정으로 로그인 상태를 확인합니다.
         </p>
 
         <section className={cn(panelClassName, "mt-6 space-y-4")}>
@@ -74,19 +74,19 @@ export default function MyPage() {
             ) : (
               <>
                 <p className={statusClassName}>
-                  조회와 후기 작성은 현재 로그인 없이 사용할 수 있습니다. 도움돼요와
-                  신고 제한은 다음 단계에서 연결할 수 있게 준비합니다.
+                  비회원은 차량 리포트 1개만 열람할 수 있고, 후기 작성은 로그인
+                  회원만 가능합니다.
                 </p>
 
                 <button
                   type="button"
                   className={primaryButtonClassName}
                   onClick={() => {
-                    void signInWithGoogle();
+                    void signInWithKakao();
                   }}
                   disabled={!isSupabaseConfigured}
                 >
-                  Google로 로그인
+                  카카오로 로그인
                 </button>
               </>
             )

@@ -145,7 +145,7 @@ export default function CarReportPage() {
     isAllowed: isGuestReportAllowed,
     isBlocked: isGuestReportBlocked,
     isChecking: isGuestReportChecking,
-    signInWithGoogle,
+    signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
   const { reviews } = useReviews(carNumber);
@@ -232,7 +232,7 @@ export default function CarReportPage() {
   }, [carNumber, isGuestReportAllowed, recentTitle, vehicle, saveRecentView]);
 
   const loginFromCurrentPage = () => {
-    void signInWithGoogle(window.location.href);
+    void signInWithKakao(window.location.href);
   };
 
   if (isGuestReportChecking) {

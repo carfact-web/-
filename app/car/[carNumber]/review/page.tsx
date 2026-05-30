@@ -122,7 +122,7 @@ export default function ReviewPage() {
   const {
     isAuthenticated,
     isAuthReady,
-    signInWithGoogle,
+    signInWithKakao,
   } = useAuth();
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
@@ -286,7 +286,7 @@ export default function ReviewPage() {
   };
 
   const loginFromCurrentPage = () => {
-    void signInWithGoogle(window.location.href);
+    void signInWithKakao(window.location.href);
   };
 
   if (!isAuthReady) {

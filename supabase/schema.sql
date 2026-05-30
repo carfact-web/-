@@ -33,6 +33,18 @@ create table if not exists public.review_reports (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.user_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  display_name text,
+  auth_provider text,
+  provider_user_id text,
+  kakao_provider_id text,
+  google_provider_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.vehicle_master (
   id uuid primary key default gen_random_uuid(),
   source text not null default 'carmanager',
@@ -69,6 +81,12 @@ create index if not exists reviews_vehicle_id_created_at_idx
 create index if not exists review_reports_review_id_idx
   on public.review_reports (review_id);
 
+create index if not exists user_profiles_kakao_provider_id_idx
+  on public.user_profiles (kakao_provider_id);
+
+create index if not exists user_profiles_provider_user_id_idx
+  on public.user_profiles (auth_provider, provider_user_id);
+
 create index if not exists vehicle_master_manufacturer_idx
   on public.vehicle_master (manufacturer);
 
@@ -90,6 +108,7 @@ create index if not exists vehicle_master_search_text_normalized_trgm_idx
 alter table public.vehicles enable row level security;
 alter table public.reviews enable row level security;
 alter table public.review_reports enable row level security;
+alter table public.user_profiles enable row level security;
 alter table public.vehicle_master enable row level security;
 
 drop policy if exists "Public read vehicles" on public.vehicles;
@@ -114,14 +133,30 @@ create policy "Public read reviews"
   using (true);
 
 drop policy if exists "Public insert reviews" on public.reviews;
-create policy "Public insert reviews"
+create policy "Authenticated insert reviews"
   on public.reviews for insert
-  with check (true);
+  with check (auth.role() = 'authenticated');
 
 drop policy if exists "Public insert review reports" on public.review_reports;
 create policy "Public insert review reports"
   on public.review_reports for insert
   with check (true);
+
+drop policy if exists "Users read own profile" on public.user_profiles;
+create policy "Users read own profile"
+  on public.user_profiles for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users insert own profile" on public.user_profiles;
+create policy "Users insert own profile"
+  on public.user_profiles for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users update own profile" on public.user_profiles;
+create policy "Users update own profile"
+  on public.user_profiles for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 drop policy if exists "Public read vehicle master" on public.vehicle_master;
 create policy "Public read vehicle master"
