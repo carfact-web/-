@@ -1,21 +1,32 @@
 {
-  "generatedAt": "2026-05-29T08:07:37.600Z",
+  "generatedAt": "2026-05-30T00:42:37.985Z",
+  "minMarketYear": 2008,
   "source": {
     "makers": 77,
     "models": 1034,
     "modelDetails": 2191
   },
   "output": {
-    "manufacturers": 77,
-    "models": 1036,
-    "modelDetails": 2191,
+    "manufacturers": 76,
+    "models": 835,
+    "modelDetails": 1736,
     "duplicatesRemoved": 0,
+    "excludedBefore2008": 455,
+    "excludedBefore2008Models": 304,
     "skipped": [],
     "orphanModelNos": [
       "100317",
       "100389"
     ],
-    "orphanModelFixesApplied": 2
+    "orphanModelFixesApplied": 2,
+    "missingRequiredImportMakers": []
+  },
+  "fileSizes": {
+    "1_create_vehicle_master.sql": 1427,
+    "2_insert_vehicle_master_part1.sql": 688374,
+    "3_insert_vehicle_master_part2.sql": 940277,
+    "4_insert_vehicle_master_part3.sql": 688241,
+    "5_create_vehicle_master_indexes.sql": 1266
   },
   "sampleSearchAliases": {
     "그랜저": [

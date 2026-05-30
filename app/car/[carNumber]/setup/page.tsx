@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
-import { carData } from "@/data/carData";
+import { VehicleMasterFields } from "@/components/VehicleMasterFields";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
@@ -20,7 +20,6 @@ const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
   "hover:opacity-75"
 );
-const formControlClassName = cn("w-full rounded-xl bg-zinc-800 p-3 text-white");
 const primaryButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 p-4 font-bold transition",
   "hover:bg-red-600"
@@ -54,22 +53,6 @@ export default function VehicleSetupPage() {
   const mileageValue = mileage ?? vehicle?.mileage ?? "";
   const fuelTypeValue = fuelType ?? vehicle?.fuelType ?? "";
 
-  const brands = Object.keys(carData);
-  const models = brandValue ? Object.keys(carData[brandValue]) : [];
-  const generations =
-    brandValue && modelValue
-      ? carData[brandValue]?.[modelValue] || []
-      : [];
-  const selectedGeneration = generations.find(
-    (item) => item.name === generationValue
-  );
-  const years = selectedGeneration
-    ? Array.from(
-        { length: selectedGeneration.endYear - selectedGeneration.startYear + 1 },
-        (_, i) => String(selectedGeneration.endYear - i)
-      )
-    : [];
-
   useEffect(() => {
     const recentTitle = [brandValue, modelValue, generationValue]
       .filter(Boolean)
@@ -79,7 +62,7 @@ export default function VehicleSetupPage() {
 
   const saveAndGoToReport = async () => {
     if (!brandValue || !modelValue || !generationValue || !yearValue) {
-      setValidationMessage("제조사, 모델, 세대, 연식을 선택해주세요.");
+      setValidationMessage("제조사, 모델, 세부모델, 연식을 선택해주세요.");
       return;
     }
 
@@ -125,98 +108,22 @@ export default function VehicleSetupPage() {
           카팩트에 처음 등록되는 차량입니다. 차량 정보를 알려주세요!
         </p>
 
-        <div className="space-y-3">
-          <select
-            value={brandValue}
-            onChange={(e) => {
-              setBrand(e.target.value);
-              setModel("");
-              setGeneration("");
-              setYear("");
-              setValidationMessage("");
-            }}
-            className={formControlClassName}
-          >
-            <option value="">제조사 선택</option>
-            {brands.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={modelValue}
-            onChange={(e) => {
-              setModel(e.target.value);
-              setGeneration("");
-              setYear("");
-              setValidationMessage("");
-            }}
-            className={formControlClassName}
-          >
-            <option value="">모델 선택</option>
-            {models.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={generationValue}
-            onChange={(e) => {
-              setGeneration(e.target.value);
-              setYear("");
-              setValidationMessage("");
-            }}
-            className={formControlClassName}
-          >
-            <option value="">세대 선택</option>
-            {generations.map((item) => (
-              <option key={item.name} value={item.name}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={yearValue}
-            onChange={(e) => {
-              setYear(e.target.value);
-              setValidationMessage("");
-            }}
-            className={formControlClassName}
-          >
-            <option value="">연식 선택</option>
-            {years.map((item) => (
-              <option key={item} value={item}>
-                {item}년
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={fuelTypeValue}
-            onChange={(e) => setFuelType(e.target.value)}
-            className={formControlClassName}
-          >
-            <option value="">연료 선택</option>
-            {fuelTypes.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <input
-            value={mileageValue}
-            onChange={(e) => setMileage(sanitizeMileage(e.target.value))}
-            placeholder="주행거리 입력 (예: 120000)"
-            inputMode="numeric"
-            className={formControlClassName}
-          />
-        </div>
+        <VehicleMasterFields
+          brandValue={brandValue}
+          modelValue={modelValue}
+          modelDetailValue={generationValue}
+          yearValue={yearValue}
+          fuelTypeValue={fuelTypeValue}
+          mileageValue={mileageValue}
+          fuelTypes={fuelTypes}
+          onBrandChange={setBrand}
+          onModelChange={setModel}
+          onModelDetailChange={setGeneration}
+          onYearChange={setYear}
+          onFuelTypeChange={setFuelType}
+          onMileageChange={(value) => setMileage(sanitizeMileage(value))}
+          onClearValidation={() => setValidationMessage("")}
+        />
 
         {validationMessage && (
           <p className={validationMessageClassName} aria-live="polite">
