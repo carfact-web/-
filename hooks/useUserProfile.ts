@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createRandomNickname } from "@/lib/nickname";
 import { supabase } from "@/lib/supabase";
 import { sanitizeUserText } from "@/utils/inputSanitizer";
 import type { Database } from "@/types/supabase";
@@ -8,7 +9,6 @@ import type { User } from "@supabase/supabase-js";
 
 type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
 
-const defaultReviewNickname = "카팩트 사용자";
 const minimumNicknameLength = 2;
 const maximumNicknameLength = 20;
 
@@ -86,6 +86,66 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
         if (error) {
           setProfileError(error.message);
           setProfile(null);
+        } else if (!data) {
+          const now = new Date().toISOString();
+          const { data: createdProfile, error: createError } = await client
+            .from("user_profiles")
+            .insert({
+              user_id: user.id,
+              nickname: createRandomNickname(),
+              nickname_changed: false,
+              created_at: now,
+              updated_at: now,
+            })
+            .select("*")
+            .single();
+
+          if (!isActive) {
+            return;
+          }
+
+          if (createError) {
+            const { data: reloadedProfile, error: reloadError } = await client
+              .from("user_profiles")
+              .select("*")
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            if (!isActive) {
+              return;
+            }
+
+            if (reloadError) {
+              setProfileError(reloadError.message);
+              setProfile(null);
+            } else {
+              setProfile(reloadedProfile);
+            }
+          } else {
+            setProfile(createdProfile);
+          }
+        } else if (!data.nickname?.trim()) {
+          const { data: updatedProfile, error: updateError } = await client
+            .from("user_profiles")
+            .update({
+              nickname: createRandomNickname(),
+              nickname_changed: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", user.id)
+            .select("*")
+            .single();
+
+          if (!isActive) {
+            return;
+          }
+
+          if (updateError) {
+            setProfileError(updateError.message);
+            setProfile(data);
+          } else {
+            setProfile(updatedProfile);
+          }
         } else {
           setProfile(data);
         }
@@ -113,10 +173,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
 
   const nickname = profile?.nickname?.trim() ?? "";
   const nicknameChanged = profile?.nickname_changed ?? false;
-  const reviewNickname = useMemo(
-    () => nickname || defaultReviewNickname,
-    [nickname]
-  );
+  const reviewNickname = useMemo(() => nickname, [nickname]);
 
   const updateNickname = useCallback(
     async (value: string) => {

@@ -124,7 +124,7 @@ export default function ReviewPage() {
     isAuthReady,
     user,
   } = useAuth();
-  const { reviewNickname } = useUserProfile(user);
+  const { isProfileReady, reviewNickname } = useUserProfile(user);
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -232,6 +232,11 @@ export default function ReviewPage() {
     }
 
     if (isSubmitting) {
+      return;
+    }
+
+    if (!isProfileReady || !reviewNickname) {
+      setValidationMessage("후기 작성자명을 준비하고 있습니다. 잠시 후 다시 시도해주세요.");
       return;
     }
 
@@ -465,7 +470,7 @@ export default function ReviewPage() {
         <button
           type="button"
           onClick={saveReview}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isProfileReady || !reviewNickname}
           className={submitButtonClassName}
         >
           {isSubmitting ? "등록 중..." : "후기 등록하기"}

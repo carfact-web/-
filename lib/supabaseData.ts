@@ -192,6 +192,12 @@ export const saveSupabaseReview = async (
     throw new Error("vehicle-not-found");
   }
 
+  const authorNickname = review.authorNickname?.trim();
+
+  if (!authorNickname) {
+    throw new Error("author-nickname-required");
+  }
+
   const reviewId = createReviewId();
   const uploadedImages = await uploadReviewImages(review.images ?? [], reviewId);
   const now = new Date().toISOString();
@@ -200,7 +206,7 @@ export const saveSupabaseReview = async (
     .insert({
       id: reviewId,
       vehicle_id: vehicle.id,
-      author_nickname: review.authorNickname ?? "카팩트 사용자",
+      author_nickname: authorNickname,
       content: review.content,
       tags: review.tags ?? [],
       images: getPersistableReviewImages(uploadedImages) as Json,

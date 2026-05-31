@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createRandomNickname } from "@/lib/nickname";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 
@@ -84,20 +85,59 @@ const syncUserProfile = async (user: User | null) => {
       : provider === "google"
         ? googleProviderId
         : null;
+  const now = new Date().toISOString();
+  const profileData = {
+    email: user.email ?? null,
+    display_name: getUserLabel(user),
+    auth_provider: provider,
+    provider_user_id: providerUserId,
+    kakao_provider_id: kakaoProviderId,
+    google_provider_id: googleProviderId,
+    updated_at: now,
+  };
+  const { data: existingProfile, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("user_id,nickname,nickname_changed")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  await supabase.from("user_profiles").upsert(
-    {
+  if (profileError) {
+    throw profileError;
+  }
+
+  if (!existingProfile) {
+    const { error } = await supabase.from("user_profiles").insert({
       user_id: user.id,
-      email: user.email ?? null,
-      display_name: getUserLabel(user),
-      auth_provider: provider,
-      provider_user_id: providerUserId,
-      kakao_provider_id: kakaoProviderId,
-      google_provider_id: googleProviderId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
-  );
+      ...profileData,
+      nickname: createRandomNickname(),
+      nickname_changed: false,
+      created_at: now,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
+
+  const nextProfile =
+    existingProfile.nickname?.trim()
+      ? profileData
+      : {
+          ...profileData,
+          nickname: createRandomNickname(),
+          nickname_changed: false,
+        };
+
+  const { error } = await supabase
+    .from("user_profiles")
+    .update(nextProfile)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw error;
+  }
 };
 
 export function useAuth(): UseAuthResult {
