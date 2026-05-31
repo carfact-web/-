@@ -6,6 +6,7 @@ import type {
 export interface CommunityCategoryConfig {
   description?: string;
   label: string;
+  shortLabel?: string;
   value: CommunityCategoryFilter;
 }
 
@@ -17,6 +18,7 @@ export const communityCategories: CommunityCategoryConfig[] = [
   {
     value: "free",
     label: "자유게시판",
+    shortLabel: "자유",
   },
   {
     value: "maintenance",

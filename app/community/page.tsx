@@ -53,6 +53,10 @@ const secondaryButtonClassName = cn(
   buttonClassName,
   "border border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-zinc-500"
 );
+const sortButtonClassName = cn(
+  "rounded-full px-3 py-2 text-sm font-extrabold text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+);
+const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 
 const normalizeField = (value: string, maxLength: number) =>
   sanitizeUserText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -64,6 +68,13 @@ const allowedCommunityImageTypes = [
 ] as const;
 const maxCommunityImages = 3;
 const maxCommunityImageBytes = 5 * 1024 * 1024;
+type CommunitySortOption = "latest" | "popular" | "weekly";
+
+const sortOptions: { label: string; value: CommunitySortOption }[] = [
+  { label: "최신", value: "latest" },
+  { label: "인기", value: "popular" },
+  { label: "주간인기", value: "weekly" },
+];
 
 const isAllowedCommunityImageType = (
   type: string
@@ -120,6 +131,8 @@ export default function CommunityPage() {
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [postImages, setPostImages] = useState<CommunityImageAttachment[]>([]);
   const [targetPostId, setTargetPostId] = useState("");
+  const [sortOption, setSortOption] = useState<CommunitySortOption>("latest");
+  const [currentTime, setCurrentTime] = useState(0);
   const [isWriting, setIsWriting] = useState(false);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -130,6 +143,39 @@ export default function CommunityPage() {
     () => getCommunityCategoryLabel(activeCategory),
     [activeCategory]
   );
+  const visiblePosts = useMemo(() => {
+    const weekAgo = currentTime - 7 * 24 * 60 * 60 * 1000;
+    const sortedPosts = [...posts];
+
+    if (sortOption === "popular" || sortOption === "weekly") {
+      const targetPosts =
+        sortOption === "weekly" && currentTime > 0
+          ? sortedPosts.filter((post) => {
+              const createdTime = Date.parse(post.createdAtRaw);
+              return !Number.isNaN(createdTime) && createdTime >= weekAgo;
+            })
+          : sortedPosts;
+
+      return targetPosts.sort(
+        (left, right) =>
+          right.likeCount +
+            right.commentCount -
+            (left.likeCount + left.commentCount) ||
+          Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
+      );
+    }
+
+    return sortedPosts.sort(
+      (left, right) =>
+        Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
+    );
+  }, [currentTime, posts, sortOption]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setCurrentTime(Date.now());
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -476,15 +522,27 @@ export default function CommunityPage() {
   return (
     <main className={pageClassName}>
       <div className={shellClassName}>
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-bold text-red-300">CARFACT COMMUNITY</p>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               커뮤니티
             </h1>
-            <p className="mt-3 text-base leading-relaxed text-zinc-400">
-              자유게시판과 정비후기에서 차량 이야기를 공유하세요.
-            </p>
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="게시글 정렬">
+              {sortOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={cn(
+                    sortButtonClassName,
+                    sortOption === option.value && activeSortButtonClassName
+                  )}
+                  onClick={() => setSortOption(option.value)}
+                  aria-pressed={sortOption === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
           <button
             type="button"
@@ -498,14 +556,11 @@ export default function CommunityPage() {
 
         <section className={panelClassName} aria-label="게시판 선택">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-extrabold">주제별 게시판</h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                관심 주제를 선택해 글을 모아보세요.
-              </p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {communityCategories.map((category) => {
               const isActive = category.value === activeCategory;
 
@@ -514,7 +569,7 @@ export default function CommunityPage() {
                   key={category.value}
                   type="button"
                   className={cn(
-                    "min-h-12 min-w-0 rounded-lg border px-3 py-2 text-center text-sm font-extrabold transition",
+                    "min-h-12 min-w-0 rounded-lg border px-3 py-2 text-center text-sm font-extrabold transition sm:text-base",
                     isActive
                       ? "border-red-400 bg-red-500 text-white"
                       : "border-zinc-800 bg-black text-zinc-300 hover:border-zinc-600"
@@ -525,7 +580,7 @@ export default function CommunityPage() {
                     setMessage("");
                   }}
                 >
-                  {category.label}
+                  {category.shortLabel ?? category.label}
                 </button>
               );
             })}
@@ -545,9 +600,7 @@ export default function CommunityPage() {
           <section className={panelClassName} aria-label="커뮤니티 글쓰기">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-extrabold">
-                  {activeCategoryLabel} 글쓰기
-                </h2>
+                <h2 className="text-xl font-extrabold">글쓰기</h2>
                 <p className={mutedTextClassName}>
                   작성자명은 내 계정 닉네임으로 표시됩니다.
                 </p>
@@ -669,13 +722,13 @@ export default function CommunityPage() {
 
             {isLoadingPosts ? (
               <p className={mutedTextClassName}>글 목록을 불러오는 중입니다.</p>
-            ) : posts.length === 0 ? (
+            ) : visiblePosts.length === 0 ? (
               <p className={mutedTextClassName}>
                 아직 등록된 글이 없습니다. 첫 글을 작성해보세요.
               </p>
             ) : (
-              <div className="flex flex-col gap-3">
-                {posts.map((post) => {
+              <div className="divide-y divide-zinc-800">
+                {visiblePosts.map((post) => {
                   const isSelected = selectedPost?.id === post.id;
 
                   return (
@@ -683,30 +736,27 @@ export default function CommunityPage() {
                       key={post.id}
                       type="button"
                       className={cn(
-                        "rounded-lg border p-4 text-left transition",
+                        "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
                         isSelected
-                          ? "border-red-400 bg-red-500/10"
-                          : "border-zinc-800 bg-black hover:border-zinc-600"
+                          ? "rounded-lg bg-red-500/10 px-4"
+                          : "hover:bg-zinc-900/50"
                       )}
                       onClick={() => {
                         setSelectedPost(post);
                         setIsWriting(false);
                       }}
                     >
-                      <span className="block text-base font-extrabold text-white">
+                      <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
+                        {getCommunityCategoryLabel(post.category)}
+                      </span>
+                      <span className="block text-base font-extrabold text-white sm:text-lg">
                         {post.title}
                       </span>
-                      <span className="mt-2 block max-h-12 overflow-hidden text-sm leading-6 text-zinc-400">
-                        {post.content}
-                      </span>
-                      <span className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
-                        {activeCategory === "all" ? (
-                          <span>{getCommunityCategoryLabel(post.category)}</span>
-                        ) : null}
+                      <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
                         <span>{post.authorNickname}</span>
-                        <span>{post.createdAt}</span>
                         <span>좋아요 {post.likeCount}</span>
                         <span>댓글 {post.commentCount}</span>
+                        <span>{post.createdAt}</span>
                         {post.images.length > 0 ? (
                           <span>이미지 {post.images.length}</span>
                         ) : null}
@@ -723,7 +773,7 @@ export default function CommunityPage() {
               <div className="flex flex-col gap-5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
-                    <span>{activeCategoryLabel}</span>
+                    <span>{getCommunityCategoryLabel(selectedPost.category)}</span>
                     <span>{selectedPost.authorNickname}</span>
                     <span>{selectedPost.createdAt}</span>
                   </div>
@@ -757,22 +807,6 @@ export default function CommunityPage() {
                       ))}
                     </div>
                   ) : null}
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className={secondaryButtonClassName}
-                      onClick={handleLike}
-                    >
-                      좋아요 {selectedPost.likeCount}
-                    </button>
-                    <button
-                      type="button"
-                      className={secondaryButtonClassName}
-                      onClick={handleReport}
-                    >
-                      신고 {selectedPost.reportCount}
-                    </button>
-                  </div>
                 </div>
 
                 <div className="border-t border-zinc-800 pt-5">
@@ -825,6 +859,22 @@ export default function CommunityPage() {
                         </div>
                       ))
                     )}
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={secondaryButtonClassName}
+                      onClick={handleLike}
+                    >
+                      좋아요 {selectedPost.likeCount}
+                    </button>
+                    <button
+                      type="button"
+                      className={secondaryButtonClassName}
+                      onClick={handleReport}
+                    >
+                      신고 {selectedPost.reportCount}
+                    </button>
                   </div>
                 </div>
               </div>

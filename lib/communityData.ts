@@ -79,6 +79,7 @@ const mapCommunityPost = (
   commentCount: counts?.comments?.[row.id] ?? 0,
   reportCount: counts?.reports?.[row.id] ?? row.report_count,
   createdAt: toLocaleDateTime(row.created_at),
+  createdAtRaw: row.created_at,
 });
 
 const mapCommunityComment = (row: CommunityCommentRow): CommunityComment => ({

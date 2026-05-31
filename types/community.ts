@@ -33,6 +33,7 @@ export interface CommunityPost {
   commentCount: number;
   reportCount: number;
   createdAt: string;
+  createdAtRaw: string;
 }
 
 export interface CommunityComment {
