@@ -124,7 +124,7 @@ export default function ReviewPage() {
     isAuthReady,
     user,
   } = useAuth();
-  const { isProfileReady, reviewNickname } = useUserProfile(user);
+  const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -235,11 +235,6 @@ export default function ReviewPage() {
       return;
     }
 
-    if (!isProfileReady || !reviewNickname) {
-      setValidationMessage("후기 작성자명을 준비하고 있습니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-
     const reviewContent = reviewInputRef.current?.value ?? review;
     const validation = validateReviewContent(reviewContent);
 
@@ -251,9 +246,19 @@ export default function ReviewPage() {
     setValidationMessage("");
     setIsSubmitting(true);
 
+    const authorNickname = reviewNickname || (await ensureReviewNickname());
+
+    if (!authorNickname) {
+      setIsSubmitting(false);
+      setValidationMessage(
+        "후기 작성자명을 저장하지 못했습니다. 잠시 후 다시 시도해주세요."
+      );
+      return;
+    }
+
     const newReview: Review = {
       id: Date.now(),
-      authorNickname: reviewNickname,
+      authorNickname,
       content: validation.content,
       tags: selectedTags,
       images: reviewImages,
@@ -470,7 +475,7 @@ export default function ReviewPage() {
         <button
           type="button"
           onClick={saveReview}
-          disabled={isSubmitting || !isProfileReady || !reviewNickname}
+          disabled={isSubmitting}
           className={submitButtonClassName}
         >
           {isSubmitting ? "등록 중..." : "후기 등록하기"}

@@ -36,6 +36,7 @@ const validateNickname = (value: string) => {
 
 interface UseUserProfileResult {
   canChangeNickname: boolean;
+  ensureReviewNickname: () => Promise<string>;
   isProfileReady: boolean;
   nickname: string;
   nicknameChanged: boolean;
@@ -48,6 +49,104 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isProfileReady, setIsProfileReady] = useState(!user);
   const [profileError, setProfileError] = useState("");
+
+  const ensureReviewNickname = useCallback(async () => {
+    if (!supabase || !user) {
+      setProfileError("로그인이 필요합니다.");
+      return "";
+    }
+
+    if (profile?.user_id === user.id && profile.nickname?.trim()) {
+      return profile.nickname.trim();
+    }
+
+    const client = supabase;
+
+    try {
+      const { data, error } = await client
+        .from("user_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        setProfileError(error.message);
+        setProfile(null);
+        return "";
+      }
+
+      if (data?.nickname?.trim()) {
+        setProfile(data);
+        setProfileError("");
+        return data.nickname.trim();
+      }
+
+      const nextNickname = createRandomNickname();
+      const now = new Date().toISOString();
+
+      if (data) {
+        const { data: updatedProfile, error: updateError } = await client
+          .from("user_profiles")
+          .update({
+            nickname: nextNickname,
+            nickname_changed: false,
+            updated_at: now,
+          })
+          .eq("user_id", user.id)
+          .select("*")
+          .single();
+
+        if (updateError) {
+          setProfileError(updateError.message);
+          setProfile(data);
+          return "";
+        }
+
+        setProfile(updatedProfile);
+        setProfileError("");
+        return updatedProfile.nickname?.trim() ?? nextNickname;
+      }
+
+      const { data: createdProfile, error: createError } = await client
+        .from("user_profiles")
+        .insert({
+          user_id: user.id,
+          nickname: nextNickname,
+          nickname_changed: false,
+          created_at: now,
+          updated_at: now,
+        })
+        .select("*")
+        .single();
+
+      if (createError) {
+        const { data: reloadedProfile, error: reloadError } = await client
+          .from("user_profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (reloadError) {
+          setProfileError(reloadError.message);
+          setProfile(null);
+          return "";
+        }
+
+        setProfile(reloadedProfile);
+        setProfileError("");
+        return reloadedProfile?.nickname?.trim() ?? "";
+      }
+
+      setProfile(createdProfile);
+      setProfileError("");
+      return createdProfile.nickname?.trim() ?? nextNickname;
+    } catch (error) {
+      setProfileError(
+        error instanceof Error ? error.message : "프로필을 저장하지 못했습니다."
+      );
+      return "";
+    }
+  }, [profile, user]);
 
   useEffect(() => {
     let isActive = true;
@@ -67,87 +166,15 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
       };
     }
 
-    const client = supabase;
     const loadProfile = async () => {
       setIsProfileReady(false);
       setProfileError("");
 
       try {
-        const { data, error } = await client
-          .from("user_profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        await ensureReviewNickname();
 
         if (!isActive) {
           return;
-        }
-
-        if (error) {
-          setProfileError(error.message);
-          setProfile(null);
-        } else if (!data) {
-          const now = new Date().toISOString();
-          const { data: createdProfile, error: createError } = await client
-            .from("user_profiles")
-            .insert({
-              user_id: user.id,
-              nickname: createRandomNickname(),
-              nickname_changed: false,
-              created_at: now,
-              updated_at: now,
-            })
-            .select("*")
-            .single();
-
-          if (!isActive) {
-            return;
-          }
-
-          if (createError) {
-            const { data: reloadedProfile, error: reloadError } = await client
-              .from("user_profiles")
-              .select("*")
-              .eq("user_id", user.id)
-              .maybeSingle();
-
-            if (!isActive) {
-              return;
-            }
-
-            if (reloadError) {
-              setProfileError(reloadError.message);
-              setProfile(null);
-            } else {
-              setProfile(reloadedProfile);
-            }
-          } else {
-            setProfile(createdProfile);
-          }
-        } else if (!data.nickname?.trim()) {
-          const { data: updatedProfile, error: updateError } = await client
-            .from("user_profiles")
-            .update({
-              nickname: createRandomNickname(),
-              nickname_changed: false,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.id)
-            .select("*")
-            .single();
-
-          if (!isActive) {
-            return;
-          }
-
-          if (updateError) {
-            setProfileError(updateError.message);
-            setProfile(data);
-          } else {
-            setProfile(updatedProfile);
-          }
-        } else {
-          setProfile(data);
         }
 
         setIsProfileReady(true);
@@ -169,7 +196,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
     return () => {
       isActive = false;
     };
-  }, [user]);
+  }, [ensureReviewNickname, user]);
 
   const nickname = profile?.nickname?.trim() ?? "";
   const nicknameChanged = profile?.nickname_changed ?? false;
@@ -224,6 +251,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
 
   return {
     canChangeNickname: Boolean(user) && !nicknameChanged,
+    ensureReviewNickname,
     isProfileReady,
     nickname,
     nicknameChanged,

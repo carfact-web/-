@@ -1,3 +1,17 @@
+create table if not exists public.user_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  display_name text,
+  nickname text,
+  nickname_changed boolean not null default false,
+  auth_provider text,
+  provider_user_id text,
+  kakao_provider_id text,
+  google_provider_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.user_profiles
   add column if not exists nickname text;
 
