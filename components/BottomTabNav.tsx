@@ -30,7 +30,7 @@ const tabs: {
   { href: "/", label: "홈", icon: "home", matchPrefix: false },
   { href: "/recent", label: "최근조회", icon: "recent", matchPrefix: true },
   { href: "/community", label: "커뮤니티", icon: "community", matchPrefix: true },
-  { href: "/my", label: "마이", icon: "my", matchPrefix: true },
+  { href: "/my", label: "내 계정", icon: "my", matchPrefix: true },
 ];
 
 function TabIcon({ icon }: { icon: TabIconName }) {

@@ -9,6 +9,138 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      community_posts: {
+        Row: {
+          id: string;
+          category: "free" | "maintenance";
+          title: string;
+          content: string;
+          author_id: string;
+          author_nickname: string | null;
+          report_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: "free" | "maintenance";
+          title: string;
+          content: string;
+          author_id: string;
+          author_nickname?: string | null;
+          report_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: "free" | "maintenance";
+          title?: string;
+          content?: string;
+          author_id?: string;
+          author_nickname?: string | null;
+          report_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      community_comments: {
+        Row: {
+          id: string;
+          post_id: string;
+          author_id: string;
+          author_nickname: string | null;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          author_id: string;
+          author_nickname?: string | null;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          author_id?: string;
+          author_nickname?: string | null;
+          content?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "community_posts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      community_likes: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "community_likes_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "community_posts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      community_reports: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          user_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          user_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "community_reports_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "community_posts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       vehicles: {
         Row: {
           id: string;

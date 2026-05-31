@@ -32,7 +32,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/my",
-    label: "마이",
+    label: "내 계정",
     icon: "my",
     isActive: (pathname) => pathname.startsWith("/my"),
   },
