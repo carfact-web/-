@@ -7,6 +7,7 @@ import type { Session, User } from "@supabase/supabase-js";
 type OAuthProvider = "google" | "kakao";
 
 const kakaoOAuthScope = "profile_nickname profile_image";
+const googleOAuthRedirectTo = "https://www.carfact.kr/auth/callback";
 
 interface UseAuthResult {
   authError: string;
@@ -185,7 +186,10 @@ export function useAuth(): UseAuthResult {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: redirectTo ?? window.location.href,
+        redirectTo:
+          provider === "google"
+            ? googleOAuthRedirectTo
+            : redirectTo ?? window.location.href,
         queryParams,
       },
     });
