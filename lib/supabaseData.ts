@@ -200,7 +200,7 @@ export const saveSupabaseReview = async (
     .insert({
       id: reviewId,
       vehicle_id: vehicle.id,
-      author_nickname: review.authorNickname ?? "익명 사용자",
+      author_nickname: review.authorNickname ?? "카팩트 사용자",
       content: review.content,
       tags: review.tags ?? [],
       images: getPersistableReviewImages(uploadedImages) as Json,

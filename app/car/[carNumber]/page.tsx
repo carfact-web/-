@@ -143,6 +143,7 @@ export default function CarReportPage() {
   );
   const {
     isAllowed: isGuestReportAllowed,
+    isAuthenticated,
     isBlocked: isGuestReportBlocked,
     isChecking: isGuestReportChecking,
     signInWithGoogle,
@@ -223,6 +224,8 @@ export default function CarReportPage() {
     setReviewPage(1);
   };
   const recentTitle = [brand, model, generation].filter(Boolean).join(" ") || carNumber;
+  const reviewPath = `/car/${encodeURIComponent(carNumber)}/review`;
+  const reviewLoginPath = `/login?redirectTo=${encodeURIComponent(reviewPath)}`;
 
   useEffect(() => {
     if (!isGuestReportAllowed) {
@@ -492,7 +495,7 @@ export default function CarReportPage() {
             )}
 
             <Link
-              href={`/car/${encodeURIComponent(carNumber)}/review`}
+              href={isAuthenticated ? reviewPath : reviewLoginPath}
               className={actionLinkClassName}
             >
               이 차량 후기 남기기

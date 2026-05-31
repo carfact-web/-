@@ -8,6 +8,7 @@ type OAuthProvider = "google" | "kakao";
 
 const kakaoOAuthScope = "profile_nickname profile_image";
 const googleOAuthRedirectTo = "https://www.carfact.kr/auth/callback";
+export const authRedirectStorageKey = "carfact-auth-redirect-to";
 
 interface UseAuthResult {
   authError: string;
@@ -173,6 +174,13 @@ export function useAuth(): UseAuthResult {
     }
 
     setAuthError("");
+
+    if (provider === "google") {
+      localStorage.setItem(
+        authRedirectStorageKey,
+        redirectTo ?? window.location.href
+      );
+    }
 
     const queryParams: Record<string, string> =
       provider === "google"

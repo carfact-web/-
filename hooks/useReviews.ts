@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { mockReviews } from "@/data/mockReviews";
+import { useAuth } from "@/hooks/useAuth";
 import {
   fetchSupabaseReviews,
   saveSupabaseReview,
@@ -50,6 +51,7 @@ const cacheReviews = (storageKey: string, reviews: Review[]) => {
 
 export function useReviews(carNumber: string): UseReviewsResult {
   const sanitizedCarNumber = sanitizeVehiclePlateNumber(carNumber);
+  const { isAuthenticated, isAuthReady } = useAuth();
   const reviewStorageKey = getReviewStorageKey(sanitizedCarNumber);
   const reviewsJson = useSyncExternalStore(
     subscribeToReviews,
@@ -94,6 +96,14 @@ export function useReviews(carNumber: string): UseReviewsResult {
 
   const addReview = useCallback(
     async (review: Review) => {
+      if (!isAuthReady || !isAuthenticated) {
+        return {
+          isValid: false,
+          message: "로그인 후 후기를 작성할 수 있습니다.",
+          content: review.content,
+        };
+      }
+
       const validation = validateReviewContent(review.content);
 
       if (!validation.isValid) {
@@ -108,40 +118,30 @@ export function useReviews(carNumber: string): UseReviewsResult {
         content: validation.content,
       };
 
-      try {
-        const savedReview = await saveSupabaseReview(
-          sanitizedCarNumber,
-          nextReview
-        );
-
-        if (savedReview) {
-          const nextReviews = [savedReview, ...savedReviews];
-
-          cacheReviews(reviewStorageKey, nextReviews);
-          setRemoteReviewsSnapshot({
-            carNumber: sanitizedCarNumber,
-            reviews: nextReviews,
-          });
-
-          return validation;
-        }
-      } catch {
-        // Supabase is the primary path, but localStorage remains the fallback.
-      }
-
-      cacheReviews(reviewStorageKey, [nextReview, ...savedReviews]);
-      setRemoteReviewsSnapshot((currentReviewsSnapshot) =>
-        currentReviewsSnapshot?.carNumber === sanitizedCarNumber
-          ? {
-              carNumber: sanitizedCarNumber,
-              reviews: [nextReview, ...currentReviewsSnapshot.reviews],
-            }
-          : null
+      const savedReview = await saveSupabaseReview(
+        sanitizedCarNumber,
+        nextReview
       );
 
-      return validation;
+      if (savedReview) {
+        const nextReviews = [savedReview, ...savedReviews];
+
+        cacheReviews(reviewStorageKey, nextReviews);
+        setRemoteReviewsSnapshot({
+          carNumber: sanitizedCarNumber,
+          reviews: nextReviews,
+        });
+
+        return validation;
+      }
+
+      return {
+        isValid: false,
+        message: "후기를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        content: validation.content,
+      };
     },
-    [reviewStorageKey, sanitizedCarNumber]
+    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
   );
 
   const remoteReviews =

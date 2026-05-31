@@ -3,10 +3,10 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
@@ -122,9 +122,9 @@ export default function ReviewPage() {
   const {
     isAuthenticated,
     isAuthReady,
-    signInWithGoogle,
-    signInWithKakao,
+    user,
   } = useAuth();
+  const { reviewNickname } = useUserProfile(user);
   const { addReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -248,7 +248,7 @@ export default function ReviewPage() {
 
     const newReview: Review = {
       id: Date.now(),
-      authorNickname: "익명 사용자",
+      authorNickname: reviewNickname,
       content: validation.content,
       tags: selectedTags,
       images: reviewImages,
@@ -286,13 +286,15 @@ export default function ReviewPage() {
     }, 850);
   };
 
-  const kakaoLoginFromCurrentPage = () => {
-    void signInWithKakao(window.location.href);
-  };
+  useEffect(() => {
+    if (!isAuthReady || isAuthenticated) {
+      return;
+    }
 
-  const googleLoginFromCurrentPage = () => {
-    void signInWithGoogle(window.location.href);
-  };
+    router.replace(
+      `/login?redirectTo=${encodeURIComponent(window.location.href)}`
+    );
+  }, [isAuthReady, isAuthenticated, router]);
 
   if (!isAuthReady) {
     return (
@@ -318,11 +320,12 @@ export default function ReviewPage() {
 
   if (!isAuthenticated) {
     return (
-      <main className="min-h-screen bg-black pb-24">
-        <LoginRequiredPanel
-          onGoogleLogin={googleLoginFromCurrentPage}
-          onKakaoLogin={kakaoLoginFromCurrentPage}
-        />
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400">로그인 페이지로 이동 중입니다.</p>
+          </div>
+        </div>
       </main>
     );
   }

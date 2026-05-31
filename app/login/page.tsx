@@ -16,9 +16,25 @@ export default function LoginPage() {
     signInWithKakao,
   } = useAuth();
 
-  const getRedirectTo = useCallback(() =>
-    new URLSearchParams(window.location.search).get("redirectTo") ||
-    window.location.origin + "/", []);
+  const getRedirectTo = useCallback(() => {
+    const redirectTo = new URLSearchParams(window.location.search).get("redirectTo");
+
+    if (!redirectTo) {
+      return window.location.origin + "/";
+    }
+
+    try {
+      const url = new URL(redirectTo, window.location.origin);
+
+      if (url.origin !== window.location.origin) {
+        return window.location.origin + "/";
+      }
+
+      return url.href;
+    } catch {
+      return window.location.origin + "/";
+    }
+  }, []);
   const getRedirectPath = useCallback(() => {
     try {
       const url = new URL(getRedirectTo(), window.location.origin);

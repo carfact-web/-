@@ -106,6 +106,7 @@ export const useGuestReportAccess = (carNumber: string) => {
 
   return {
     isAllowed,
+    isAuthenticated,
     isBlocked,
     isChecking: !isAuthReady,
     signInWithGoogle,

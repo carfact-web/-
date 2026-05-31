@@ -126,6 +126,8 @@ export interface Database {
           user_id: string;
           email: string | null;
           display_name: string | null;
+          nickname: string | null;
+          nickname_changed: boolean;
           auth_provider: string | null;
           provider_user_id: string | null;
           kakao_provider_id: string | null;
@@ -137,6 +139,8 @@ export interface Database {
           user_id: string;
           email?: string | null;
           display_name?: string | null;
+          nickname?: string | null;
+          nickname_changed?: boolean;
           auth_provider?: string | null;
           provider_user_id?: string | null;
           kakao_provider_id?: string | null;
@@ -148,6 +152,8 @@ export interface Database {
           user_id?: string;
           email?: string | null;
           display_name?: string | null;
+          nickname?: string | null;
+          nickname_changed?: boolean;
           auth_provider?: string | null;
           provider_user_id?: string | null;
           kakao_provider_id?: string | null;

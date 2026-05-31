@@ -2,7 +2,31 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { authRedirectStorageKey } from "@/hooks/useAuth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+
+const getSafeRedirectPath = () => {
+  const fallbackPath = "/my";
+  const redirectTo = localStorage.getItem(authRedirectStorageKey);
+
+  localStorage.removeItem(authRedirectStorageKey);
+
+  if (!redirectTo) {
+    return fallbackPath;
+  }
+
+  try {
+    const url = new URL(redirectTo, window.location.origin);
+
+    if (url.origin !== window.location.origin) {
+      return fallbackPath;
+    }
+
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return fallbackPath;
+  }
+};
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -16,7 +40,7 @@ export default function AuthCallbackPage() {
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        router.replace(data.session ? "/my" : "/login");
+        router.replace(data.session ? getSafeRedirectPath() : "/login");
       })
       .catch(() => {
         router.replace("/login");
