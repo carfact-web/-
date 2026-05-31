@@ -1,6 +1,16 @@
 import type { Database } from "@/types/supabase";
 
-export type CommunityCategory = "free" | "maintenance";
+export type CommunityCategory =
+  | "free"
+  | "maintenance"
+  | "question"
+  | "news"
+  | "shop_review"
+  | "electric"
+  | "imported"
+  | "domestic";
+
+export type CommunityCategoryFilter = "all" | CommunityCategory;
 
 export interface CommunityImageAttachment {
   id: string;
@@ -18,6 +28,7 @@ export interface CommunityPost {
   content: string;
   authorNickname: string;
   images: CommunityImageAttachment[];
+  imageUploadWarning?: string;
   likeCount: number;
   commentCount: number;
   reportCount: number;

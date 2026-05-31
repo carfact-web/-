@@ -5,6 +5,7 @@ import {
 } from "@/lib/communityImages";
 import type {
   CommunityCategory,
+  CommunityCategoryFilter,
   CommunityComment,
   CommunityImageAttachment,
   CommunityCommentRow,
@@ -118,16 +119,21 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
   };
 };
 
-export const fetchCommunityPosts = async (category: CommunityCategory) => {
+export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => {
   if (!supabase) {
     return [] as CommunityPost[];
   }
 
-  const { data: posts, error } = await supabase
+  let query = supabase
     .from("community_posts")
     .select("*")
-    .eq("category", category)
     .order("created_at", { ascending: false });
+
+  if (category !== "all") {
+    query = query.eq("category", category);
+  }
+
+  const { data: posts, error } = await query;
 
   if (error) {
     throw error;
@@ -199,7 +205,7 @@ export const saveCommunityPost = async (input: {
 
   const now = new Date().toISOString();
   const postId = createCommunityPostId();
-  const uploadedImages = await uploadCommunityImages(input.images ?? [], postId);
+  const uploadResult = await uploadCommunityImages(input.images ?? [], postId);
   const { data, error } = await supabase
     .from("community_posts")
     .insert({
@@ -208,7 +214,7 @@ export const saveCommunityPost = async (input: {
       author_nickname: input.authorNickname || defaultCommunityNickname,
       category: input.category,
       content: input.content,
-      images: getPersistableCommunityImages(uploadedImages) as Json,
+      images: getPersistableCommunityImages(uploadResult.images) as Json,
       title: input.title,
       created_at: now,
       updated_at: now,
@@ -220,7 +226,18 @@ export const saveCommunityPost = async (input: {
     throw error;
   }
 
-  return mapCommunityPost(data);
+  const savedPost = mapCommunityPost(data);
+
+  if (uploadResult.failedCount > 0) {
+    return {
+      ...savedPost,
+      imageUploadWarning:
+        uploadResult.errorMessage ||
+        "일부 이미지를 업로드하지 못해 글만 저장했습니다.",
+    };
+  }
+
+  return savedPost;
 };
 
 export const saveCommunityComment = async (input: {

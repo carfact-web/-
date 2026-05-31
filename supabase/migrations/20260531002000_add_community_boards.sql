@@ -1,6 +1,17 @@
 create table if not exists public.community_posts (
   id uuid primary key default gen_random_uuid(),
-  category text not null check (category in ('free', 'maintenance')),
+  category text not null check (
+    category in (
+      'free',
+      'maintenance',
+      'question',
+      'news',
+      'shop_review',
+      'electric',
+      'imported',
+      'domestic'
+    )
+  ),
   title text not null,
   content text not null,
   author_id uuid not null references auth.users(id) on delete cascade,

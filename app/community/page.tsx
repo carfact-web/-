@@ -9,6 +9,7 @@ import {
   communityCategories,
   getCommunityCategoryLabel,
   isCommunityCategory,
+  writableCommunityCategories,
 } from "@/lib/communityCategories";
 import {
   fetchCommunityComments,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/communityData";
 import type {
   CommunityCategory,
+  CommunityCategoryFilter,
   CommunityComment,
   CommunityImageAttachment,
   CommunityPost,
@@ -110,6 +112,8 @@ export default function CommunityPage() {
   const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
 
   const [activeCategory, setActiveCategory] =
+    useState<CommunityCategoryFilter>("all");
+  const [writeCategory, setWriteCategory] =
     useState<CommunityCategory>("free");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
@@ -160,7 +164,7 @@ export default function CommunityPage() {
     return nickname.trim() || "카팩트 사용자";
   };
 
-  const loadPosts = useCallback(async (category: CommunityCategory) => {
+  const loadPosts = useCallback(async (category: CommunityCategoryFilter) => {
     setIsLoadingPosts(true);
     setMessage("");
 
@@ -250,6 +254,7 @@ export default function CommunityPage() {
     }
 
     setSelectedPost(null);
+    setWriteCategory(activeCategory === "all" ? "free" : activeCategory);
     setIsWriting(true);
     setMessage("");
   };
@@ -320,7 +325,7 @@ export default function CommunityPage() {
       const createdPost = await saveCommunityPost({
         authorId: user.id,
         authorNickname: nickname,
-        category: activeCategory,
+        category: writeCategory,
         content,
         images: postImages,
         title,
@@ -335,7 +340,11 @@ export default function CommunityPage() {
       setSelectedPost(createdPost);
       setIsWriting(false);
       setPostImages([]);
+      setActiveCategory(createdPost.category);
       event.currentTarget.reset();
+      if (createdPost.imageUploadWarning) {
+        setMessage(createdPost.imageUploadWarning);
+      }
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "커뮤니티 글 저장에 실패했습니다."
@@ -487,38 +496,40 @@ export default function CommunityPage() {
           </button>
         </header>
 
-        <section
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-          aria-label="게시판 선택"
-        >
-          {communityCategories.map((category) => {
-            const isActive = category.value === activeCategory;
+        <section className={panelClassName} aria-label="게시판 선택">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-extrabold">주제별 게시판</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                관심 주제를 선택해 글을 모아보세요.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+            {communityCategories.map((category) => {
+              const isActive = category.value === activeCategory;
 
-            return (
-              <button
-                key={category.value}
-                type="button"
-                className={cn(
-                  "min-h-24 min-w-0 rounded-lg border p-4 text-left transition",
-                  isActive
-                    ? "border-red-400 bg-red-500/15 text-white"
-                    : "border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-600"
-                )}
-                onClick={() => {
-                  setActiveCategory(category.value);
-                  setIsWriting(false);
-                  setMessage("");
-                }}
-              >
-                <span className="block text-base font-extrabold sm:text-lg">
+              return (
+                <button
+                  key={category.value}
+                  type="button"
+                  className={cn(
+                    "min-h-12 min-w-0 rounded-lg border px-3 py-2 text-center text-sm font-extrabold transition",
+                    isActive
+                      ? "border-red-400 bg-red-500 text-white"
+                      : "border-zinc-800 bg-black text-zinc-300 hover:border-zinc-600"
+                  )}
+                  onClick={() => {
+                    setActiveCategory(category.value);
+                    setIsWriting(false);
+                    setMessage("");
+                  }}
+                >
                   {category.label}
-                </span>
-                <span className="mt-1 block text-xs leading-relaxed text-zinc-400 sm:text-sm">
-                  {category.description}
-                </span>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         {message ? (
@@ -550,6 +561,22 @@ export default function CommunityPage() {
               </button>
             </div>
             <form className="flex flex-col gap-3" onSubmit={submitPost}>
+              <label className="flex flex-col gap-2 text-sm font-bold text-zinc-300">
+                게시판
+                <select
+                  className={inputClassName}
+                  value={writeCategory}
+                  onChange={(event) =>
+                    setWriteCategory(event.currentTarget.value as CommunityCategory)
+                  }
+                >
+                  {writableCommunityCategories.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <input
                 className={inputClassName}
                 name="title"
@@ -673,6 +700,9 @@ export default function CommunityPage() {
                         {post.content}
                       </span>
                       <span className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
+                        {activeCategory === "all" ? (
+                          <span>{getCommunityCategoryLabel(post.category)}</span>
+                        ) : null}
                         <span>{post.authorNickname}</span>
                         <span>{post.createdAt}</span>
                         <span>좋아요 {post.likeCount}</span>

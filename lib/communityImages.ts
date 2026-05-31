@@ -3,6 +3,12 @@ import type { CommunityImageAttachment } from "@/types/community";
 
 export const communityImagesBucketName = "community-images";
 
+export interface CommunityImageUploadResult {
+  errorMessage: string;
+  failedCount: number;
+  images: CommunityImageAttachment[];
+}
+
 const getSafeFileName = (name: string) =>
   name
     .trim()
@@ -27,51 +33,70 @@ const getImageBlob = async (image: CommunityImageAttachment) => {
 export const uploadCommunityImages = async (
   images: CommunityImageAttachment[],
   postId: string
-) => {
+) : Promise<CommunityImageUploadResult> => {
   if (!supabase || images.length === 0) {
-    return images;
+    return {
+      errorMessage: "",
+      failedCount: 0,
+      images,
+    };
   }
 
   const client = supabase;
+  const uploadedImages: CommunityImageAttachment[] = [];
+  const errors: string[] = [];
 
-  return Promise.all(
+  await Promise.all(
     images.map(async (image, index) => {
-      if (image.path && image.url && !image.url.startsWith("data:")) {
-        return image;
-      }
+      try {
+        if (image.path && image.url && !image.url.startsWith("data:")) {
+          uploadedImages.push(image);
+          return;
+        }
 
-      const blob = await getImageBlob(image);
-      const path = [
-        postId,
-        Date.now(),
-        index,
-        getSafeFileName(image.name),
-      ].join("/");
-      const { error } = await client.storage
-        .from(communityImagesBucketName)
-        .upload(path, blob, {
-          contentType: image.type,
-          upsert: false,
+        const blob = await getImageBlob(image);
+        const path = [
+          postId,
+          Date.now(),
+          index,
+          getSafeFileName(image.name),
+        ].join("/");
+        const { error } = await client.storage
+          .from(communityImagesBucketName)
+          .upload(path, blob, {
+            contentType: image.type,
+            upsert: false,
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        const { data } = client.storage
+          .from(communityImagesBucketName)
+          .getPublicUrl(path);
+
+        uploadedImages.push({
+          id: image.id,
+          name: image.name,
+          path,
+          size: image.size,
+          type: image.type,
+          url: data.publicUrl,
         });
-
-      if (error) {
-        throw error;
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error.message : "이미지 업로드 실패"
+        );
       }
-
-      const { data } = client.storage
-        .from(communityImagesBucketName)
-        .getPublicUrl(path);
-
-      return {
-        id: image.id,
-        name: image.name,
-        path,
-        size: image.size,
-        type: image.type,
-        url: data.publicUrl,
-      };
     })
   );
+
+  return {
+    errorMessage: errors[0] ?? "",
+    failedCount: errors.length,
+    images: uploadedImages,
+  };
 };
 
 export const getPersistableCommunityImages = (

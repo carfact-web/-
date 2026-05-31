@@ -12,7 +12,7 @@ export interface Database {
       community_posts: {
         Row: {
           id: string;
-          category: "free" | "maintenance";
+          category: "free" | "maintenance" | "question" | "news" | "shop_review" | "electric" | "imported" | "domestic";
           title: string;
           content: string;
           author_id: string;
@@ -24,7 +24,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          category: "free" | "maintenance";
+          category: "free" | "maintenance" | "question" | "news" | "shop_review" | "electric" | "imported" | "domestic";
           title: string;
           content: string;
           author_id: string;
@@ -36,7 +36,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          category?: "free" | "maintenance";
+          category?: "free" | "maintenance" | "question" | "news" | "shop_review" | "electric" | "imported" | "domestic";
           title?: string;
           content?: string;
           author_id?: string;
