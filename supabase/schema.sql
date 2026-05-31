@@ -17,11 +17,13 @@ create table if not exists public.vehicles (
 create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles(id) on delete cascade,
+  author_id uuid references auth.users(id) on delete set null,
   author_nickname text default '익명 사용자',
   content text not null,
   tags text[] not null default '{}',
   images jsonb not null default '[]'::jsonb,
   vehicle_snapshot jsonb not null default '{}'::jsonb,
+  helpful_count integer not null default 0,
   report_count integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -48,6 +50,7 @@ create table if not exists public.community_posts (
   content text not null,
   author_id uuid not null references auth.users(id) on delete cascade,
   author_nickname text default '카팩트 사용자',
+  images jsonb not null default '[]'::jsonb,
   report_count integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -83,6 +86,15 @@ alter table public.user_profiles
 
 alter table public.user_profiles
   add column if not exists nickname_changed boolean not null default false;
+
+alter table public.reviews
+  add column if not exists author_id uuid references auth.users(id) on delete set null;
+
+alter table public.reviews
+  add column if not exists helpful_count integer not null default 0;
+
+alter table public.community_posts
+  add column if not exists images jsonb not null default '[]'::jsonb;
 
 create or replace function public.generate_random_profile_nickname()
 returns text
@@ -212,6 +224,25 @@ create trigger prevent_user_profile_nickname_rechange_trigger
   for each row
   execute function public.prevent_user_profile_nickname_rechange();
 
+create or replace function public.set_review_helpful_count(
+  p_review_id uuid,
+  p_helpful_count integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.reviews
+  set helpful_count = greatest(coalesce(p_helpful_count, 0), 0)
+  where id = p_review_id;
+end;
+$$;
+
+grant execute on function public.set_review_helpful_count(uuid, integer)
+  to anon, authenticated;
+
 create table if not exists public.vehicle_master (
   id uuid primary key default gen_random_uuid(),
   source text not null default 'carmanager',
@@ -245,11 +276,17 @@ create index if not exists vehicles_car_number_idx
 create index if not exists reviews_vehicle_id_created_at_idx
   on public.reviews (vehicle_id, created_at desc);
 
+create index if not exists reviews_author_id_created_at_idx
+  on public.reviews (author_id, created_at desc);
+
 create index if not exists review_reports_review_id_idx
   on public.review_reports (review_id);
 
 create index if not exists community_posts_category_created_at_idx
   on public.community_posts (category, created_at desc);
+
+create index if not exists community_posts_author_id_created_at_idx
+  on public.community_posts (author_id, created_at desc);
 
 create index if not exists community_comments_post_id_created_at_idx
   on public.community_comments (post_id, created_at);
@@ -312,7 +349,10 @@ create policy "Public read reviews"
 drop policy if exists "Public insert reviews" on public.reviews;
 create policy "Authenticated insert reviews"
   on public.reviews for insert
-  with check (auth.role() = 'authenticated');
+  with check (
+    auth.role() = 'authenticated'
+    and (author_id is null or auth.uid() = author_id)
+  );
 
 drop policy if exists "Public insert review reports" on public.review_reports;
 create policy "Public insert review reports"
@@ -401,3 +441,20 @@ drop policy if exists "Public upload review images" on storage.objects;
 create policy "Public upload review images"
   on storage.objects for insert
   with check (bucket_id = 'review-images');
+
+insert into storage.buckets (id, name, public)
+values ('community-images', 'community-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Public read community images" on storage.objects;
+create policy "Public read community images"
+  on storage.objects for select
+  using (bucket_id = 'community-images');
+
+drop policy if exists "Authenticated upload community images" on storage.objects;
+create policy "Authenticated upload community images"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'community-images'
+    and auth.role() = 'authenticated'
+  );

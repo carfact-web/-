@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Review } from "@/types/review";
+import { updateSupabaseReviewHelpfulCount } from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
 import {
   addHelpfulVote,
@@ -173,7 +174,13 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
       return;
     }
 
-    addHelpfulVote(storageKey, initialHelpfulCount);
+    const nextSnapshot = addHelpfulVote(storageKey, initialHelpfulCount);
+    void updateSupabaseReviewHelpfulCount(
+      String(review.id),
+      nextSnapshot.count
+    ).catch(() => {
+      // Keep local helpful state when remote persistence is unavailable.
+    });
   };
   const openReportModal = () => {
     if (reportSnapshot.isReported) {

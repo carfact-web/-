@@ -17,6 +17,7 @@ export interface Database {
           content: string;
           author_id: string;
           author_nickname: string | null;
+          images: Json;
           report_count: number;
           created_at: string;
           updated_at: string;
@@ -28,6 +29,7 @@ export interface Database {
           content: string;
           author_id: string;
           author_nickname?: string | null;
+          images?: Json;
           report_count?: number;
           created_at?: string;
           updated_at?: string;
@@ -39,6 +41,7 @@ export interface Database {
           content?: string;
           author_id?: string;
           author_nickname?: string | null;
+          images?: Json;
           report_count?: number;
           created_at?: string;
           updated_at?: string;
@@ -184,33 +187,39 @@ export interface Database {
         Row: {
           id: string;
           vehicle_id: string;
+          author_id: string | null;
           author_nickname: string | null;
           content: string;
           tags: string[];
           images: Json;
           vehicle_snapshot: Json;
+          helpful_count: number;
           report_count: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           vehicle_id: string;
+          author_id?: string | null;
           author_nickname?: string | null;
           content: string;
           tags?: string[];
           images?: Json;
           vehicle_snapshot?: Json;
+          helpful_count?: number;
           report_count?: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           vehicle_id?: string;
+          author_id?: string | null;
           author_nickname?: string | null;
           content?: string;
           tags?: string[];
           images?: Json;
           vehicle_snapshot?: Json;
+          helpful_count?: number;
           report_count?: number;
           created_at?: string;
         };
@@ -362,7 +371,15 @@ export interface Database {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      set_review_helpful_count: {
+        Args: {
+          p_helpful_count: number;
+          p_review_id: string;
+        };
+        Returns: void;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };

@@ -1,11 +1,17 @@
 import { supabase } from "@/lib/supabase";
+import {
+  getPersistableCommunityImages,
+  uploadCommunityImages,
+} from "@/lib/communityImages";
 import type {
   CommunityCategory,
   CommunityComment,
+  CommunityImageAttachment,
   CommunityCommentRow,
   CommunityPost,
   CommunityPostRow,
 } from "@/types/community";
+import type { Json } from "@/types/supabase";
 
 const defaultCommunityNickname = "카팩트 사용자";
 
@@ -25,6 +31,35 @@ const countByPostId = <T extends { post_id: string }>(rows: T[]) =>
     return counts;
   }, {});
 
+const createCommunityPostId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return String(Date.now());
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return (value as unknown[]).filter(isRecord).map((image) => ({
+    id: String(image.id ?? image.url ?? image.path ?? Date.now()),
+    name: String(image.name ?? "커뮤니티 이미지"),
+    path: typeof image.path === "string" ? image.path : undefined,
+    size: typeof image.size === "number" ? image.size : 0,
+    type:
+      image.type === "image/png" || image.type === "image/webp"
+        ? image.type
+        : "image/jpeg",
+    url: typeof image.url === "string" ? image.url : undefined,
+  }));
+};
+
 const mapCommunityPost = (
   row: CommunityPostRow,
   counts?: {
@@ -38,6 +73,7 @@ const mapCommunityPost = (
   title: row.title,
   content: row.content,
   authorNickname: row.author_nickname?.trim() || defaultCommunityNickname,
+  images: toCommunityImages(row.images),
   likeCount: counts?.likes?.[row.id] ?? 0,
   commentCount: counts?.comments?.[row.id] ?? 0,
   reportCount: counts?.reports?.[row.id] ?? row.report_count,
@@ -51,6 +87,36 @@ const mapCommunityComment = (row: CommunityCommentRow): CommunityComment => ({
   authorNickname: row.author_nickname?.trim() || defaultCommunityNickname,
   createdAt: toLocaleDateTime(row.created_at),
 });
+
+const fetchCommunityPostCounts = async (postIds: string[]) => {
+  if (!supabase || postIds.length === 0) {
+    return {};
+  }
+
+  const [commentsResult, likesResult, reportsResult] = await Promise.all([
+    supabase.from("community_comments").select("post_id").in("post_id", postIds),
+    supabase.from("community_likes").select("post_id").in("post_id", postIds),
+    supabase.from("community_reports").select("post_id").in("post_id", postIds),
+  ]);
+
+  if (commentsResult.error) {
+    throw commentsResult.error;
+  }
+
+  if (likesResult.error) {
+    throw likesResult.error;
+  }
+
+  if (reportsResult.error) {
+    throw reportsResult.error;
+  }
+
+  return {
+    comments: countByPostId(commentsResult.data),
+    likes: countByPostId(likesResult.data),
+    reports: countByPostId(reportsResult.data),
+  };
+};
 
 export const fetchCommunityPosts = async (category: CommunityCategory) => {
   if (!supabase) {
@@ -72,29 +138,31 @@ export const fetchCommunityPosts = async (category: CommunityCategory) => {
   }
 
   const postIds = posts.map((post) => post.id);
-  const [commentsResult, likesResult, reportsResult] = await Promise.all([
-    supabase.from("community_comments").select("post_id").in("post_id", postIds),
-    supabase.from("community_likes").select("post_id").in("post_id", postIds),
-    supabase.from("community_reports").select("post_id").in("post_id", postIds),
-  ]);
+  const counts = await fetchCommunityPostCounts(postIds);
 
-  if (commentsResult.error) {
-    throw commentsResult.error;
+  return posts.map((post) => mapCommunityPost(post, counts));
+};
+
+export const fetchCommunityPostsByAuthor = async (authorId: string) => {
+  if (!supabase) {
+    return [] as CommunityPost[];
   }
 
-  if (likesResult.error) {
-    throw likesResult.error;
+  const { data: posts, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("author_id", authorId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
   }
 
-  if (reportsResult.error) {
-    throw reportsResult.error;
+  if (posts.length === 0) {
+    return [];
   }
 
-  const counts = {
-    comments: countByPostId(commentsResult.data),
-    likes: countByPostId(likesResult.data),
-    reports: countByPostId(reportsResult.data),
-  };
+  const counts = await fetchCommunityPostCounts(posts.map((post) => post.id));
 
   return posts.map((post) => mapCommunityPost(post, counts));
 };
@@ -122,6 +190,7 @@ export const saveCommunityPost = async (input: {
   authorNickname: string;
   category: CommunityCategory;
   content: string;
+  images?: CommunityImageAttachment[];
   title: string;
 }) => {
   if (!supabase) {
@@ -129,13 +198,17 @@ export const saveCommunityPost = async (input: {
   }
 
   const now = new Date().toISOString();
+  const postId = createCommunityPostId();
+  const uploadedImages = await uploadCommunityImages(input.images ?? [], postId);
   const { data, error } = await supabase
     .from("community_posts")
     .insert({
+      id: postId,
       author_id: input.authorId,
       author_nickname: input.authorNickname || defaultCommunityNickname,
       category: input.category,
       content: input.content,
+      images: getPersistableCommunityImages(uploadedImages) as Json,
       title: input.title,
       created_at: now,
       updated_at: now,

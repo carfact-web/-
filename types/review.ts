@@ -13,6 +13,7 @@ export interface ReviewImageAttachment {
 
 export interface Review {
   id: number | string;
+  authorId?: string;
   authorNickname?: string;
   content: string;
   tags?: string[];

@@ -51,7 +51,7 @@ const cacheReviews = (storageKey: string, reviews: Review[]) => {
 
 export function useReviews(carNumber: string): UseReviewsResult {
   const sanitizedCarNumber = sanitizeVehiclePlateNumber(carNumber);
-  const { isAuthenticated, isAuthReady } = useAuth();
+  const { isAuthenticated, isAuthReady, user } = useAuth();
   const reviewStorageKey = getReviewStorageKey(sanitizedCarNumber);
   const reviewsJson = useSyncExternalStore(
     subscribeToReviews,
@@ -120,7 +120,8 @@ export function useReviews(carNumber: string): UseReviewsResult {
 
       const savedReview = await saveSupabaseReview(
         sanitizedCarNumber,
-        nextReview
+        nextReview,
+        user?.id
       );
 
       if (savedReview) {
@@ -141,7 +142,7 @@ export function useReviews(carNumber: string): UseReviewsResult {
         content: validation.content,
       };
     },
-    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
+    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber, user?.id]
   );
 
   const remoteReviews =

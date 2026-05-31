@@ -1,9 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import {
+  communityCategories,
+  getCommunityCategoryLabel,
+  isCommunityCategory,
+} from "@/lib/communityCategories";
 import {
   fetchCommunityComments,
   fetchCommunityPosts,
@@ -15,27 +21,11 @@ import {
 import type {
   CommunityCategory,
   CommunityComment,
+  CommunityImageAttachment,
   CommunityPost,
 } from "@/types/community";
 import { sanitizeUserText } from "@/utils/inputSanitizer";
 import { cn } from "@/utils/cn";
-
-const categories: {
-  description: string;
-  label: string;
-  value: CommunityCategory;
-}[] = [
-  {
-    value: "free",
-    label: "자유게시판",
-    description: "차량, 거래, 일상 이야기를 자유롭게 나눕니다.",
-  },
-  {
-    value: "maintenance",
-    label: "정비후기",
-    description: "정비 경험과 업체 이용 후기를 공유합니다.",
-  },
-];
 
 const pageClassName = cn(
   "min-h-screen overflow-x-hidden bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8"
@@ -65,6 +55,55 @@ const secondaryButtonClassName = cn(
 const normalizeField = (value: string, maxLength: number) =>
   sanitizeUserText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
 
+const allowedCommunityImageTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+const maxCommunityImages = 3;
+const maxCommunityImageBytes = 5 * 1024 * 1024;
+
+const isAllowedCommunityImageType = (
+  type: string
+): type is CommunityImageAttachment["type"] =>
+  allowedCommunityImageTypes.includes(
+    type as CommunityImageAttachment["type"]
+  );
+
+const readCommunityImageFile = async (
+  file: File
+): Promise<CommunityImageAttachment> => {
+  if (!isAllowedCommunityImageType(file.type)) {
+    throw new Error("jpg, png, webp 이미지만 첨부할 수 있습니다.");
+  }
+
+  if (file.size > maxCommunityImageBytes) {
+    throw new Error("이미지는 1장당 5MB 이하만 첨부할 수 있습니다.");
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("이미지를 불러오지 못했습니다."));
+        return;
+      }
+
+      resolve({
+        id: [file.name, file.size, Date.now()].join("-"),
+        name: file.name,
+        size: file.size,
+        type: file.type as CommunityImageAttachment["type"],
+        url: reader.result,
+      });
+    };
+
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function CommunityPage() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, user } = useAuth();
@@ -75,6 +114,8 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
+  const [postImages, setPostImages] = useState<CommunityImageAttachment[]>([]);
+  const [targetPostId, setTargetPostId] = useState("");
   const [isWriting, setIsWriting] = useState(false);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -82,11 +123,29 @@ export default function CommunityPage() {
   const [message, setMessage] = useState("");
 
   const activeCategoryLabel = useMemo(
-    () =>
-      categories.find((category) => category.value === activeCategory)?.label ??
-      "커뮤니티",
+    () => getCommunityCategoryLabel(activeCategory),
     [activeCategory]
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
+    const postId = params.get("post");
+
+    void Promise.resolve().then(() => {
+      if (category && isCommunityCategory(category)) {
+        setActiveCategory(category);
+      }
+
+      if (postId) {
+        setTargetPostId(postId);
+      }
+    });
+  }, []);
 
   const goToLogin = () => {
     const redirectTo =
@@ -165,6 +224,21 @@ export default function CommunityPage() {
     });
   }, [loadComments, selectedPostId]);
 
+  useEffect(() => {
+    if (!targetPostId) {
+      return;
+    }
+
+    const targetPost = posts.find((post) => post.id === targetPostId);
+
+    if (targetPost) {
+      void Promise.resolve().then(() => {
+        setSelectedPost(targetPost);
+        setTargetPostId("");
+      });
+    }
+  }, [posts, targetPostId]);
+
   const startWriting = () => {
     if (!isAuthReady) {
       return;
@@ -177,6 +251,47 @@ export default function CommunityPage() {
 
     setSelectedPost(null);
     setIsWriting(true);
+    setMessage("");
+  };
+
+  const addPostImages = async (files: FileList | null) => {
+    if (!files) {
+      return;
+    }
+
+    const remainingSlots = maxCommunityImages - postImages.length;
+
+    if (remainingSlots <= 0) {
+      setMessage("이미지는 최대 3장까지 첨부할 수 있습니다.");
+      return;
+    }
+
+    const nextFiles = Array.from(files).slice(0, remainingSlots);
+
+    try {
+      const nextImages = await Promise.all(
+        nextFiles.map((file) => readCommunityImageFile(file))
+      );
+
+      setPostImages((current) =>
+        [...current, ...nextImages].slice(0, maxCommunityImages)
+      );
+      setMessage(
+        files.length > remainingSlots
+          ? "이미지는 최대 3장까지 첨부할 수 있습니다."
+          : ""
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "이미지를 불러오지 못했습니다."
+      );
+    }
+  };
+
+  const removePostImage = (imageId: string) => {
+    setPostImages((current) =>
+      current.filter((image) => image.id !== imageId)
+    );
     setMessage("");
   };
 
@@ -207,6 +322,7 @@ export default function CommunityPage() {
         authorNickname: nickname,
         category: activeCategory,
         content,
+        images: postImages,
         title,
       });
 
@@ -218,6 +334,7 @@ export default function CommunityPage() {
       setPosts((current) => [createdPost, ...current]);
       setSelectedPost(createdPost);
       setIsWriting(false);
+      setPostImages([]);
       event.currentTarget.reset();
     } catch (error) {
       setMessage(
@@ -370,8 +487,11 @@ export default function CommunityPage() {
           </button>
         </header>
 
-        <section className="grid gap-3 sm:grid-cols-2" aria-label="게시판 선택">
-          {categories.map((category) => {
+        <section
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+          aria-label="게시판 선택"
+        >
+          {communityCategories.map((category) => {
             const isActive = category.value === activeCategory;
 
             return (
@@ -379,9 +499,9 @@ export default function CommunityPage() {
                 key={category.value}
                 type="button"
                 className={cn(
-                  "rounded-lg border p-4 text-left transition",
+                  "min-h-24 rounded-lg border p-4 text-left transition",
                   isActive
-                    ? "border-red-400 bg-red-500/10 text-white"
+                    ? "border-red-400 bg-red-500/15 text-white"
                     : "border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-600"
                 )}
                 onClick={() => {
@@ -390,10 +510,10 @@ export default function CommunityPage() {
                   setMessage("");
                 }}
               >
-                <span className="block text-lg font-extrabold">
+                <span className="block text-base font-extrabold sm:text-lg">
                   {category.label}
                 </span>
-                <span className="mt-1 block text-sm leading-relaxed text-zinc-400">
+                <span className="mt-1 block text-xs leading-relaxed text-zinc-400 sm:text-sm">
                   {category.description}
                 </span>
               </button>
@@ -444,6 +564,58 @@ export default function CommunityPage() {
                 maxLength={2000}
                 required
               />
+              <div className="rounded-lg border border-dashed border-zinc-700 bg-black/40 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-white">이미지 첨부</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      jpg, png, webp · 최대 3장 · 이미지당 5MB 이하
+                    </p>
+                  </div>
+                  <label className={cn(secondaryButtonClassName, "cursor-pointer")}>
+                    이미지 선택
+                    <input
+                      className="sr-only"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={(event) => {
+                        void addPostImages(event.currentTarget.files);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {postImages.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    {postImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+                      >
+                        {image.url ? (
+                          <Image
+                            src={image.url}
+                            alt={image.name}
+                            fill
+                            unoptimized
+                            sizes="120px"
+                            className="object-cover"
+                          />
+                        ) : null}
+                        <button
+                          type="button"
+                          className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-bold text-white"
+                          onClick={() => removePostImage(image.id)}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <button
                 type="submit"
                 className={primaryButtonClassName}
@@ -505,6 +677,9 @@ export default function CommunityPage() {
                         <span>{post.createdAt}</span>
                         <span>좋아요 {post.likeCount}</span>
                         <span>댓글 {post.commentCount}</span>
+                        {post.images.length > 0 ? (
+                          <span>이미지 {post.images.length}</span>
+                        ) : null}
                       </span>
                     </button>
                   );
@@ -528,6 +703,30 @@ export default function CommunityPage() {
                   <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-zinc-200">
                     {selectedPost.content}
                   </p>
+                  {selectedPost.images.length > 0 ? (
+                    <div className="mt-5 grid grid-cols-3 gap-3">
+                      {selectedPost.images.map((image) => (
+                        <a
+                          key={image.id}
+                          href={image.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+                        >
+                          {image.url ? (
+                            <Image
+                              src={image.url}
+                              alt={image.name}
+                              fill
+                              unoptimized
+                              sizes="160px"
+                              className="object-cover"
+                            />
+                          ) : null}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button
                       type="button"

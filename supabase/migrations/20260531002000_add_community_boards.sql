@@ -5,6 +5,7 @@ create table if not exists public.community_posts (
   content text not null,
   author_id uuid not null references auth.users(id) on delete cascade,
   author_nickname text default '카팩트 사용자',
+  images jsonb not null default '[]'::jsonb,
   report_count integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -98,4 +99,21 @@ create policy "Authenticated insert community reports"
   with check (
     auth.role() = 'authenticated'
     and (user_id is null or auth.uid() = user_id)
+  );
+
+insert into storage.buckets (id, name, public)
+values ('community-images', 'community-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Public read community images" on storage.objects;
+create policy "Public read community images"
+  on storage.objects for select
+  using (bucket_id = 'community-images');
+
+drop policy if exists "Authenticated upload community images" on storage.objects;
+create policy "Authenticated upload community images"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'community-images'
+    and auth.role() = 'authenticated'
   );

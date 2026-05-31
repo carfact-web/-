@@ -91,11 +91,13 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
 
 export const mapReviewRow = (row: ReviewRow): Review => ({
   id: row.id,
+  authorId: row.author_id ?? undefined,
   authorNickname: row.author_nickname ?? "익명 사용자",
   content: row.content,
   tags: row.tags ?? [],
   images: toReviewImages(row.images),
   hasImages: toReviewImages(row.images).length > 0,
+  helpfulCount: row.helpful_count,
   reportCount: row.report_count,
   createdAt: toLocaleDateTime(row.created_at),
   vehicleSnapshot: toVehicleSnapshot(row.vehicle_snapshot),
@@ -176,7 +178,8 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
 
 export const saveSupabaseReview = async (
   plateNumber: string,
-  review: Review
+  review: Review,
+  authorId?: string
 ) => {
   if (!supabase) {
     return null;
@@ -206,6 +209,7 @@ export const saveSupabaseReview = async (
     .insert({
       id: reviewId,
       vehicle_id: vehicle.id,
+      author_id: authorId ?? null,
       author_nickname: authorNickname,
       content: review.content,
       tags: review.tags ?? [],
@@ -246,4 +250,22 @@ export const saveSupabaseReviewReport = async (
   }
 
   return data;
+};
+
+export const updateSupabaseReviewHelpfulCount = async (
+  reviewId: string,
+  helpfulCount: number
+) => {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.rpc("set_review_helpful_count", {
+    p_helpful_count: helpfulCount,
+    p_review_id: reviewId,
+  });
+
+  if (error) {
+    throw error;
+  }
 };
