@@ -51,54 +51,16 @@ const getUserLabel = (user: User | null) => {
   return user.email ?? "로그인 사용자";
 };
 
-const getProviderUserId = (user: User | null, provider: OAuthProvider) => {
-  const identity = user?.identities?.find((item) => item.provider === provider);
-  const identityData = identity?.identity_data;
-  const providerId = identityData?.provider_id;
-  const sub = identityData?.sub;
-
-  if (typeof providerId === "string" && providerId.trim()) {
-    return providerId;
-  }
-
-  if (typeof sub === "string" && sub.trim()) {
-    return sub;
-  }
-
-  return identity?.id ?? null;
-};
-
 const syncUserProfile = async (user: User | null) => {
   if (!supabase || !user) {
     return;
   }
 
-  const provider =
-    typeof user.app_metadata.provider === "string"
-      ? user.app_metadata.provider
-      : null;
-  const kakaoProviderId = getProviderUserId(user, "kakao");
-  const googleProviderId = getProviderUserId(user, "google");
-  const providerUserId =
-    provider === "kakao"
-      ? kakaoProviderId
-      : provider === "google"
-        ? googleProviderId
-        : null;
   const now = new Date().toISOString();
-  const profileData = {
-    email: user.email ?? null,
-    display_name: getUserLabel(user),
-    auth_provider: provider,
-    provider_user_id: providerUserId,
-    kakao_provider_id: kakaoProviderId,
-    google_provider_id: googleProviderId,
-    updated_at: now,
-  };
   const { data: existingProfile, error: profileError } = await supabase
     .from("user_profiles")
-    .select("user_id,nickname,nickname_changed")
-    .eq("user_id", user.id)
+    .select("id,nickname,nickname_changed")
+    .eq("id", user.id)
     .maybeSingle();
 
   if (profileError) {
@@ -107,10 +69,10 @@ const syncUserProfile = async (user: User | null) => {
 
   if (!existingProfile) {
     const { error } = await supabase.from("user_profiles").insert({
-      user_id: user.id,
-      ...profileData,
+      id: user.id,
       nickname: createRandomNickname(),
       nickname_changed: false,
+      updated_at: now,
       created_at: now,
     });
 
@@ -123,17 +85,19 @@ const syncUserProfile = async (user: User | null) => {
 
   const nextProfile =
     existingProfile.nickname?.trim()
-      ? profileData
+      ? {
+          updated_at: now,
+        }
       : {
-          ...profileData,
           nickname: createRandomNickname(),
           nickname_changed: false,
+          updated_at: now,
         };
 
   const { error } = await supabase
     .from("user_profiles")
     .update(nextProfile)
-    .eq("user_id", user.id);
+    .eq("id", user.id);
 
   if (error) {
     throw error;

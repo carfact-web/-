@@ -56,7 +56,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
       return "";
     }
 
-    if (profile?.user_id === user.id && profile.nickname?.trim()) {
+    if (profile?.id === user.id && profile.nickname?.trim()) {
       return profile.nickname.trim();
     }
 
@@ -66,7 +66,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
       const { data, error } = await client
         .from("user_profiles")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (error) {
@@ -92,7 +92,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
             nickname_changed: false,
             updated_at: now,
           })
-          .eq("user_id", user.id)
+          .eq("id", user.id)
           .select("*")
           .single();
 
@@ -110,7 +110,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
       const { data: createdProfile, error: createError } = await client
         .from("user_profiles")
         .insert({
-          user_id: user.id,
+          id: user.id,
           nickname: nextNickname,
           nickname_changed: false,
           created_at: now,
@@ -123,7 +123,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
         const { data: reloadedProfile, error: reloadError } = await client
           .from("user_profiles")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("id", user.id)
           .maybeSingle();
 
         if (reloadError) {
@@ -228,12 +228,12 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
         .from("user_profiles")
         .upsert(
           {
-            user_id: user.id,
+            id: user.id,
             nickname: validation.nickname,
             nickname_changed: true,
             updated_at: now,
           },
-          { onConflict: "user_id" }
+          { onConflict: "id" }
         )
         .select("*")
         .single();
