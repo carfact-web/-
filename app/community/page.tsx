@@ -38,7 +38,7 @@ const categories: {
 ];
 
 const pageClassName = cn(
-  "min-h-screen bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8"
+  "min-h-screen overflow-x-hidden bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8"
 );
 const shellClassName = cn("mx-auto flex w-full max-w-4xl flex-col gap-5");
 const panelClassName = cn(
@@ -603,7 +603,7 @@ export default function CommunityPage() {
               <div className="flex min-h-64 items-center justify-center text-center">
                 <div>
                   <h2 className="text-xl font-extrabold">글 상세</h2>
-                  <p className={cn(mutedTextClassName, "mt-2")}>
+                  <p className={cn(mutedTextClassName, "mx-auto mt-2 max-w-xs")}>
                     목록에서 글을 선택하면 상세 내용과 댓글을 확인할 수 있습니다.
                   </p>
                 </div>

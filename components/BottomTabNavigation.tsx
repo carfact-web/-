@@ -43,9 +43,9 @@ const navClassName = cn(
   "px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-2xl shadow-black/40 backdrop-blur md:hidden"
 );
 
-const listClassName = cn("mx-auto grid max-w-md grid-cols-4 gap-1");
+const listClassName = cn("mx-auto grid w-full max-w-md grid-cols-4 gap-1");
 const itemClassName = cn(
-  "flex h-14 flex-col items-center justify-center gap-1 rounded-lg text-xs font-semibold transition",
+  "flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg text-xs font-semibold transition",
   "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200 active:scale-[0.98]"
 );
 const activeItemClassName = cn("bg-red-500/10 text-red-300");
@@ -135,7 +135,7 @@ export function BottomTabNavigation() {
               className={cn(itemClassName, isActive && activeItemClassName)}
             >
               <TabIcon icon={item.icon} />
-              <span>{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
