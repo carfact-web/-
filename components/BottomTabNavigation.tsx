@@ -39,11 +39,11 @@ const navigationItems: NavigationItem[] = [
 ];
 
 const navClassName = cn(
-  "fixed inset-x-0 bottom-0 z-[9000] border-t border-zinc-800/90 bg-zinc-950/95",
+  "fixed inset-x-0 bottom-0 z-[9000] box-border w-screen overflow-hidden border-t border-zinc-800/90 bg-zinc-950/95",
   "px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-2xl shadow-black/40 backdrop-blur md:hidden"
 );
 
-const listClassName = cn("mx-auto grid w-full max-w-md grid-cols-4 gap-1");
+const listClassName = cn("mx-auto grid w-full max-w-md grid-cols-4 gap-1 box-border");
 const itemClassName = cn(
   "flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg text-xs font-semibold transition",
   "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200 active:scale-[0.98]"

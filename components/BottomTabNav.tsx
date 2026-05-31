@@ -7,10 +7,10 @@ import { cn } from "@/utils/cn";
 type TabIconName = "home" | "recent" | "community" | "my";
 
 const navClassName = cn(
-  "fixed inset-x-0 bottom-0 z-50 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
+  "fixed inset-x-0 bottom-0 z-50 w-screen overflow-hidden border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
 );
 const navInnerClassName = cn(
-  "mx-auto grid w-full max-w-3xl grid-cols-4 gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
+  "mx-auto grid w-full max-w-3xl grid-cols-4 gap-1 box-border px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
 );
 const tabButtonClassName = cn(
   "inline-flex h-14 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs font-semibold transition",
