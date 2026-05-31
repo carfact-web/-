@@ -60,6 +60,7 @@ export const useGuestReportAccess = (carNumber: string) => {
   const {
     isAuthenticated,
     isAuthReady,
+    signInWithGoogle,
     signInWithKakao,
   } = useAuth();
   const sanitizedCarNumber = sanitizeVehiclePlateNumber(carNumber);
@@ -107,6 +108,7 @@ export const useGuestReportAccess = (carNumber: string) => {
     isAllowed,
     isBlocked,
     isChecking: !isAuthReady,
+    signInWithGoogle,
     signInWithKakao,
   };
 };

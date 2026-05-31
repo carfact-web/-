@@ -122,6 +122,7 @@ export default function ReviewPage() {
   const {
     isAuthenticated,
     isAuthReady,
+    signInWithGoogle,
     signInWithKakao,
   } = useAuth();
   const { addReview } = useReviews(carNumber);
@@ -285,8 +286,12 @@ export default function ReviewPage() {
     }, 850);
   };
 
-  const loginFromCurrentPage = () => {
+  const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
+  };
+
+  const googleLoginFromCurrentPage = () => {
+    void signInWithGoogle(window.location.href);
   };
 
   if (!isAuthReady) {
@@ -313,23 +318,11 @@ export default function ReviewPage() {
 
   if (!isAuthenticated) {
     return (
-      <main className={pageClassName}>
-        <div className={shellClassName}>
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className={homeButtonClassName}
-          >
-            ← 홈으로
-          </button>
-
-          <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
-
-          <LoginRequiredPanel
-            onHome={() => router.push("/")}
-            onLogin={loginFromCurrentPage}
-          />
-        </div>
+      <main className="min-h-screen bg-black pb-24">
+        <LoginRequiredPanel
+          onGoogleLogin={googleLoginFromCurrentPage}
+          onKakaoLogin={kakaoLoginFromCurrentPage}
+        />
       </main>
     );
   }

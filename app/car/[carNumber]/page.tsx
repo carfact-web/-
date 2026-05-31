@@ -145,6 +145,7 @@ export default function CarReportPage() {
     isAllowed: isGuestReportAllowed,
     isBlocked: isGuestReportBlocked,
     isChecking: isGuestReportChecking,
+    signInWithGoogle,
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
@@ -231,8 +232,12 @@ export default function CarReportPage() {
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
   }, [carNumber, isGuestReportAllowed, recentTitle, vehicle, saveRecentView]);
 
-  const loginFromCurrentPage = () => {
+  const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
+  };
+
+  const googleLoginFromCurrentPage = () => {
+    void signInWithGoogle(window.location.href);
   };
 
   if (isGuestReportChecking) {
@@ -259,23 +264,11 @@ export default function CarReportPage() {
 
   if (isGuestReportBlocked) {
     return (
-      <main className={pageClassName}>
-        <div className={shellClassName}>
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className={homeButtonClassName}
-          >
-            ← 홈으로
-          </button>
-
-          <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
-
-          <LoginRequiredPanel
-            onHome={() => router.push("/")}
-            onLogin={loginFromCurrentPage}
-          />
-        </div>
+      <main className="min-h-screen bg-black pb-24">
+        <LoginRequiredPanel
+          onGoogleLogin={googleLoginFromCurrentPage}
+          onKakaoLogin={kakaoLoginFromCurrentPage}
+        />
       </main>
     );
   }
