@@ -392,8 +392,11 @@ export default function CommunityPage() {
         setMessage(createdPost.imageUploadWarning);
       }
     } catch (error) {
+      console.error("community-post-save-error", error);
       setMessage(
-        error instanceof Error ? error.message : "커뮤니티 글 저장에 실패했습니다."
+        error instanceof Error
+          ? "커뮤니티 글 저장 실패: " + error.message
+          : "커뮤니티 글 저장에 실패했습니다."
       );
     } finally {
       setIsSubmitting(false);
@@ -527,6 +530,9 @@ export default function CommunityPage() {
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               커뮤니티
             </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
+              차량 고민, 정비 경험, 구매 후기를 자유롭게 나눠보세요.
+            </p>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="게시글 정렬">
               {sortOptions.map((option) => (
                 <button
@@ -754,8 +760,8 @@ export default function CommunityPage() {
                       </span>
                       <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
                         <span>{post.authorNickname}</span>
-                        <span>좋아요 {post.likeCount}</span>
                         <span>댓글 {post.commentCount}</span>
+                        <span>좋아요 {post.likeCount}</span>
                         <span>{post.createdAt}</span>
                         {post.images.length > 0 ? (
                           <span>이미지 {post.images.length}</span>

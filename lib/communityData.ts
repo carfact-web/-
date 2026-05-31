@@ -23,7 +23,11 @@ const toLocaleDateTime = (value: string) => {
     return value;
   }
 
-  return date.toLocaleString();
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join(".");
 };
 
 const countByPostId = <T extends { post_id: string }>(rows: T[]) =>
@@ -59,6 +63,22 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
         : "image/jpeg",
     url: typeof image.url === "string" ? image.url : undefined,
   }));
+};
+
+const isMissingImagesColumnError = (error: unknown) => {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  const message = String(error.message ?? "");
+  const details = String(error.details ?? "");
+  const code = String(error.code ?? "");
+
+  return (
+    code === "PGRST204" ||
+    message.includes("images") ||
+    details.includes("images")
+  );
 };
 
 const mapCommunityPost = (
@@ -207,24 +227,43 @@ export const saveCommunityPost = async (input: {
   const now = new Date().toISOString();
   const postId = createCommunityPostId();
   const uploadResult = await uploadCommunityImages(input.images ?? [], postId);
-  const { data, error } = await supabase
-    .from("community_posts")
-    .insert({
+  const basePayload = {
       id: postId,
       author_id: input.authorId,
       author_nickname: input.authorNickname || defaultCommunityNickname,
       category: input.category,
       content: input.content,
-      images: getPersistableCommunityImages(uploadResult.images) as Json,
       title: input.title,
       created_at: now,
       updated_at: now,
-    })
+  };
+  const payloadWithImages = {
+    ...basePayload,
+    images: getPersistableCommunityImages(uploadResult.images) as Json,
+  };
+  let { data, error } = await supabase
+    .from("community_posts")
+    .insert(payloadWithImages)
     .select("*")
     .single();
 
+  if (error && isMissingImagesColumnError(error)) {
+    const retryResult = await supabase
+      .from("community_posts")
+      .insert(basePayload)
+      .select("*")
+      .single();
+
+    data = retryResult.data;
+    error = retryResult.error;
+  }
+
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error("community-post-empty-response");
   }
 
   const savedPost = mapCommunityPost(data);
