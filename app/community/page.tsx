@@ -499,7 +499,7 @@ export default function CommunityPage() {
                 key={category.value}
                 type="button"
                 className={cn(
-                  "min-h-24 rounded-lg border p-4 text-left transition",
+                  "min-h-24 min-w-0 rounded-lg border p-4 text-left transition",
                   isActive
                     ? "border-red-400 bg-red-500/15 text-white"
                     : "border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-600"
