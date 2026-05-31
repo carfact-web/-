@@ -6,7 +6,7 @@ import type { Session, User } from "@supabase/supabase-js";
 
 type OAuthProvider = "google" | "kakao";
 
-const kakaoOAuthScopes = "profile_nickname profile_image";
+const kakaoOAuthScope = "profile_nickname profile_image";
 
 interface UseAuthResult {
   authError: string;
@@ -173,17 +173,20 @@ export function useAuth(): UseAuthResult {
 
     setAuthError("");
 
+    const queryParams: Record<string, string> =
+      provider === "google"
+        ? {
+            prompt: "select_account",
+          }
+        : {
+            scope: kakaoOAuthScope,
+          };
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: redirectTo ?? window.location.href,
-        scopes: provider === "kakao" ? kakaoOAuthScopes : undefined,
-        queryParams:
-          provider === "google"
-            ? {
-                prompt: "select_account",
-              }
-            : undefined,
+        queryParams,
       },
     });
 
