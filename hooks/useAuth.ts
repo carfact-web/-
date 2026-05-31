@@ -6,6 +6,8 @@ import type { Session, User } from "@supabase/supabase-js";
 
 type OAuthProvider = "google" | "kakao";
 
+const kakaoOAuthScopes = "profile_nickname profile_image";
+
 interface UseAuthResult {
   authError: string;
   isAuthenticated: boolean;
@@ -19,20 +21,28 @@ interface UseAuthResult {
   userLabel: string;
 }
 
+const getStringMetadata = (
+  metadata: User["user_metadata"] | undefined,
+  key: string
+) => {
+  const value = metadata?.[key];
+
+  return typeof value === "string" && value.trim() ? value : null;
+};
+
 const getUserLabel = (user: User | null) => {
   if (!user) {
     return "";
   }
 
-  const fullName = user.user_metadata?.full_name;
-  const name = user.user_metadata?.name;
+  const label =
+    getStringMetadata(user.user_metadata, "full_name") ??
+    getStringMetadata(user.user_metadata, "name") ??
+    getStringMetadata(user.user_metadata, "nickname") ??
+    getStringMetadata(user.user_metadata, "preferred_username");
 
-  if (typeof fullName === "string" && fullName.trim()) {
-    return fullName;
-  }
-
-  if (typeof name === "string" && name.trim()) {
-    return name;
+  if (label) {
+    return label;
   }
 
   return user.email ?? "로그인 사용자";
@@ -167,6 +177,7 @@ export function useAuth(): UseAuthResult {
       provider,
       options: {
         redirectTo: redirectTo ?? window.location.href,
+        scopes: provider === "kakao" ? kakaoOAuthScopes : undefined,
         queryParams:
           provider === "google"
             ? {
