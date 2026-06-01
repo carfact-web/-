@@ -95,13 +95,12 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
 
 export const mapReviewRow = (row: ReviewRow): Review => ({
   id: row.id,
-  authorId: row.author_id ?? undefined,
   authorNickname: row.author_nickname ?? "익명 사용자",
   content: row.content,
   tags: row.tags ?? [],
   images: toReviewImages(row.images),
   hasImages: toReviewImages(row.images).length > 0,
-  helpfulCount: row.helpful_count,
+  helpfulCount: 0,
   reportCount: row.report_count,
   createdAt: toLocaleDateTime(row.created_at),
   vehicleSnapshot: toVehicleSnapshot(row.vehicle_snapshot),
@@ -182,8 +181,7 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
 
 export const saveSupabaseReview = async (
   plateNumber: string,
-  review: Review,
-  authorId?: string
+  review: Review
 ) => {
   if (!supabase) {
     return null;
@@ -208,24 +206,27 @@ export const saveSupabaseReview = async (
   const reviewId = createReviewId();
   const uploadedImages = await uploadReviewImages(review.images ?? [], reviewId);
   const now = new Date().toISOString();
+  const payload = {
+    id: reviewId,
+    vehicle_id: vehicle.id,
+    author_nickname: authorNickname,
+    content: review.content,
+    tags: review.tags ?? [],
+    images: getPersistableReviewImages(uploadedImages) as Json,
+    vehicle_snapshot: {
+      ...(review.vehicleSnapshot ?? vehicle),
+      id: vehicle.id,
+      plateNumber: sanitizeVehiclePlateNumber(plateNumber),
+    } as Json,
+    report_count: review.reportCount ?? 0,
+    created_at: now,
+  };
+
+  console.log("review-insert-payload", payload);
+
   const { data, error } = await supabase
     .from("reviews")
-    .insert({
-      id: reviewId,
-      vehicle_id: vehicle.id,
-      author_id: authorId ?? null,
-      author_nickname: authorNickname,
-      content: review.content,
-      tags: review.tags ?? [],
-      images: getPersistableReviewImages(uploadedImages) as Json,
-      vehicle_snapshot: {
-        ...(review.vehicleSnapshot ?? vehicle),
-        id: vehicle.id,
-        plateNumber: sanitizeVehiclePlateNumber(plateNumber),
-      } as Json,
-      report_count: review.reportCount ?? 0,
-      created_at: now,
-    })
+    .insert(payload)
     .select("*")
     .single();
 

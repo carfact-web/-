@@ -2,7 +2,7 @@ import { fetchCommunityPostsByAuthor } from "@/lib/communityData";
 import { supabase } from "@/lib/supabase";
 import { mapReviewRow } from "@/lib/supabaseData";
 import type { CommunityCategory, CommunityPost } from "@/types/community";
-import type { Review } from "@/types/review";
+import type { Review, ReviewRow } from "@/types/review";
 
 export interface AccountActivity {
   communityLikeCount: number;
@@ -52,11 +52,9 @@ export const fetchAccountActivity = async (
   }
 
   const [reviewsResult, communityPosts] = await Promise.all([
-    supabase
-      .from("reviews")
-      .select("*")
-      .eq("author_id", userId)
-      .order("created_at", { ascending: false }),
+    // The production reviews table currently has no user identifier column,
+    // so account-scoped review activity cannot be queried without a schema change.
+    Promise.resolve({ data: [] as ReviewRow[], error: null }),
     fetchCommunityPostsByAuthor(userId),
   ]);
 

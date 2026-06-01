@@ -131,8 +131,7 @@ export function useReviews(carNumber: string): UseReviewsResult {
 
       const savedReview = await saveSupabaseReview(
         sanitizedCarNumber,
-        nextReview,
-        sessionUserId
+        nextReview
       );
 
       if (savedReview) {

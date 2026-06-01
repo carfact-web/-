@@ -193,39 +193,33 @@ export interface Database {
         Row: {
           id: string;
           vehicle_id: string;
-          author_id: string | null;
           author_nickname: string | null;
           content: string;
           tags: string[];
           images: Json;
           vehicle_snapshot: Json;
-          helpful_count: number;
           report_count: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           vehicle_id: string;
-          author_id?: string | null;
           author_nickname?: string | null;
           content: string;
           tags?: string[];
           images?: Json;
           vehicle_snapshot?: Json;
-          helpful_count?: number;
           report_count?: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           vehicle_id?: string;
-          author_id?: string | null;
           author_nickname?: string | null;
           content?: string;
           tags?: string[];
           images?: Json;
           vehicle_snapshot?: Json;
-          helpful_count?: number;
           report_count?: number;
           created_at?: string;
         };

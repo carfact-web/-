@@ -82,6 +82,22 @@ const isMissingImagesColumnError = (error: unknown) => {
   );
 };
 
+const isMissingCommunityAuxTableError = (error: unknown) => {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  const code = String(error.code ?? "");
+  const message = String(error.message ?? "");
+
+  return (
+    code === "PGRST205" &&
+    (message.includes("community_comments") ||
+      message.includes("community_likes") ||
+      message.includes("community_reports"))
+  );
+};
+
 const mapCommunityPost = (
   row: CommunityPostRow,
   counts?: {
@@ -122,22 +138,30 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
     supabase.from("community_reports").select("post_id").in("post_id", postIds),
   ]);
 
-  if (commentsResult.error) {
+  if (commentsResult.error && !isMissingCommunityAuxTableError(commentsResult.error)) {
     throw commentsResult.error;
   }
 
-  if (likesResult.error) {
+  if (likesResult.error && !isMissingCommunityAuxTableError(likesResult.error)) {
     throw likesResult.error;
   }
 
-  if (reportsResult.error) {
+  if (reportsResult.error && !isMissingCommunityAuxTableError(reportsResult.error)) {
     throw reportsResult.error;
   }
 
+  if (commentsResult.error || likesResult.error || reportsResult.error) {
+    console.warn("community-counts-partial-error", {
+      commentsError: commentsResult.error ?? null,
+      likesError: likesResult.error ?? null,
+      reportsError: reportsResult.error ?? null,
+    });
+  }
+
   return {
-    comments: countByPostId(commentsResult.data),
-    likes: countByPostId(likesResult.data),
-    reports: countByPostId(reportsResult.data),
+    comments: countByPostId(commentsResult.data ?? []),
+    likes: countByPostId(likesResult.data ?? []),
+    reports: countByPostId(reportsResult.data ?? []),
   };
 };
 
@@ -209,6 +233,14 @@ export const fetchCommunityComments = async (postId: string) => {
     .order("created_at", { ascending: true });
 
   if (error) {
+    if (isMissingCommunityAuxTableError(error)) {
+      console.warn("community-comments-missing-table", {
+        postId,
+        error,
+      });
+      return [] as CommunityComment[];
+    }
+
     throw error;
   }
 
