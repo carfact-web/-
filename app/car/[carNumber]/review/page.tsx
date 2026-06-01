@@ -8,6 +8,7 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useVehicle } from "@/hooks/useVehicle";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { validateReviewContent } from "@/utils/reviewValidation";
@@ -246,6 +247,30 @@ export default function ReviewPage() {
     setValidationMessage("");
     setIsSubmitting(true);
 
+    const { data: sessionData, error: sessionError } =
+      supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+    const sessionUserId = sessionData.session?.user.id ?? null;
+
+    console.log("review-auth-session", {
+      sessionUserId,
+      hookUserId: user?.id ?? null,
+      userIdMatches: sessionUserId === user?.id,
+    });
+
+    if (sessionError) {
+      setIsSubmitting(false);
+      setValidationMessage(sessionError.message);
+      return;
+    }
+
+    if (!sessionUserId) {
+      setIsSubmitting(false);
+      router.replace(
+        `/login?redirectTo=${encodeURIComponent(window.location.href)}`
+      );
+      return;
+    }
+
     const authorNickname = reviewNickname || (await ensureReviewNickname());
 
     if (!authorNickname) {
@@ -270,11 +295,14 @@ export default function ReviewPage() {
     let saveResult;
 
     try {
-      saveResult = await addReview(newReview);
-    } catch {
+      saveResult = await addReview(newReview, sessionUserId);
+    } catch (error) {
+      console.error("review-save-error", error);
       setIsSubmitting(false);
       setValidationMessage(
-        "이미지 저장 공간이 부족해요. 이미지를 줄인 뒤 다시 시도해주세요."
+        error instanceof Error
+          ? error.message
+          : "후기 저장 실패: 알 수 없는 Supabase 오류"
       );
       return;
     }

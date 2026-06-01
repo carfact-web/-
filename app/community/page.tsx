@@ -11,6 +11,7 @@ import {
   isCommunityCategory,
   writableCommunityCategories,
 } from "@/lib/communityCategories";
+import { supabase } from "@/lib/supabase";
 import {
   fetchCommunityComments,
   fetchCommunityPosts,
@@ -349,7 +350,11 @@ export default function CommunityPage() {
   const submitPost = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!user) {
+    if (!isAuthReady) {
+      return;
+    }
+
+    if (!isAuthenticated || !user) {
       goToLogin();
       return;
     }
@@ -367,10 +372,21 @@ export default function CommunityPage() {
     setMessage("");
 
     try {
-      const nickname = await getAuthorNickname();
+      const { data: sessionData, error: sessionError } =
+        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const sessionUserId = sessionData.session?.user.id ?? null;
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionUserId) {
+        setIsSubmitting(false);
+        goToLogin();
+        return;
+      }
+
       const createdPost = await saveCommunityPost({
-        authorId: user.id,
-        authorNickname: nickname,
         category: writeCategory,
         content,
         images: postImages,

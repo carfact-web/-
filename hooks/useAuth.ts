@@ -8,7 +8,6 @@ import type { Session, User } from "@supabase/supabase-js";
 type OAuthProvider = "google" | "kakao";
 
 const kakaoOAuthScope = "profile_nickname profile_image";
-const googleOAuthRedirectTo = "https://www.carfact.kr/auth/callback";
 export const authRedirectStorageKey = "carfact-auth-redirect-to";
 
 interface UseAuthResult {
@@ -129,6 +128,10 @@ export function useAuth(): UseAuthResult {
           setAuthError(error.message);
         }
 
+        console.log("supabase-auth-get-session", {
+          sessionUserId: data.session?.user.id ?? null,
+          hasSession: Boolean(data.session),
+        });
         setSession(data.session);
         setIsAuthReady(true);
       })
@@ -145,7 +148,12 @@ export function useAuth(): UseAuthResult {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      console.log("supabase-auth-state-change", {
+        event,
+        sessionUserId: nextSession?.user.id ?? null,
+        hasSession: Boolean(nextSession),
+      });
       setSession(nextSession);
       setIsAuthReady(true);
       setAuthError("");
@@ -161,6 +169,26 @@ export function useAuth(): UseAuthResult {
     if (!user) {
       return;
     }
+
+    supabase?.auth
+      .getUser()
+      .then(({ data, error }) => {
+        console.log("supabase-auth-get-user", {
+          error: error?.message ?? null,
+          userId: data.user?.id ?? null,
+          hookUserId: user.id,
+          userIdMatches: data.user?.id === user.id,
+        });
+      })
+      .catch((error) => {
+        console.log("supabase-auth-get-user", {
+          error:
+            error instanceof Error ? error.message : "getUser failed",
+          userId: null,
+          hookUserId: user.id,
+          userIdMatches: false,
+        });
+      });
 
     syncUserProfile(user).catch(() => {
       // Profile persistence is additive for Kakao channel/AlimTalk readiness.
@@ -179,12 +207,10 @@ export function useAuth(): UseAuthResult {
 
     setAuthError("");
 
-    if (provider === "google") {
-      localStorage.setItem(
-        authRedirectStorageKey,
-        redirectTo ?? window.location.href
-      );
-    }
+    localStorage.setItem(
+      authRedirectStorageKey,
+      redirectTo ?? window.location.href
+    );
 
     const queryParams: Record<string, string> =
       provider === "google"
@@ -198,10 +224,7 @@ export function useAuth(): UseAuthResult {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo:
-          provider === "google"
-            ? googleOAuthRedirectTo
-            : redirectTo ?? window.location.href,
+        redirectTo: window.location.origin + "/auth/callback",
         queryParams,
       },
     });

@@ -37,14 +37,45 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        router.replace(data.session ? getSafeRedirectPath() : "/login");
-      })
-      .catch(() => {
-        router.replace("/login");
+    const client = supabase;
+    const handleAuthCallback = async () => {
+      const code = new URLSearchParams(window.location.search).get("code");
+
+      if (code) {
+        const { error } = await client.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          console.log("supabase-auth-callback-exchange", {
+            error: error.message,
+          });
+        }
+      }
+
+      const [sessionResult, userResult] = await Promise.all([
+        client.auth.getSession(),
+        client.auth.getUser(),
+      ]);
+
+      console.log("supabase-auth-callback-session", {
+        error: sessionResult.error?.message ?? null,
+        sessionUserId: sessionResult.data.session?.user.id ?? null,
+        hasSession: Boolean(sessionResult.data.session),
       });
+      console.log("supabase-auth-callback-user", {
+        error: userResult.error?.message ?? null,
+        userId: userResult.data.user?.id ?? null,
+      });
+
+      router.replace(sessionResult.data.session ? getSafeRedirectPath() : "/login");
+    };
+
+    handleAuthCallback()
+      .catch((error) => {
+        console.log("supabase-auth-callback-error", {
+          error: error instanceof Error ? error.message : "callback failed",
+        });
+        router.replace("/login");
+      })
   }, [router]);
 
   return (

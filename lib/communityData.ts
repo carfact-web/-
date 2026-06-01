@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { createSupabaseFailureError } from "@/lib/supabaseErrorMessages";
 import {
   getPersistableCommunityImages,
   uploadCommunityImages,
@@ -93,10 +94,10 @@ const mapCommunityPost = (
   category: row.category,
   title: row.title,
   content: row.content,
-  authorNickname: row.author_nickname?.trim() || defaultCommunityNickname,
+  authorNickname: defaultCommunityNickname,
   images: toCommunityImages(row.images),
-  likeCount: counts?.likes?.[row.id] ?? 0,
-  commentCount: counts?.comments?.[row.id] ?? 0,
+  likeCount: counts?.likes?.[row.id] ?? row.like_count,
+  commentCount: counts?.comments?.[row.id] ?? row.comment_count,
   reportCount: counts?.reports?.[row.id] ?? row.report_count,
   createdAt: toLocaleDateTime(row.created_at),
   createdAtRaw: row.created_at,
@@ -148,6 +149,7 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
   let query = supabase
     .from("community_posts")
     .select("*")
+    .eq("is_hidden", false)
     .order("created_at", { ascending: false });
 
   if (category !== "all") {
@@ -178,7 +180,8 @@ export const fetchCommunityPostsByAuthor = async (authorId: string) => {
   const { data: posts, error } = await supabase
     .from("community_posts")
     .select("*")
-    .eq("author_id", authorId)
+    .eq("user_id", authorId)
+    .eq("is_hidden", false)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -213,8 +216,6 @@ export const fetchCommunityComments = async (postId: string) => {
 };
 
 export const saveCommunityPost = async (input: {
-  authorId: string;
-  authorNickname: string;
   category: CommunityCategory;
   content: string;
   images?: CommunityImageAttachment[];
@@ -224,23 +225,44 @@ export const saveCommunityPost = async (input: {
     return null;
   }
 
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  const sessionUserId = sessionData.session?.user.id ?? null;
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!sessionUserId) {
+    throw new Error("로그인 세션이 없어 커뮤니티 글을 저장하지 않았습니다.");
+  }
+
   const now = new Date().toISOString();
   const postId = createCommunityPostId();
-  const uploadResult = await uploadCommunityImages(input.images ?? [], postId);
   const basePayload = {
-      id: postId,
-      author_id: input.authorId,
-      author_nickname: input.authorNickname || defaultCommunityNickname,
-      category: input.category,
-      content: input.content,
-      title: input.title,
-      created_at: now,
-      updated_at: now,
+    id: postId,
+    user_id: sessionUserId,
+    category: input.category,
+    content: input.content,
+    title: input.title,
+    created_at: now,
+    updated_at: now,
   };
+
+  console.log("community-post-auth-session", {
+    payloadUserId: basePayload.user_id,
+    sessionUserId,
+    userIdMatches: sessionUserId === basePayload.user_id,
+  });
+
+  const uploadResult = await uploadCommunityImages(input.images ?? [], postId);
   const payloadWithImages = {
     ...basePayload,
     images: getPersistableCommunityImages(uploadResult.images) as Json,
   };
+
+  console.log("community-post-insert-payload", payloadWithImages);
+
   let { data, error } = await supabase
     .from("community_posts")
     .insert(payloadWithImages)
@@ -259,7 +281,11 @@ export const saveCommunityPost = async (input: {
   }
 
   if (error) {
-    throw error;
+    console.error("community-post-save-error", {
+      table: "community_posts",
+      error,
+    });
+    throw createSupabaseFailureError("db-insert", error);
   }
 
   if (!data) {

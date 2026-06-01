@@ -17,7 +17,10 @@ import type { Review } from "@/types/review";
 
 interface UseReviewsResult {
   reviews: Review[];
-  addReview: (review: Review) => Promise<ReviewValidationResult>;
+  addReview: (
+    review: Review,
+    sessionUserId: string
+  ) => Promise<ReviewValidationResult>;
 }
 
 const fallbackReviewsJson = JSON.stringify(mockReviews);
@@ -51,7 +54,7 @@ const cacheReviews = (storageKey: string, reviews: Review[]) => {
 
 export function useReviews(carNumber: string): UseReviewsResult {
   const sanitizedCarNumber = sanitizeVehiclePlateNumber(carNumber);
-  const { isAuthenticated, isAuthReady, user } = useAuth();
+  const { isAuthenticated, isAuthReady } = useAuth();
   const reviewStorageKey = getReviewStorageKey(sanitizedCarNumber);
   const reviewsJson = useSyncExternalStore(
     subscribeToReviews,
@@ -95,11 +98,19 @@ export function useReviews(carNumber: string): UseReviewsResult {
   }, [reviewStorageKey, sanitizedCarNumber]);
 
   const addReview = useCallback(
-    async (review: Review) => {
+    async (review: Review, sessionUserId: string) => {
       if (!isAuthReady || !isAuthenticated) {
         return {
           isValid: false,
           message: "로그인 후 후기를 작성할 수 있습니다.",
+          content: review.content,
+        };
+      }
+
+      if (!sessionUserId) {
+        return {
+          isValid: false,
+          message: "로그인 세션이 없어 후기를 저장하지 않았습니다.",
           content: review.content,
         };
       }
@@ -121,7 +132,7 @@ export function useReviews(carNumber: string): UseReviewsResult {
       const savedReview = await saveSupabaseReview(
         sanitizedCarNumber,
         nextReview,
-        user?.id
+        sessionUserId
       );
 
       if (savedReview) {
@@ -142,7 +153,7 @@ export function useReviews(carNumber: string): UseReviewsResult {
         content: validation.content,
       };
     },
-    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber, user?.id]
+    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
   );
 
   const remoteReviews =

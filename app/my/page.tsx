@@ -12,6 +12,7 @@ import {
   type AccountActivity,
 } from "@/lib/accountActivity";
 import { getCommunityCategoryLabel } from "@/lib/communityCategories";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
@@ -57,6 +58,7 @@ export default function MyPage() {
     isAuthenticated,
     isAuthReady,
     isSupabaseConfigured,
+    session,
     signInWithGoogle,
     signInWithKakao,
     signOut,
@@ -93,6 +95,36 @@ export default function MyPage() {
   );
   const receivedLikeCount =
     accountActivity.communityLikeCount + accountActivity.reviewHelpfulCount;
+
+  useEffect(() => {
+    if (!isAuthReady || !supabase) {
+      return;
+    }
+
+    void Promise.all([supabase.auth.getSession(), supabase.auth.getUser()])
+      .then(([sessionResult, userResult]) => {
+        console.log("my-auth-session-check", {
+          getSessionError: sessionResult.error?.message ?? null,
+          getSessionUserId: sessionResult.data.session?.user.id ?? null,
+          getUserError: userResult.error?.message ?? null,
+          getUserId: userResult.data.user?.id ?? null,
+          hookSessionUserId: session?.user.id ?? null,
+          hookUserId: user?.id ?? null,
+          isAuthenticated,
+        });
+      })
+      .catch((error) => {
+        console.log("my-auth-session-check", {
+          error:
+            error instanceof Error ? error.message : "session check failed",
+          getSessionUserId: null,
+          getUserId: null,
+          hookSessionUserId: session?.user.id ?? null,
+          hookUserId: user?.id ?? null,
+          isAuthenticated,
+        });
+      });
+  }, [isAuthReady, isAuthenticated, session?.user.id, user?.id]);
 
   useEffect(() => {
     let isActive = true;

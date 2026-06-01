@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { createSupabaseFailureError } from "@/lib/supabaseErrorMessages";
 import type { ReviewImageAttachment } from "@/types/review";
 
 export const reviewImagesBucketName = "review-images";
@@ -55,7 +56,12 @@ export const uploadReviewImages = async (
         });
 
       if (error) {
-        throw error;
+        console.error("review-image-upload-error", {
+          bucket: reviewImagesBucketName,
+          path,
+          error,
+        });
+        throw createSupabaseFailureError("storage-upload", error);
       }
 
       const { data } = client.storage

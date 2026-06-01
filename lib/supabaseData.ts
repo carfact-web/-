@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import {
+  createSupabaseFailureError,
+  isRlsPolicyError,
+} from "@/lib/supabaseErrorMessages";
+import {
   getPersistableReviewImages,
   uploadReviewImages,
 } from "@/lib/reviewImages";
@@ -226,7 +230,14 @@ export const saveSupabaseReview = async (
     .single();
 
   if (error) {
-    throw error;
+    console.error(
+      isRlsPolicyError(error) ? "review-rls-policy-error" : "review-db-insert-error",
+      {
+        table: "reviews",
+        error,
+      }
+    );
+    throw createSupabaseFailureError("db-insert", error);
   }
 
   return mapReviewRow(data);
