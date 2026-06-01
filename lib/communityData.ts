@@ -376,9 +376,18 @@ export const saveCommunityPost = async (input: {
   });
 
   const uploadResult = await uploadCommunityImages(input.images ?? [], postId);
+  const persistableImages = getPersistableCommunityImages(uploadResult.images);
+  console.log("community-post-images-payload", {
+    bucket: communityImagesBucketName,
+    images: persistableImages,
+  });
   const payloadWithImages = {
     ...basePayload,
-    images: getPersistableCommunityImages(uploadResult.images) as Json,
+    images: persistableImages as Json,
+  };
+  const legacyPayloadWithImages = {
+    ...legacyBasePayload,
+    images: persistableImages as Json,
   };
 
   console.log("community-post-insert-payload", payloadWithImages);
@@ -396,7 +405,9 @@ export const saveCommunityPost = async (input: {
     const retryResult = await supabase
       .from("community_posts")
       .insert(
-        isMissingAuthorNicknameColumnError(error) ? legacyBasePayload : basePayload
+        isMissingAuthorNicknameColumnError(error)
+          ? (legacyPayloadWithImages as never)
+          : basePayload
       )
       .select("*")
       .single();

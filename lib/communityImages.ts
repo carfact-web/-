@@ -69,6 +69,12 @@ export const uploadCommunityImages = async (
           });
 
         if (error) {
+          console.error("community-image-upload-error", {
+            bucket: communityImagesBucketName,
+            image,
+            path,
+            error,
+          });
           throw error;
         }
 
@@ -85,12 +91,31 @@ export const uploadCommunityImages = async (
           url: data.publicUrl,
         });
       } catch (error) {
+        if (
+          !(
+            error instanceof Error &&
+            (error.message === "missing-image-data" ||
+              error.message === "invalid-image-data")
+          )
+        ) {
+          console.error("community-image-upload-error", {
+            bucket: communityImagesBucketName,
+            image,
+            error,
+          });
+        }
         errors.push(
           error instanceof Error ? error.message : "이미지 업로드 실패"
         );
       }
     })
   );
+
+  console.log("community-image-upload-result", {
+    bucket: communityImagesBucketName,
+    failedCount: errors.length,
+    images: uploadedImages,
+  });
 
   return {
     errorMessage: errors[0] ?? "",

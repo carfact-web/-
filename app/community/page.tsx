@@ -58,6 +58,32 @@ const sortButtonClassName = cn(
   "rounded-full px-3 py-2 text-sm font-extrabold text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
+const reportButtonClassName = cn(
+  "inline-flex items-center rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-300 transition",
+  "hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-200 active:scale-[0.98]",
+  "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500"
+);
+const reportModalOverlayClassName = cn(
+  "fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+);
+const reportModalPanelClassName = cn(
+  "w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-black/60"
+);
+const reportReasonButtonClassName = cn(
+  "w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-zinc-200 transition",
+  "hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.99]"
+);
+const activeReportReasonButtonClassName = cn(
+  "border-red-500 bg-red-500/15 text-red-100"
+);
+const reportSubmitButtonClassName = cn(
+  "mt-4 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition",
+  "hover:bg-red-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:hover:bg-zinc-700"
+);
+const reportCancelButtonClassName = cn(
+  "mt-2 w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-300 transition",
+  "hover:bg-zinc-800 active:scale-[0.99]"
+);
 
 const normalizeField = (value: string, maxLength: number) =>
   sanitizeUserText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -70,11 +96,24 @@ const allowedCommunityImageTypes = [
 const maxCommunityImages = 3;
 const maxCommunityImageBytes = 5 * 1024 * 1024;
 type CommunitySortOption = "latest" | "popular" | "weekly";
+type CommunityReportReason =
+  | "욕설/비방"
+  | "허위 정보 의심"
+  | "광고/홍보"
+  | "개인정보 노출"
+  | "기타";
 
 const sortOptions: { label: string; value: CommunitySortOption }[] = [
   { label: "최신", value: "latest" },
   { label: "인기", value: "popular" },
   { label: "주간인기", value: "weekly" },
+];
+const communityReportReasons: CommunityReportReason[] = [
+  "욕설/비방",
+  "허위 정보 의심",
+  "광고/홍보",
+  "개인정보 노출",
+  "기타",
 ];
 
 const isAllowedCommunityImageType = (
@@ -138,6 +177,12 @@ export default function CommunityPage() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] =
+    useState<CommunityReportReason | null>(null);
+  const [reportedPostIds, setReportedPostIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [message, setMessage] = useState("");
 
   const activeCategoryLabel = useMemo(
@@ -289,6 +334,35 @@ export default function CommunityPage() {
       });
     }
   }, [posts, targetPostId]);
+
+  useEffect(() => {
+    const postsWithImages = posts
+      .filter((post) => post.images.length > 0)
+      .map((post) => ({
+        id: post.id,
+        imageCount: post.images.length,
+        images: post.images.slice(0, maxCommunityImages),
+      }));
+
+    if (postsWithImages.length > 0) {
+      console.log("community-post-images-render", {
+        surface: "list",
+        posts: postsWithImages,
+      });
+    }
+  }, [posts]);
+
+  useEffect(() => {
+    if (!selectedPost || selectedPost.images.length === 0) {
+      return;
+    }
+
+    console.log("community-post-images-render", {
+      surface: "detail",
+      postId: selectedPost.id,
+      images: selectedPost.images.slice(0, maxCommunityImages),
+    });
+  }, [selectedPost]);
 
   const startWriting = () => {
     if (!isAuthReady) {
@@ -536,8 +610,32 @@ export default function CommunityPage() {
     }
   };
 
-  const handleReport = async () => {
+  const closeReportModal = () => {
+    setIsReportModalOpen(false);
+    setSelectedReportReason(null);
+  };
+
+  const handleReport = () => {
     if (!selectedPost) {
+      return;
+    }
+
+    if (reportedPostIds.has(selectedPost.id)) {
+      setMessage("이미 신고한 글입니다.");
+      return;
+    }
+
+    if (!user) {
+      goToLogin();
+      return;
+    }
+
+    setSelectedReportReason(null);
+    setIsReportModalOpen(true);
+  };
+
+  const submitCommunityReport = async () => {
+    if (!selectedPost || !selectedReportReason) {
       return;
     }
 
@@ -562,10 +660,13 @@ export default function CommunityPage() {
 
       const didReport = await reportCommunityPost({
         postId: selectedPost.id,
+        reason: selectedReportReason,
         userId: sessionUserId,
       });
 
       if (!didReport) {
+        setReportedPostIds((current) => new Set(current).add(selectedPost.id));
+        closeReportModal();
         setMessage("이미 신고한 글입니다.");
         return;
       }
@@ -580,6 +681,8 @@ export default function CommunityPage() {
       setSelectedPost((current) =>
         current ? { ...current, reportCount: current.reportCount + 1 } : current
       );
+      setReportedPostIds((current) => new Set(current).add(selectedPost.id));
+      closeReportModal();
       setMessage("신고가 접수되었습니다.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "신고 처리에 실패했습니다.");
@@ -831,25 +934,18 @@ export default function CommunityPage() {
                           <span>이미지 {post.images.length}</span>
                         ) : null}
                       </span>
-                      {post.images.length > 0 ? (
-                        <span className="mt-3 grid grid-cols-3 gap-2">
-                          {post.images.slice(0, maxCommunityImages).map((image) => (
-                            <span
-                              key={image.id}
-                              className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
-                            >
-                              {image.url ? (
-                                <Image
-                                  src={image.url}
-                                  alt={image.name}
-                                  fill
-                                  unoptimized
-                                  sizes="120px"
-                                  className="object-cover"
-                                />
-                              ) : null}
-                            </span>
-                          ))}
+                      {post.images[0]?.url ? (
+                        <span className="mt-3 block">
+                          <span className="relative block aspect-[16/9] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                            <Image
+                              src={post.images[0].url}
+                              alt={post.images[0].name}
+                              fill
+                              unoptimized
+                              sizes="360px"
+                              className="object-cover"
+                            />
+                          </span>
                         </span>
                       ) : null}
                     </button>
@@ -961,10 +1057,13 @@ export default function CommunityPage() {
                     </button>
                     <button
                       type="button"
-                      className={secondaryButtonClassName}
+                      className={reportButtonClassName}
                       onClick={handleReport}
+                      disabled={reportedPostIds.has(selectedPost.id)}
                     >
-                      신고 {selectedPost.reportCount}
+                      {reportedPostIds.has(selectedPost.id)
+                        ? "신고됨 " + selectedPost.reportCount
+                        : "🚨 신고 " + selectedPost.reportCount}
                     </button>
                   </div>
                 </div>
@@ -981,6 +1080,71 @@ export default function CommunityPage() {
             )}
           </article>
         </section>
+
+        {isReportModalOpen && selectedPost ? (
+          <div
+            className={reportModalOverlayClassName}
+            onClick={closeReportModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label="게시글 신고"
+          >
+            <div
+              className={reportModalPanelClassName}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">게시글 신고</h3>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    신고 사유를 선택해주세요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeReportModal}
+                  className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {communityReportReasons.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setSelectedReportReason(reason)}
+                    aria-pressed={selectedReportReason === reason}
+                    className={cn(
+                      reportReasonButtonClassName,
+                      selectedReportReason === reason &&
+                        activeReportReasonButtonClassName
+                    )}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={submitCommunityReport}
+                disabled={!selectedReportReason}
+                className={reportSubmitButtonClassName}
+              >
+                신고하기
+              </button>
+              <button
+                type="button"
+                onClick={closeReportModal}
+                className={reportCancelButtonClassName}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );
