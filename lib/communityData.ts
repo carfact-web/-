@@ -417,7 +417,9 @@ export const saveCommunityPost = async (input: {
     throw new Error("community-post-empty-response");
   }
 
-  const savedPost = mapCommunityPost(data);
+  const savedPost = mapCommunityPost(data, {
+    [sessionUserId]: basePayload.author_nickname,
+  });
 
   if (uploadResult.failedCount > 0) {
     return {
@@ -441,7 +443,7 @@ export const saveCommunityComment = async (input: {
     return null;
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("community_comments")
     .insert({
       author_nickname: input.authorNickname || defaultCommunityNickname,
@@ -452,8 +454,33 @@ export const saveCommunityComment = async (input: {
     .select("*")
     .single();
 
+  if (
+    error &&
+    isRecord(error) &&
+    String(error.code ?? "") === "42703" &&
+    String(error.message ?? "").includes("community_comments.user_id")
+  ) {
+    const retryResult = await supabase
+      .from("community_comments")
+      .insert({
+        author_id: input.userId,
+        author_nickname: input.authorNickname || defaultCommunityNickname,
+        content: input.content,
+        post_id: input.postId,
+      } as never)
+      .select("*")
+      .single();
+
+    data = retryResult.data;
+    error = retryResult.error;
+  }
+
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error("community-comment-empty-response");
   }
 
   return mapCommunityComment(data);
