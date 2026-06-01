@@ -386,7 +386,9 @@ export default function CommunityPage() {
         return;
       }
 
+      const authorNickname = await getAuthorNickname();
       const createdPost = await saveCommunityPost({
+        authorNickname,
         category: writeCategory,
         content,
         images: postImages,
@@ -444,12 +446,26 @@ export default function CommunityPage() {
     setMessage("");
 
     try {
+      const { data: sessionData, error: sessionError } =
+        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const sessionUserId = sessionData.session?.user.id ?? null;
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionUserId) {
+        setIsSubmitting(false);
+        goToLogin();
+        return;
+      }
+
       const nickname = await getAuthorNickname();
       const createdComment = await saveCommunityComment({
-        authorId: user.id,
         authorNickname: nickname,
         content,
         postId: selectedPost.id,
+        userId: sessionUserId,
       });
 
       if (!createdComment) {
@@ -487,7 +503,20 @@ export default function CommunityPage() {
     }
 
     try {
-      const didLike = await toggleCommunityLike(selectedPost.id, user.id);
+      const { data: sessionData, error: sessionError } =
+        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const sessionUserId = sessionData.session?.user.id ?? null;
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionUserId) {
+        goToLogin();
+        return;
+      }
+
+      const didLike = await toggleCommunityLike(selectedPost.id, sessionUserId);
       const likeDelta = didLike ? 1 : -1;
 
       setPosts((current) =>
@@ -518,10 +547,29 @@ export default function CommunityPage() {
     }
 
     try {
-      await reportCommunityPost({
+      const { data: sessionData, error: sessionError } =
+        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const sessionUserId = sessionData.session?.user.id ?? null;
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionUserId) {
+        goToLogin();
+        return;
+      }
+
+      const didReport = await reportCommunityPost({
         postId: selectedPost.id,
-        userId: user.id,
+        userId: sessionUserId,
       });
+
+      if (!didReport) {
+        setMessage("이미 신고한 글입니다.");
+        return;
+      }
+
       setPosts((current) =>
         current.map((post) =>
           post.id === selectedPost.id
@@ -783,6 +831,27 @@ export default function CommunityPage() {
                           <span>이미지 {post.images.length}</span>
                         ) : null}
                       </span>
+                      {post.images.length > 0 ? (
+                        <span className="mt-3 grid grid-cols-3 gap-2">
+                          {post.images.slice(0, maxCommunityImages).map((image) => (
+                            <span
+                              key={image.id}
+                              className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+                            >
+                              {image.url ? (
+                                <Image
+                                  src={image.url}
+                                  alt={image.name}
+                                  fill
+                                  unoptimized
+                                  sizes="120px"
+                                  className="object-cover"
+                                />
+                              ) : null}
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -807,7 +876,7 @@ export default function CommunityPage() {
                   </p>
                   {selectedPost.images.length > 0 ? (
                     <div className="mt-5 grid grid-cols-3 gap-3">
-                      {selectedPost.images.map((image) => (
+                      {selectedPost.images.slice(0, maxCommunityImages).map((image) => (
                         <a
                           key={image.id}
                           href={image.url}

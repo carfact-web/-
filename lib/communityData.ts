@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { createSupabaseFailureError } from "@/lib/supabaseErrorMessages";
 import {
+  communityImagesBucketName,
   getPersistableCommunityImages,
   uploadCommunityImages,
 } from "@/lib/communityImages";
@@ -53,17 +54,28 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
     return [];
   }
 
-  return (value as unknown[]).filter(isRecord).map((image) => ({
-    id: String(image.id ?? image.url ?? image.path ?? Date.now()),
-    name: String(image.name ?? "커뮤니티 이미지"),
-    path: typeof image.path === "string" ? image.path : undefined,
-    size: typeof image.size === "number" ? image.size : 0,
-    type:
-      image.type === "image/png" || image.type === "image/webp"
-        ? image.type
-        : "image/jpeg",
-    url: typeof image.url === "string" ? image.url : undefined,
-  }));
+  return (value as unknown[]).filter(isRecord).map((image) => {
+    const path = typeof image.path === "string" ? image.path : undefined;
+    const publicUrl =
+      typeof image.url === "string" && image.url
+        ? image.url
+        : path && supabase
+          ? supabase.storage.from(communityImagesBucketName).getPublicUrl(path)
+              .data.publicUrl
+          : undefined;
+
+    return {
+      id: String(image.id ?? publicUrl ?? path ?? Date.now()),
+      name: String(image.name ?? "커뮤니티 이미지"),
+      path,
+      size: typeof image.size === "number" ? image.size : 0,
+      type:
+        image.type === "image/png" || image.type === "image/webp"
+          ? image.type
+          : "image/jpeg",
+      url: publicUrl,
+    };
+  });
 };
 
 const isMissingImagesColumnError = (error: unknown) => {
@@ -79,6 +91,21 @@ const isMissingImagesColumnError = (error: unknown) => {
     code === "PGRST204" ||
     message.includes("images") ||
     details.includes("images")
+  );
+};
+
+const isMissingAuthorNicknameColumnError = (error: unknown) => {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  const message = String(error.message ?? "");
+  const details = String(error.details ?? "");
+  const code = String(error.code ?? "");
+
+  return (
+    code === "PGRST204" &&
+    (message.includes("author_nickname") || details.includes("author_nickname"))
   );
 };
 
@@ -98,8 +125,12 @@ const isMissingCommunityAuxTableError = (error: unknown) => {
   );
 };
 
+const isUniqueViolationError = (error: unknown) =>
+  isRecord(error) && String(error.code ?? "") === "23505";
+
 const mapCommunityPost = (
   row: CommunityPostRow,
+  authorNicknames?: Record<string, string>,
   counts?: {
     comments?: Record<string, number>;
     likes?: Record<string, number>;
@@ -110,7 +141,10 @@ const mapCommunityPost = (
   category: row.category,
   title: row.title,
   content: row.content,
-  authorNickname: defaultCommunityNickname,
+  authorNickname:
+    row.author_nickname?.trim() ||
+    authorNicknames?.[row.user_id]?.trim() ||
+    defaultCommunityNickname,
   images: toCommunityImages(row.images),
   likeCount: counts?.likes?.[row.id] ?? row.like_count,
   commentCount: counts?.comments?.[row.id] ?? row.comment_count,
@@ -165,6 +199,43 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
   };
 };
 
+const fetchCommunityAuthorNicknames = async (posts: CommunityPostRow[]) => {
+  if (!supabase || posts.length === 0) {
+    return {};
+  }
+
+  const missingNicknameUserIds = Array.from(
+    new Set(
+      posts
+        .filter((post) => !post.author_nickname?.trim())
+        .map((post) => post.user_id)
+        .filter(Boolean)
+    )
+  );
+
+  if (missingNicknameUserIds.length === 0) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("id,nickname")
+    .in("id", missingNicknameUserIds);
+
+  if (error) {
+    console.warn("community-author-profile-error", error);
+    return {};
+  }
+
+  return data.reduce<Record<string, string>>((nicknames, profile) => {
+    if (profile.nickname?.trim()) {
+      nicknames[profile.id] = profile.nickname.trim();
+    }
+
+    return nicknames;
+  }, {});
+};
+
 export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => {
   if (!supabase) {
     return [] as CommunityPost[];
@@ -191,9 +262,12 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
   }
 
   const postIds = posts.map((post) => post.id);
-  const counts = await fetchCommunityPostCounts(postIds);
+  const [counts, authorNicknames] = await Promise.all([
+    fetchCommunityPostCounts(postIds),
+    fetchCommunityAuthorNicknames(posts),
+  ]);
 
-  return posts.map((post) => mapCommunityPost(post, counts));
+  return posts.map((post) => mapCommunityPost(post, authorNicknames, counts));
 };
 
 export const fetchCommunityPostsByAuthor = async (authorId: string) => {
@@ -216,9 +290,12 @@ export const fetchCommunityPostsByAuthor = async (authorId: string) => {
     return [];
   }
 
-  const counts = await fetchCommunityPostCounts(posts.map((post) => post.id));
+  const [counts, authorNicknames] = await Promise.all([
+    fetchCommunityPostCounts(posts.map((post) => post.id)),
+    fetchCommunityAuthorNicknames(posts),
+  ]);
 
-  return posts.map((post) => mapCommunityPost(post, counts));
+  return posts.map((post) => mapCommunityPost(post, authorNicknames, counts));
 };
 
 export const fetchCommunityComments = async (postId: string) => {
@@ -248,6 +325,7 @@ export const fetchCommunityComments = async (postId: string) => {
 };
 
 export const saveCommunityPost = async (input: {
+  authorNickname: string;
   category: CommunityCategory;
   content: string;
   images?: CommunityImageAttachment[];
@@ -274,11 +352,21 @@ export const saveCommunityPost = async (input: {
   const basePayload = {
     id: postId,
     user_id: sessionUserId,
+    author_nickname: input.authorNickname.trim() || defaultCommunityNickname,
     category: input.category,
     content: input.content,
     title: input.title,
     created_at: now,
     updated_at: now,
+  };
+  const legacyBasePayload = {
+    id: basePayload.id,
+    user_id: basePayload.user_id,
+    category: basePayload.category,
+    content: basePayload.content,
+    title: basePayload.title,
+    created_at: basePayload.created_at,
+    updated_at: basePayload.updated_at,
   };
 
   console.log("community-post-auth-session", {
@@ -301,10 +389,15 @@ export const saveCommunityPost = async (input: {
     .select("*")
     .single();
 
-  if (error && isMissingImagesColumnError(error)) {
+  if (
+    error &&
+    (isMissingImagesColumnError(error) || isMissingAuthorNicknameColumnError(error))
+  ) {
     const retryResult = await supabase
       .from("community_posts")
-      .insert(basePayload)
+      .insert(
+        isMissingAuthorNicknameColumnError(error) ? legacyBasePayload : basePayload
+      )
       .select("*")
       .single();
 
@@ -339,10 +432,10 @@ export const saveCommunityPost = async (input: {
 };
 
 export const saveCommunityComment = async (input: {
-  authorId: string;
   authorNickname: string;
   content: string;
   postId: string;
+  userId: string;
 }) => {
   if (!supabase) {
     return null;
@@ -351,10 +444,10 @@ export const saveCommunityComment = async (input: {
   const { data, error } = await supabase
     .from("community_comments")
     .insert({
-      author_id: input.authorId,
       author_nickname: input.authorNickname || defaultCommunityNickname,
       content: input.content,
       post_id: input.postId,
+      user_id: input.userId,
     })
     .select("*")
     .single();
@@ -400,6 +493,10 @@ export const toggleCommunityLike = async (postId: string, userId: string) => {
     .insert({ post_id: postId, user_id: userId });
 
   if (error) {
+    if (isUniqueViolationError(error)) {
+      return true;
+    }
+
     throw error;
   }
 
@@ -412,7 +509,22 @@ export const reportCommunityPost = async (input: {
   userId: string;
 }) => {
   if (!supabase) {
-    return null;
+    return false;
+  }
+
+  const { data: existingReport, error: existingError } = await supabase
+    .from("community_reports")
+    .select("id")
+    .eq("post_id", input.postId)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  if (existingReport) {
+    return false;
   }
 
   const { data, error } = await supabase
@@ -426,8 +538,12 @@ export const reportCommunityPost = async (input: {
     .single();
 
   if (error) {
+    if (isUniqueViolationError(error)) {
+      return false;
+    }
+
     throw error;
   }
 
-  return data;
+  return Boolean(data);
 };

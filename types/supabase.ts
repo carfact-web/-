@@ -16,6 +16,7 @@ export interface Database {
           title: string;
           content: string;
           user_id: string;
+          author_nickname: string | null;
           images: Json;
           is_hidden: boolean;
           report_count: number;
@@ -30,6 +31,7 @@ export interface Database {
           title: string;
           content: string;
           user_id: string;
+          author_nickname?: string | null;
           images?: Json;
           is_hidden?: boolean;
           report_count?: number;
@@ -44,6 +46,7 @@ export interface Database {
           title?: string;
           content?: string;
           user_id?: string;
+          author_nickname?: string | null;
           images?: Json;
           is_hidden?: boolean;
           report_count?: number;
@@ -58,7 +61,7 @@ export interface Database {
         Row: {
           id: string;
           post_id: string;
-          author_id: string;
+          user_id: string;
           author_nickname: string | null;
           content: string;
           created_at: string;
@@ -66,7 +69,7 @@ export interface Database {
         Insert: {
           id?: string;
           post_id: string;
-          author_id: string;
+          user_id: string;
           author_nickname?: string | null;
           content: string;
           created_at?: string;
@@ -74,7 +77,7 @@ export interface Database {
         Update: {
           id?: string;
           post_id?: string;
-          author_id?: string;
+          user_id?: string;
           author_nickname?: string | null;
           content?: string;
           created_at?: string;
