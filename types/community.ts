@@ -29,8 +29,10 @@ export interface CommunityPost {
   authorNickname: string;
   images: CommunityImageAttachment[];
   imageUploadWarning?: string;
+  likedByMe: boolean;
   likeCount: number;
   commentCount: number;
+  reportedByMe: boolean;
   reportCount: number;
   createdAt: string;
   createdAtRaw: string;

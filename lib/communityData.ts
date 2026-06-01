@@ -54,28 +54,65 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
     return [];
   }
 
-  return (value as unknown[]).filter(isRecord).map((image) => {
-    const path = typeof image.path === "string" ? image.path : undefined;
+  const images = (value as unknown[]).map<CommunityImageAttachment | null>((image) => {
+    if (typeof image === "string") {
+      const isPublicUrl = /^https?:\/\//.test(image);
+      const path = isPublicUrl ? undefined : image;
+      const url =
+        isPublicUrl || !supabase || !path
+          ? image
+          : supabase.storage.from(communityImagesBucketName).getPublicUrl(path)
+              .data.publicUrl;
+
+      return {
+        id: image,
+        name: "커뮤니티 이미지",
+        path,
+        size: 0,
+        type: "image/jpeg",
+        url,
+      } satisfies CommunityImageAttachment;
+    }
+
+    if (!isRecord(image)) {
+      return null;
+    }
+
+    const rawPath =
+      typeof image.path === "string"
+        ? image.path
+        : typeof image.key === "string"
+          ? image.key
+          : undefined;
+    const path = rawPath?.replace(/^community-images\//, "");
     const publicUrl =
       typeof image.url === "string" && image.url
         ? image.url
+        : typeof image.publicUrl === "string" && image.publicUrl
+          ? image.publicUrl
         : path && supabase
           ? supabase.storage.from(communityImagesBucketName).getPublicUrl(path)
               .data.publicUrl
           : undefined;
+
+    const imageType: CommunityImageAttachment["type"] =
+      image.type === "image/png" || image.type === "image/webp"
+        ? image.type
+        : "image/jpeg";
 
     return {
       id: String(image.id ?? publicUrl ?? path ?? Date.now()),
       name: String(image.name ?? "커뮤니티 이미지"),
       path,
       size: typeof image.size === "number" ? image.size : 0,
-      type:
-        image.type === "image/png" || image.type === "image/webp"
-          ? image.type
-          : "image/jpeg",
+      type: imageType,
       url: publicUrl,
     };
   });
+
+  return images.filter((image): image is CommunityImageAttachment =>
+    Boolean(image)
+  );
 };
 
 const isMissingImagesColumnError = (error: unknown) => {
@@ -135,23 +172,41 @@ const mapCommunityPost = (
     comments?: Record<string, number>;
     likes?: Record<string, number>;
     reports?: Record<string, number>;
+  },
+  interactions?: {
+    likedByMe?: Set<string>;
+    reportedByMe?: Set<string>;
   }
-): CommunityPost => ({
-  id: row.id,
-  category: row.category,
-  title: row.title,
-  content: row.content,
-  authorNickname:
-    row.author_nickname?.trim() ||
-    authorNicknames?.[row.user_id]?.trim() ||
-    defaultCommunityNickname,
-  images: toCommunityImages(row.images),
-  likeCount: counts?.likes?.[row.id] ?? row.like_count,
-  commentCount: counts?.comments?.[row.id] ?? row.comment_count,
-  reportCount: counts?.reports?.[row.id] ?? row.report_count,
-  createdAt: toLocaleDateTime(row.created_at),
-  createdAtRaw: row.created_at,
-});
+): CommunityPost => {
+  const images = toCommunityImages(row.images);
+
+  if (Array.isArray(row.images) && row.images.length > 0) {
+    console.log("community-post-images-render", {
+      postId: row.id,
+      rawImages: row.images,
+      images,
+    });
+  }
+
+  return {
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    content: row.content,
+    authorNickname:
+      row.author_nickname?.trim() ||
+      authorNicknames?.[row.user_id]?.trim() ||
+      defaultCommunityNickname,
+    images,
+    likedByMe: interactions?.likedByMe?.has(row.id) ?? false,
+    likeCount: counts?.likes?.[row.id] ?? row.like_count,
+    commentCount: counts?.comments?.[row.id] ?? row.comment_count,
+    reportedByMe: interactions?.reportedByMe?.has(row.id) ?? false,
+    reportCount: counts?.reports?.[row.id] ?? row.report_count,
+    createdAt: toLocaleDateTime(row.created_at),
+    createdAtRaw: row.created_at,
+  };
+};
 
 const mapCommunityComment = (row: CommunityCommentRow): CommunityComment => ({
   id: row.id,
@@ -236,6 +291,70 @@ const fetchCommunityAuthorNicknames = async (posts: CommunityPostRow[]) => {
   }, {});
 };
 
+const fetchCommunityInteractionState = async (postIds: string[]) => {
+  if (!supabase || postIds.length === 0) {
+    return {
+      likedByMe: new Set<string>(),
+      reportedByMe: new Set<string>(),
+    };
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id ?? null;
+
+  if (sessionError || !userId) {
+    console.log("community-interaction-state", {
+      userId,
+      likedPostIds: [],
+      reportedPostIds: [],
+    });
+
+    return {
+      likedByMe: new Set<string>(),
+      reportedByMe: new Set<string>(),
+    };
+  }
+
+  const [likesResult, reportsResult] = await Promise.all([
+    supabase
+      .from("community_likes")
+      .select("post_id")
+      .eq("user_id", userId)
+      .in("post_id", postIds),
+    supabase
+      .from("community_reports")
+      .select("post_id")
+      .eq("user_id", userId)
+      .in("post_id", postIds),
+  ]);
+
+  if (likesResult.error && !isMissingCommunityAuxTableError(likesResult.error)) {
+    throw likesResult.error;
+  }
+
+  if (
+    reportsResult.error &&
+    !isMissingCommunityAuxTableError(reportsResult.error)
+  ) {
+    throw reportsResult.error;
+  }
+
+  const likedPostIds = (likesResult.data ?? []).map((row) => row.post_id);
+  const reportedPostIds = (reportsResult.data ?? []).map((row) => row.post_id);
+
+  console.log("community-interaction-state", {
+    userId,
+    likedPostIds,
+    reportedPostIds,
+  });
+
+  return {
+    likedByMe: new Set(likedPostIds),
+    reportedByMe: new Set(reportedPostIds),
+  };
+};
+
 export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => {
   if (!supabase) {
     return [] as CommunityPost[];
@@ -262,12 +381,15 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
   }
 
   const postIds = posts.map((post) => post.id);
-  const [counts, authorNicknames] = await Promise.all([
+  const [counts, authorNicknames, interactions] = await Promise.all([
     fetchCommunityPostCounts(postIds),
     fetchCommunityAuthorNicknames(posts),
+    fetchCommunityInteractionState(postIds),
   ]);
 
-  return posts.map((post) => mapCommunityPost(post, authorNicknames, counts));
+  return posts.map((post) =>
+    mapCommunityPost(post, authorNicknames, counts, interactions)
+  );
 };
 
 export const fetchCommunityPostsByAuthor = async (authorId: string) => {
@@ -290,12 +412,16 @@ export const fetchCommunityPostsByAuthor = async (authorId: string) => {
     return [];
   }
 
-  const [counts, authorNicknames] = await Promise.all([
-    fetchCommunityPostCounts(posts.map((post) => post.id)),
+  const postIds = posts.map((post) => post.id);
+  const [counts, authorNicknames, interactions] = await Promise.all([
+    fetchCommunityPostCounts(postIds),
     fetchCommunityAuthorNicknames(posts),
+    fetchCommunityInteractionState(postIds),
   ]);
 
-  return posts.map((post) => mapCommunityPost(post, authorNicknames, counts));
+  return posts.map((post) =>
+    mapCommunityPost(post, authorNicknames, counts, interactions)
+  );
 };
 
 export const fetchCommunityComments = async (postId: string) => {
@@ -514,15 +640,6 @@ export const toggleCommunityLike = async (postId: string, userId: string) => {
   }
 
   if (existingLike) {
-    const { error } = await supabase
-      .from("community_likes")
-      .delete()
-      .eq("id", existingLike.id);
-
-    if (error) {
-      throw error;
-    }
-
     return false;
   }
 

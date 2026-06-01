@@ -571,6 +571,11 @@ export default function CommunityPage() {
       return;
     }
 
+    if (selectedPost.likedByMe) {
+      setMessage("이미 좋아요를 눌렀습니다.");
+      return;
+    }
+
     if (!user) {
       goToLogin();
       return;
@@ -591,18 +596,30 @@ export default function CommunityPage() {
       }
 
       const didLike = await toggleCommunityLike(selectedPost.id, sessionUserId);
-      const likeDelta = didLike ? 1 : -1;
+
+      if (!didLike) {
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === selectedPost.id ? { ...post, likedByMe: true } : post
+          )
+        );
+        setSelectedPost((current) =>
+          current ? { ...current, likedByMe: true } : current
+        );
+        setMessage("이미 좋아요를 눌렀습니다.");
+        return;
+      }
 
       setPosts((current) =>
         current.map((post) =>
           post.id === selectedPost.id
-            ? { ...post, likeCount: Math.max(0, post.likeCount + likeDelta) }
+            ? { ...post, likedByMe: true, likeCount: post.likeCount + 1 }
             : post
         )
       );
       setSelectedPost((current) =>
         current
-          ? { ...current, likeCount: Math.max(0, current.likeCount + likeDelta) }
+          ? { ...current, likedByMe: true, likeCount: current.likeCount + 1 }
           : current
       );
     } catch (error) {
@@ -620,7 +637,7 @@ export default function CommunityPage() {
       return;
     }
 
-    if (reportedPostIds.has(selectedPost.id)) {
+    if (selectedPost.reportedByMe || reportedPostIds.has(selectedPost.id)) {
       setMessage("이미 신고한 글입니다.");
       return;
     }
@@ -666,6 +683,14 @@ export default function CommunityPage() {
 
       if (!didReport) {
         setReportedPostIds((current) => new Set(current).add(selectedPost.id));
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === selectedPost.id ? { ...post, reportedByMe: true } : post
+          )
+        );
+        setSelectedPost((current) =>
+          current ? { ...current, reportedByMe: true } : current
+        );
         closeReportModal();
         setMessage("이미 신고한 글입니다.");
         return;
@@ -674,12 +699,22 @@ export default function CommunityPage() {
       setPosts((current) =>
         current.map((post) =>
           post.id === selectedPost.id
-            ? { ...post, reportCount: post.reportCount + 1 }
+            ? {
+                ...post,
+                reportedByMe: true,
+                reportCount: post.reportCount + 1,
+              }
             : post
         )
       );
       setSelectedPost((current) =>
-        current ? { ...current, reportCount: current.reportCount + 1 } : current
+        current
+          ? {
+              ...current,
+              reportedByMe: true,
+              reportCount: current.reportCount + 1,
+            }
+          : current
       );
       setReportedPostIds((current) => new Set(current).add(selectedPost.id));
       closeReportModal();
@@ -944,6 +979,12 @@ export default function CommunityPage() {
                               unoptimized
                               sizes="360px"
                               className="object-cover"
+                              onError={(error) => {
+                                console.error("community-image-render-error", {
+                                  src: post.images[0]?.url,
+                                  error,
+                                });
+                              }}
                             />
                           </span>
                         </span>
@@ -988,6 +1029,12 @@ export default function CommunityPage() {
                               unoptimized
                               sizes="160px"
                               className="object-cover"
+                              onError={(error) => {
+                                console.error("community-image-render-error", {
+                                  src: image.url,
+                                  error,
+                                });
+                              }}
                             />
                           ) : null}
                         </a>
@@ -1052,16 +1099,23 @@ export default function CommunityPage() {
                       type="button"
                       className={secondaryButtonClassName}
                       onClick={handleLike}
+                      disabled={selectedPost.likedByMe}
                     >
-                      좋아요 {selectedPost.likeCount}
+                      {selectedPost.likedByMe
+                        ? "좋아요됨 " + selectedPost.likeCount
+                        : "좋아요 " + selectedPost.likeCount}
                     </button>
                     <button
                       type="button"
                       className={reportButtonClassName}
                       onClick={handleReport}
-                      disabled={reportedPostIds.has(selectedPost.id)}
+                      disabled={
+                        selectedPost.reportedByMe ||
+                        reportedPostIds.has(selectedPost.id)
+                      }
                     >
-                      {reportedPostIds.has(selectedPost.id)
+                      {selectedPost.reportedByMe ||
+                      reportedPostIds.has(selectedPost.id)
                         ? "신고됨 " + selectedPost.reportCount
                         : "🚨 신고 " + selectedPost.reportCount}
                     </button>
