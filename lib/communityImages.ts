@@ -16,12 +16,40 @@ const getSafeFileName = (name: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "") || "community-image";
 
+const getWebpFileName = (name: string) => {
+  const safeName = getSafeFileName(name).replace(/\.[^.]+$/, "");
+
+  return `${safeName || "community-image"}.webp`;
+};
+
+export const getCommunityImagePublicUrl = (storedImageValue?: string) => {
+  if (!storedImageValue) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//.test(storedImageValue)) {
+    return storedImageValue;
+  }
+
+  if (!supabase) {
+    return storedImageValue;
+  }
+
+  const path = storedImageValue.replace(/^community-images\//, "");
+
+  return supabase.storage
+    .from(communityImagesBucketName)
+    .getPublicUrl(path).data.publicUrl;
+};
+
 const getImageBlob = async (image: CommunityImageAttachment) => {
-  if (!image.url?.startsWith("data:")) {
+  const imageData = image.dataUrl ?? image.url;
+
+  if (!imageData?.startsWith("data:")) {
     throw new Error("missing-image-data");
   }
 
-  const response = await fetch(image.url);
+  const response = await fetch(imageData);
 
   if (!response.ok) {
     throw new Error("invalid-image-data");
@@ -43,15 +71,13 @@ export const uploadCommunityImages = async (
   }
 
   const client = supabase;
-  const uploadedImages: CommunityImageAttachment[] = [];
   const errors: string[] = [];
 
-  await Promise.all(
+  const uploadResults = await Promise.all(
     images.map(async (image, index) => {
       try {
         if (image.path && image.url && !image.url.startsWith("data:")) {
-          uploadedImages.push(image);
-          return;
+          return image;
         }
 
         const blob = await getImageBlob(image);
@@ -59,12 +85,12 @@ export const uploadCommunityImages = async (
           postId,
           Date.now(),
           index,
-          getSafeFileName(image.name),
+          getWebpFileName(image.name),
         ].join("/");
         const { error } = await client.storage
           .from(communityImagesBucketName)
           .upload(path, blob, {
-            contentType: image.type,
+            contentType: "image/webp",
             upsert: false,
           });
 
@@ -82,14 +108,14 @@ export const uploadCommunityImages = async (
           .from(communityImagesBucketName)
           .getPublicUrl(path);
 
-        uploadedImages.push({
+        return {
           id: image.id,
           name: image.name,
           path,
           size: image.size,
-          type: image.type,
+          type: "image/webp",
           url: data.publicUrl,
-        });
+        } satisfies CommunityImageAttachment;
       } catch (error) {
         if (
           !(
@@ -107,8 +133,12 @@ export const uploadCommunityImages = async (
         errors.push(
           error instanceof Error ? error.message : "이미지 업로드 실패"
         );
+        return null;
       }
     })
+  );
+  const uploadedImages = uploadResults.filter(
+    (image): image is CommunityImageAttachment => Boolean(image)
   );
 
   console.log("community-image-upload-result", {

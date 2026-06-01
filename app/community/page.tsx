@@ -27,6 +27,7 @@ import type {
   CommunityImageAttachment,
   CommunityPost,
 } from "@/types/community";
+import { compressImage, isSupportedImageFile } from "@/utils/imageCompression";
 import { sanitizeUserText } from "@/utils/inputSanitizer";
 import { cn } from "@/utils/cn";
 
@@ -92,9 +93,13 @@ const allowedCommunityImageTypes = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
 ] as const;
 const maxCommunityImages = 3;
-const maxCommunityImageBytes = 5 * 1024 * 1024;
+const maxCommunityOriginalImageBytes = 25 * 1024 * 1024;
 type CommunitySortOption = "latest" | "popular" | "weekly";
 type CommunityReportReason =
   | "욕설/비방"
@@ -116,23 +121,29 @@ const communityReportReasons: CommunityReportReason[] = [
   "기타",
 ];
 
-const isAllowedCommunityImageType = (
-  type: string
-): type is CommunityImageAttachment["type"] =>
+const isAllowedCommunityImageFile = (file: File) =>
   allowedCommunityImageTypes.includes(
-    type as CommunityImageAttachment["type"]
-  );
+    file.type as (typeof allowedCommunityImageTypes)[number]
+  ) || isSupportedImageFile(file);
 
 const readCommunityImageFile = async (
   file: File
 ): Promise<CommunityImageAttachment> => {
-  if (!isAllowedCommunityImageType(file.type)) {
-    throw new Error("jpg, png, webp 이미지만 첨부할 수 있습니다.");
+  if (!isAllowedCommunityImageFile(file)) {
+    throw new Error("jpg, png, webp, heic 이미지만 첨부할 수 있습니다.");
   }
 
-  if (file.size > maxCommunityImageBytes) {
-    throw new Error("이미지는 1장당 5MB 이하만 첨부할 수 있습니다.");
+  if (file.size > maxCommunityOriginalImageBytes) {
+    throw new Error("이미지는 1장당 25MB 이하만 첨부할 수 있습니다.");
   }
+
+  const compressionResult = await compressImage(file);
+
+  if (!compressionResult.success) {
+    throw new Error(compressionResult.message);
+  }
+
+  const { blob } = compressionResult;
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -144,16 +155,17 @@ const readCommunityImageFile = async (
       }
 
       resolve({
-        id: [file.name, file.size, Date.now()].join("-"),
+        id: [file.name, blob.size, Date.now()].join("-"),
         name: file.name,
-        size: file.size,
-        type: file.type as CommunityImageAttachment["type"],
+        size: blob.size,
+        type: "image/webp",
+        dataUrl: reader.result,
         url: reader.result,
       });
     };
 
     reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 };
 
@@ -857,7 +869,7 @@ export default function CommunityPage() {
                   <div>
                     <p className="text-sm font-bold text-white">이미지 첨부</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      jpg, png, webp · 최대 3장 · 이미지당 5MB 이하
+                      jpg, png, webp, heic · 최대 3장 · 자동 압축
                     </p>
                   </div>
                   <label className={cn(secondaryButtonClassName, "cursor-pointer")}>
@@ -865,7 +877,7 @@ export default function CommunityPage() {
                     <input
                       className="sr-only"
                       type="file"
-                      accept="image/jpeg,image/png,image/webp"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
                       multiple
                       onChange={(event) => {
                         void addPostImages(event.currentTarget.files);
@@ -884,12 +896,19 @@ export default function CommunityPage() {
                       >
                         {image.url ? (
                           <Image
-                            src={image.url}
+                            src={image.dataUrl ?? image.url}
                             alt={image.name}
                             fill
                             unoptimized
                             sizes="120px"
                             className="object-cover"
+                            onError={() => {
+                              console.error("community-image-render-error", {
+                                storedImageValue:
+                                  image.path ?? image.url ?? image.dataUrl,
+                                finalImageUrl: image.dataUrl ?? image.url,
+                              });
+                            }}
                           />
                         ) : null}
                         <button
@@ -938,6 +957,9 @@ export default function CommunityPage() {
               <div className="divide-y divide-zinc-800">
                 {visiblePosts.map((post) => {
                   const isSelected = selectedPost?.id === post.id;
+                  const thumbnailImage = post.images[0];
+                  const thumbnailImageUrl =
+                    thumbnailImage?.url ?? thumbnailImage?.dataUrl;
 
                   return (
                     <button
@@ -969,20 +991,23 @@ export default function CommunityPage() {
                           <span>이미지 {post.images.length}</span>
                         ) : null}
                       </span>
-                      {post.images[0]?.url ? (
+                      {thumbnailImageUrl ? (
                         <span className="mt-3 block">
                           <span className="relative block aspect-[16/9] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
                             <Image
-                              src={post.images[0].url}
-                              alt={post.images[0].name}
+                              src={thumbnailImageUrl}
+                              alt={thumbnailImage.name}
                               fill
                               unoptimized
                               sizes="360px"
                               className="object-cover"
-                              onError={(error) => {
+                              onError={() => {
                                 console.error("community-image-render-error", {
-                                  src: post.images[0]?.url,
-                                  error,
+                                  storedImageValue:
+                                    thumbnailImage.path ??
+                                    thumbnailImage.url ??
+                                    thumbnailImage.dataUrl,
+                                  finalImageUrl: thumbnailImageUrl,
                                 });
                               }}
                             />
@@ -1013,32 +1038,44 @@ export default function CommunityPage() {
                   </p>
                   {selectedPost.images.length > 0 ? (
                     <div className="mt-5 grid grid-cols-3 gap-3">
-                      {selectedPost.images.slice(0, maxCommunityImages).map((image) => (
-                        <a
-                          key={image.id}
-                          href={image.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
-                        >
-                          {image.url ? (
-                            <Image
-                              src={image.url}
-                              alt={image.name}
-                              fill
-                              unoptimized
-                              sizes="160px"
-                              className="object-cover"
-                              onError={(error) => {
-                                console.error("community-image-render-error", {
-                                  src: image.url,
-                                  error,
-                                });
-                              }}
-                            />
-                          ) : null}
-                        </a>
-                      ))}
+                      {selectedPost.images
+                        .slice(0, maxCommunityImages)
+                        .map((image) => {
+                          const finalImageUrl = image.url ?? image.dataUrl;
+
+                          return (
+                            <a
+                              key={image.id}
+                              href={finalImageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+                            >
+                              {finalImageUrl ? (
+                                <Image
+                                  src={finalImageUrl}
+                                  alt={image.name}
+                                  fill
+                                  unoptimized
+                                  sizes="160px"
+                                  className="object-cover"
+                                  onError={() => {
+                                    console.error(
+                                      "community-image-render-error",
+                                      {
+                                        storedImageValue:
+                                          image.path ??
+                                          image.url ??
+                                          image.dataUrl,
+                                        finalImageUrl,
+                                      }
+                                    );
+                                  }}
+                                />
+                              ) : null}
+                            </a>
+                          );
+                        })}
                     </div>
                   ) : null}
                 </div>

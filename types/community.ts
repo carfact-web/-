@@ -18,6 +18,7 @@ export interface CommunityImageAttachment {
   path?: string;
   size: number;
   type: "image/jpeg" | "image/png" | "image/webp";
+  dataUrl?: string;
   url?: string;
 }
 

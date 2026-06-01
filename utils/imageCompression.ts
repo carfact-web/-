@@ -2,27 +2,37 @@
 
 /**
  * 이미지 압축 유틸리티
- * - jpg/jpeg/png/webp 지원
+ * - jpg/jpeg/png/webp/heic/heif 지원
  * - 긴 변 1600px 이하로 리사이즈
  * - WebP 품질 80%로 변환
- * - 1MB 이하 목표
- * - HEIC/HEIF 미지원
+ * - 800KB 이하 목표
+ * - Canvas 재인코딩으로 EXIF 제거
  */
 
 const MAX_DIMENSION = 1600;
 const MIN_DIMENSION = 640;
 const WEBP_QUALITY = 0.8;
-const TARGET_FILE_SIZE = 1024 * 1024; // 1MB
+const TARGET_FILE_SIZE = 800 * 1024;
 const OUTPUT_MIME_TYPE = "image/webp";
 const MAX_RESIZE_ATTEMPTS = 8;
 
-const UNSUPPORTED_TYPES = [
+const SUPPORTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
   "image/heic",
   "image/heif",
   "image/heic-sequence",
   "image/heif-sequence",
 ];
-const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const SUPPORTED_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+];
 
 export interface ImageCompressionError {
   success: false;
@@ -58,11 +68,21 @@ interface WebpRenderResult {
 }
 
 export const isUnsupportedImageFormat = (mimeType: string): boolean => {
-  return UNSUPPORTED_TYPES.includes(mimeType.toLowerCase());
+  return Boolean(mimeType) && !SUPPORTED_TYPES.includes(mimeType.toLowerCase());
 };
 
 export const isSupportedImageFormat = (mimeType: string): boolean => {
   return SUPPORTED_TYPES.includes(mimeType.toLowerCase());
+};
+
+export const isSupportedImageFile = (file: File): boolean => {
+  if (isSupportedImageFormat(file.type)) {
+    return true;
+  }
+
+  const lowerName = file.name.toLowerCase();
+
+  return SUPPORTED_EXTENSIONS.some((extension) => lowerName.endsWith(extension));
 };
 
 const getResizedDimensions = (
@@ -91,7 +111,9 @@ const waitForImageLoad = (image: HTMLImageElement) =>
 const loadImageSource = async (file: File): Promise<LoadedImageSource> => {
   if ("createImageBitmap" in window) {
     try {
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image",
+      });
 
       return {
         source: bitmap,
@@ -179,7 +201,7 @@ const logCompressionResult = (
     outputType: result.blob.type,
     quality: "80%",
     dimensions: `${result.width}x${result.height}`,
-    target: "1 MB",
+    target: "800 KB",
   };
 
   if (targetReached) {
@@ -187,32 +209,23 @@ const logCompressionResult = (
   } else {
     console.warn(message, {
       ...payload,
-      note: "1 MB target was not reached after resizing attempts.",
+      note: "800 KB target was not reached after resizing attempts.",
     });
   }
 };
 
 /**
- * 이미지를 WebP 80%로 변환하고 1MB 이하를 목표로 리사이즈합니다.
+ * 이미지를 WebP 80%로 변환하고 800KB 이하를 목표로 리사이즈합니다.
  */
 export const compressImage = async (
   file: File
 ): Promise<ImageCompressionOutput> => {
   try {
-    if (isUnsupportedImageFormat(file.type)) {
+    if (!isSupportedImageFile(file)) {
       return {
         success: false,
         type: "unsupported-format",
-        message:
-          "HEIC/HEIF 형식은 지원되지 않습니다. jpg, png, webp 형식의 이미지를 업로드해주세요.",
-      };
-    }
-
-    if (!isSupportedImageFormat(file.type)) {
-      return {
-        success: false,
-        type: "unsupported-format",
-        message: `${file.type} 형식은 지원되지 않습니다. jpg, png, webp 형식의 이미지를 업로드해주세요.`,
+        message: `${file.type || file.name} 형식은 지원되지 않습니다. jpg, png, webp, heic 형식의 이미지를 업로드해주세요.`,
       };
     }
 
@@ -288,7 +301,7 @@ export const compressImage = async (
         success: false,
         type: "unsupported-format",
         message:
-          "HEIC/HEIF 형식은 지원되지 않습니다. jpg, png, webp 형식의 이미지를 업로드해주세요.",
+          "이 브라우저에서 HEIC/HEIF 이미지를 변환하지 못했습니다. iPhone 설정에서 '높은 호환성' 사진으로 다시 시도해주세요.",
       };
     }
 

@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { createSupabaseFailureError } from "@/lib/supabaseErrorMessages";
 import {
   communityImagesBucketName,
+  getCommunityImagePublicUrl,
   getPersistableCommunityImages,
   uploadCommunityImages,
 } from "@/lib/communityImages";
@@ -58,11 +59,7 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
     if (typeof image === "string") {
       const isPublicUrl = /^https?:\/\//.test(image);
       const path = isPublicUrl ? undefined : image;
-      const url =
-        isPublicUrl || !supabase || !path
-          ? image
-          : supabase.storage.from(communityImagesBucketName).getPublicUrl(path)
-              .data.publicUrl;
+      const url = getCommunityImagePublicUrl(image);
 
       return {
         id: image,
@@ -85,14 +82,12 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
           ? image.key
           : undefined;
     const path = rawPath?.replace(/^community-images\//, "");
-    const publicUrl =
-      typeof image.url === "string" && image.url
+    const publicUrl = path
+      ? getCommunityImagePublicUrl(path)
+      : typeof image.url === "string" && image.url
         ? image.url
         : typeof image.publicUrl === "string" && image.publicUrl
           ? image.publicUrl
-        : path && supabase
-          ? supabase.storage.from(communityImagesBucketName).getPublicUrl(path)
-              .data.publicUrl
           : undefined;
 
     const imageType: CommunityImageAttachment["type"] =
@@ -553,6 +548,8 @@ export const saveCommunityPost = async (input: {
   if (!data) {
     throw new Error("community-post-empty-response");
   }
+
+  console.log("community-post-images-db", data.images);
 
   const savedPost = mapCommunityPost(data, {
     [sessionUserId]: basePayload.author_nickname,
