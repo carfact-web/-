@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRandomNickname } from "@/lib/nickname";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import type { Database } from "@/types/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 
 type OAuthProvider = "google" | "kakao";
+type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
+type UserRole = UserProfile["role"];
 
 const kakaoOAuthScope = "profile_nickname profile_image";
 export const authRedirectStorageKey = "carfact-auth-redirect-to";
@@ -13,8 +16,12 @@ export const authRedirectStorageKey = "carfact-auth-redirect-to";
 interface UseAuthResult {
   authError: string;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isAuthReady: boolean;
+  isSuperAdmin: boolean;
   isSupabaseConfigured: boolean;
+  profile: UserProfile | null;
+  role: UserRole;
   session: Session | null;
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signInWithKakao: (redirectTo?: string) => Promise<void>;
@@ -50,36 +57,57 @@ const getUserLabel = (user: User | null) => {
   return user.email ?? "로그인 사용자";
 };
 
+const defaultUserRole: UserRole = "user";
+
+const isMissingRoleColumnError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "message" in error &&
+  String((error as { message?: unknown }).message ?? "").includes("role");
+
 const syncUserProfile = async (user: User | null) => {
   if (!supabase || !user) {
-    return;
+    return null;
   }
 
   const now = new Date().toISOString();
   const { data: existingProfile, error: profileError } = await supabase
     .from("user_profiles")
-    .select("id,nickname,nickname_changed")
+    .select("*")
     .eq("id", user.id)
     .maybeSingle();
 
   if (profileError) {
-    throw profileError;
+    if (!isMissingRoleColumnError(profileError)) {
+      throw profileError;
+    }
+
+    return null;
   }
 
   if (!existingProfile) {
-    const { error } = await supabase.from("user_profiles").insert({
-      id: user.id,
-      nickname: createRandomNickname(),
-      nickname_changed: false,
-      updated_at: now,
-      created_at: now,
-    });
+    const { data: createdProfile, error } = await supabase
+      .from("user_profiles")
+      .insert({
+        id: user.id,
+        nickname: createRandomNickname(),
+        nickname_changed: false,
+        role: defaultUserRole,
+        updated_at: now,
+        created_at: now,
+      })
+      .select("*")
+      .single();
 
     if (error) {
-      throw error;
+      if (!isMissingRoleColumnError(error)) {
+        throw error;
+      }
+
+      return null;
     }
 
-    return;
+    return createdProfile;
   }
 
   const nextProfile =
@@ -93,22 +121,34 @@ const syncUserProfile = async (user: User | null) => {
           updated_at: now,
         };
 
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from("user_profiles")
     .update(nextProfile)
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("*")
+    .single();
 
   if (error) {
-    throw error;
+    if (!isMissingRoleColumnError(error)) {
+      throw error;
+    }
+
+    return existingProfile;
   }
+
+  return updatedProfile;
 };
 
 export function useAuth(): UseAuthResult {
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(!isSupabaseConfigured);
   const [authError, setAuthError] = useState("");
   const user = session?.user ?? null;
   const userLabel = useMemo(() => getUserLabel(user), [user]);
+  const role = profile?.role ?? defaultUserRole;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const isSuperAdmin = role === "super_admin";
 
   useEffect(() => {
     if (!supabase) {
@@ -167,6 +207,7 @@ export function useAuth(): UseAuthResult {
 
   useEffect(() => {
     if (!user) {
+      setProfile(null);
       return;
     }
 
@@ -190,10 +231,15 @@ export function useAuth(): UseAuthResult {
         });
       });
 
-    syncUserProfile(user).catch(() => {
-      // Profile persistence is additive for Kakao channel/AlimTalk readiness.
-      // Auth must continue even if the table has not been applied yet.
-    });
+    syncUserProfile(user)
+      .then((nextProfile) => {
+        setProfile(nextProfile);
+      })
+      .catch(() => {
+        setProfile(null);
+        // Profile persistence is additive for Kakao channel/AlimTalk readiness.
+        // Auth must continue even if the table has not been applied yet.
+      });
   }, [user]);
 
   const signInWithProvider = useCallback(async (
@@ -247,6 +293,7 @@ export function useAuth(): UseAuthResult {
   const signOut = useCallback(async () => {
     if (!supabase) {
       setSession(null);
+      setProfile(null);
       return;
     }
 
@@ -260,13 +307,18 @@ export function useAuth(): UseAuthResult {
     }
 
     setSession(null);
+    setProfile(null);
   }, []);
 
   return {
     authError,
     isAuthenticated: Boolean(user),
+    isAdmin,
     isAuthReady,
+    isSuperAdmin,
     isSupabaseConfigured,
+    profile,
+    role,
     session,
     signInWithGoogle,
     signInWithKakao,

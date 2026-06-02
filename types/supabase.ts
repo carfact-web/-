@@ -19,6 +19,8 @@ export interface Database {
           author_nickname: string | null;
           images: Json;
           is_hidden: boolean;
+          is_notice: boolean;
+          is_pinned: boolean;
           report_count: number;
           like_count: number;
           comment_count: number;
@@ -34,6 +36,8 @@ export interface Database {
           author_nickname?: string | null;
           images?: Json;
           is_hidden?: boolean;
+          is_notice?: boolean;
+          is_pinned?: boolean;
           report_count?: number;
           like_count?: number;
           comment_count?: number;
@@ -49,6 +53,8 @@ export interface Database {
           author_nickname?: string | null;
           images?: Json;
           is_hidden?: boolean;
+          is_notice?: boolean;
+          is_pinned?: boolean;
           report_count?: number;
           like_count?: number;
           comment_count?: number;
@@ -270,6 +276,7 @@ export interface Database {
           id: string;
           nickname: string | null;
           nickname_changed: boolean;
+          role: "user" | "admin" | "super_admin";
           created_at: string;
           updated_at: string;
         };
@@ -277,6 +284,7 @@ export interface Database {
           id: string;
           nickname?: string | null;
           nickname_changed?: boolean;
+          role?: "user" | "admin" | "super_admin";
           created_at?: string;
           updated_at?: string;
         };
@@ -284,6 +292,7 @@ export interface Database {
           id?: string;
           nickname?: string | null;
           nickname_changed?: boolean;
+          role?: "user" | "admin" | "super_admin";
           created_at?: string;
           updated_at?: string;
         };
@@ -375,6 +384,16 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
+      current_user_has_admin_role: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      hide_own_community_post: {
+        Args: {
+          target_post_id: string;
+        };
+        Returns: boolean;
+      };
       set_review_helpful_count: {
         Args: {
           p_helpful_count: number;

@@ -28,6 +28,8 @@ export interface CommunityPost {
   content: string;
   authorNickname: string;
   userId: string;
+  isNotice: boolean;
+  isPinned: boolean;
   images: CommunityImageAttachment[];
   imageUploadWarning?: string;
   likedByMe: boolean;

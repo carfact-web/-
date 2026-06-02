@@ -256,6 +256,8 @@ const mapCommunityPost = (
       authorNicknames?.[row.user_id]?.trim() ||
       defaultCommunityNickname,
     userId: row.user_id,
+    isNotice: row.is_notice ?? false,
+    isPinned: row.is_pinned ?? false,
     images,
     likedByMe: interactions?.likedByMe?.has(row.id) ?? false,
     likeCount: counts?.likes?.[row.id] ?? row.like_count,
@@ -423,6 +425,7 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
     .from("community_posts")
     .select("*")
     .eq("is_hidden", false)
+    .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (category !== "all") {
@@ -514,6 +517,8 @@ export const saveCommunityPost = async (input: {
   category: CommunityCategory;
   content: string;
   images?: CommunityImageAttachment[];
+  isNotice?: boolean;
+  isPinned?: boolean;
   title: string;
 }) => {
   if (!supabase) {
@@ -540,6 +545,8 @@ export const saveCommunityPost = async (input: {
     author_nickname: input.authorNickname.trim() || defaultCommunityNickname,
     category: input.category,
     content: input.content,
+    is_notice: input.isNotice ?? false,
+    is_pinned: input.isPinned ?? false,
     title: input.title,
     created_at: now,
     updated_at: now,
@@ -549,6 +556,8 @@ export const saveCommunityPost = async (input: {
     user_id: basePayload.user_id,
     category: basePayload.category,
     content: basePayload.content,
+    is_notice: basePayload.is_notice,
+    is_pinned: basePayload.is_pinned,
     title: basePayload.title,
     created_at: basePayload.created_at,
     updated_at: basePayload.updated_at,
@@ -702,8 +711,8 @@ export const deleteCommunityPost = async (postId: string) => {
   }
 
   const { data: didHidePost, error: rpcError } = await supabase.rpc(
-    "hide_own_community_post" as never,
-    { target_post_id: postId } as never
+    "hide_own_community_post",
+    { target_post_id: postId }
   );
 
   if (!rpcError) {

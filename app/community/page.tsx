@@ -177,7 +177,7 @@ const readCommunityImageFile = async (
 
 export default function CommunityPage() {
   const router = useRouter();
-  const { isAuthenticated, isAuthReady, user } = useAuth();
+  const { isAdmin, isAuthenticated, isAuthReady, user } = useAuth();
   const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
 
   const [activeCategory, setActiveCategory] =
@@ -236,6 +236,7 @@ export default function CommunityPage() {
 
       return targetPosts.sort(
         (left, right) =>
+          Number(right.isPinned) - Number(left.isPinned) ||
           right.likeCount +
             right.commentCount -
             (left.likeCount + left.commentCount) ||
@@ -245,6 +246,7 @@ export default function CommunityPage() {
 
     return sortedPosts.sort(
       (left, right) =>
+        Number(right.isPinned) - Number(left.isPinned) ||
         Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
     );
   }, [currentTime, normalizedSearchQuery, posts, sortOption]);
@@ -255,7 +257,7 @@ export default function CommunityPage() {
     return visiblePosts.slice(startIndex, startIndex + postsPerPage);
   }, [currentPage, visiblePosts]);
   const canDeleteSelectedPost = Boolean(
-    user && selectedPost?.userId === user.id
+    user && selectedPost && (selectedPost.userId === user.id || isAdmin)
   );
 
   useEffect(() => {
@@ -506,6 +508,8 @@ export default function CommunityPage() {
     const formData = new FormData(form);
     const title = normalizeField(String(formData.get("title") ?? ""), 80);
     const content = normalizeField(String(formData.get("content") ?? ""), 2000);
+    const isNoticePost = isAdmin && formData.get("isNotice") === "on";
+    const isPinnedPost = isAdmin && formData.get("isPinned") === "on";
 
     if (title.length < 2 || content.length < 5) {
       setMessage("제목은 2자 이상, 내용은 5자 이상 입력해주세요.");
@@ -536,6 +540,8 @@ export default function CommunityPage() {
         category: writeCategory,
         content,
         images: postImages,
+        isNotice: isNoticePost,
+        isPinned: isPinnedPost,
         title,
       });
 
@@ -1049,6 +1055,26 @@ export default function CommunityPage() {
                   </div>
                 ) : null}
               </div>
+              {isAdmin ? (
+                <div className="grid gap-2 rounded-lg border border-zinc-800 bg-black/40 p-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm font-bold text-zinc-300">
+                    <input
+                      type="checkbox"
+                      name="isNotice"
+                      className="h-4 w-4 accent-red-500"
+                    />
+                    공지글
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-bold text-zinc-300">
+                    <input
+                      type="checkbox"
+                      name="isPinned"
+                      className="h-4 w-4 accent-red-500"
+                    />
+                    상단 고정
+                  </label>
+                </div>
+              ) : null}
               <button
                 type="submit"
                 className={primaryButtonClassName}
@@ -1111,6 +1137,16 @@ export default function CommunityPage() {
                         <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
                           {getCommunityCategoryLabel(post.category)}
                         </span>
+                        {post.isNotice ? (
+                          <span className="mb-2 ml-2 inline-flex rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-xs font-extrabold text-amber-200">
+                            공지
+                          </span>
+                        ) : null}
+                        {post.isPinned ? (
+                          <span className="mb-2 ml-2 inline-flex rounded-md border border-zinc-500 bg-zinc-800 px-2 py-1 text-xs font-extrabold text-zinc-100">
+                            상단고정
+                          </span>
+                        ) : null}
                         <span className="block text-base font-extrabold text-white sm:text-lg">
                           {post.title}
                         </span>
@@ -1189,6 +1225,8 @@ export default function CommunityPage() {
                         <span>
                           {getCommunityCategoryLabel(selectedPost.category)}
                         </span>
+                        {selectedPost.isNotice ? <span>공지</span> : null}
+                        {selectedPost.isPinned ? <span>상단고정</span> : null}
                         <span>{selectedPost.authorNickname}</span>
                         <span>{selectedPost.createdAt}</span>
                       </div>
