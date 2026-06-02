@@ -13,6 +13,7 @@ import {
 } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import {
+  deleteCommunityPost,
   fetchCommunityComments,
   fetchCommunityPosts,
   reportCommunityPost,
@@ -64,6 +65,10 @@ const reportButtonClassName = cn(
   "hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-200 active:scale-[0.98]",
   "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500"
 );
+const dangerButtonClassName = cn(
+  buttonClassName,
+  "border border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20"
+);
 const reportModalOverlayClassName = cn(
   "fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
 );
@@ -100,6 +105,7 @@ const allowedCommunityImageTypes = [
 ] as const;
 const maxCommunityImages = 3;
 const maxCommunityOriginalImageBytes = 25 * 1024 * 1024;
+const postsPerPage = 5;
 type CommunitySortOption = "latest" | "popular" | "weekly";
 type CommunityReportReason =
   | "욕설/비방"
@@ -184,11 +190,15 @@ export default function CommunityPage() {
   const [postImages, setPostImages] = useState<CommunityImageAttachment[]>([]);
   const [targetPostId, setTargetPostId] = useState("");
   const [sortOption, setSortOption] = useState<CommunitySortOption>("latest");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [isWriting, setIsWriting] = useState(false);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedReportReason, setSelectedReportReason] =
     useState<CommunityReportReason | null>(null);
@@ -201,9 +211,19 @@ export default function CommunityPage() {
     () => getCommunityCategoryLabel(activeCategory),
     [activeCategory]
   );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const visiblePosts = useMemo(() => {
     const weekAgo = currentTime - 7 * 24 * 60 * 60 * 1000;
-    const sortedPosts = [...posts];
+    const sortedPosts = posts.filter((post) => {
+      if (!normalizedSearchQuery) {
+        return true;
+      }
+
+      return [post.title, post.content]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearchQuery);
+    });
 
     if (sortOption === "popular" || sortOption === "weekly") {
       const targetPosts =
@@ -227,7 +247,16 @@ export default function CommunityPage() {
       (left, right) =>
         Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
     );
-  }, [currentTime, posts, sortOption]);
+  }, [currentTime, normalizedSearchQuery, posts, sortOption]);
+  const totalPages = Math.max(1, Math.ceil(visiblePosts.length / postsPerPage));
+  const currentPagePosts = useMemo(() => {
+    const startIndex = (currentPage - 1) * postsPerPage;
+
+    return visiblePosts.slice(startIndex, startIndex + postsPerPage);
+  }, [currentPage, visiblePosts]);
+  const canDeleteSelectedPost = Boolean(
+    user && selectedPost?.userId === user.id
+  );
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -276,7 +305,11 @@ export default function CommunityPage() {
       const nextPosts = await fetchCommunityPosts(category);
       setPosts(nextPosts);
       setSelectedPost((current) => {
-        if (!current || current.category !== category) {
+        if (!current) {
+          return null;
+        }
+
+        if (category !== "all" && current.category !== category) {
           return null;
         }
 
@@ -318,6 +351,14 @@ export default function CommunityPage() {
       void loadPosts(activeCategory);
     });
   }, [activeCategory, loadPosts]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, normalizedSearchQuery, sortOption]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(Math.max(1, page), totalPages));
+  }, [totalPages]);
 
   const selectedPostId = selectedPost?.id;
 
@@ -433,6 +474,22 @@ export default function CommunityPage() {
     setMessage("");
   };
 
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(normalizeField(searchInput, 80));
+    setCurrentPage(1);
+    setSelectedPost(null);
+    setMessage("");
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setCurrentPage(1);
+    setSelectedPost(null);
+    setMessage("");
+  };
+
   const submitPost = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -490,6 +547,9 @@ export default function CommunityPage() {
       setSelectedPost(createdPost);
       setIsWriting(false);
       setPostImages([]);
+      setSearchInput("");
+      setSearchQuery("");
+      setCurrentPage(1);
       setActiveCategory(createdPost.category);
       event.currentTarget.reset();
       if (createdPost.imageUploadWarning) {
@@ -639,6 +699,35 @@ export default function CommunityPage() {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!selectedPost || !canDeleteSelectedPost || isDeletingPost) {
+      return;
+    }
+
+    if (!window.confirm("게시글을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    setIsDeletingPost(true);
+    setMessage("");
+
+    try {
+      await deleteCommunityPost(selectedPost.id);
+      setPosts((current) =>
+        current.filter((post) => post.id !== selectedPost.id)
+      );
+      setSelectedPost(null);
+      setComments([]);
+      setMessage("게시글을 삭제했습니다.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "게시글 삭제에 실패했습니다."
+      );
+    } finally {
+      setIsDeletingPost(false);
+    }
+  };
+
   const closeReportModal = () => {
     setIsReportModalOpen(false);
     setSelectedReportReason(null);
@@ -756,7 +845,10 @@ export default function CommunityPage() {
                     sortButtonClassName,
                     sortOption === option.value && activeSortButtonClassName
                   )}
-                  onClick={() => setSortOption(option.value)}
+                  onClick={() => {
+                    setSortOption(option.value);
+                    setCurrentPage(1);
+                  }}
                   aria-pressed={sortOption === option.value}
                 >
                   {option.label}
@@ -773,6 +865,38 @@ export default function CommunityPage() {
             글쓰기
           </button>
         </header>
+
+        <section className={panelClassName} aria-label="커뮤니티 검색">
+          <form
+            className="grid gap-2 sm:grid-cols-[1fr_auto_auto]"
+            onSubmit={submitSearch}
+          >
+            <input
+              className={inputClassName}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.currentTarget.value)}
+              placeholder="제목 또는 내용 검색"
+              maxLength={80}
+            />
+            <button type="submit" className={primaryButtonClassName}>
+              검색
+            </button>
+            {searchQuery ? (
+              <button
+                type="button"
+                className={secondaryButtonClassName}
+                onClick={clearSearch}
+              >
+                초기화
+              </button>
+            ) : null}
+          </form>
+          {searchQuery ? (
+            <p className="mt-3 text-sm font-semibold text-zinc-400">
+              “{searchQuery}” 검색 결과 {visiblePosts.length}개
+            </p>
+          ) : null}
+        </section>
 
         <section className={panelClassName} aria-label="게시판 선택">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -796,6 +920,7 @@ export default function CommunityPage() {
                   )}
                   onClick={() => {
                     setActiveCategory(category.value);
+                    setCurrentPage(1);
                     setIsWriting(false);
                     setMessage("");
                   }}
@@ -941,7 +1066,10 @@ export default function CommunityPage() {
               <button
                 type="button"
                 className={secondaryButtonClassName}
-                onClick={() => void loadPosts(activeCategory)}
+                onClick={() => {
+                  setCurrentPage(1);
+                  void loadPosts(activeCategory);
+                }}
               >
                 새로고침
               </button>
@@ -951,72 +1079,101 @@ export default function CommunityPage() {
               <p className={mutedTextClassName}>글 목록을 불러오는 중입니다.</p>
             ) : visiblePosts.length === 0 ? (
               <p className={mutedTextClassName}>
-                아직 등록된 글이 없습니다. 첫 글을 작성해보세요.
+                {searchQuery
+                  ? "검색 결과가 없습니다."
+                  : "아직 등록된 글이 없습니다. 첫 글을 작성해보세요."}
               </p>
             ) : (
-              <div className="divide-y divide-zinc-800">
-                {visiblePosts.map((post) => {
-                  const isSelected = selectedPost?.id === post.id;
-                  const thumbnailImage = post.images[0];
-                  const thumbnailImageUrl =
-                    thumbnailImage?.url ?? thumbnailImage?.dataUrl;
+              <div>
+                <div className="divide-y divide-zinc-800">
+                  {currentPagePosts.map((post) => {
+                    const isSelected = selectedPost?.id === post.id;
+                    const thumbnailImage = post.images[0];
+                    const thumbnailImageUrl =
+                      thumbnailImage?.url ?? thumbnailImage?.dataUrl;
 
-                  return (
-                    <button
-                      key={post.id}
-                      type="button"
-                      className={cn(
-                        "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
-                        isSelected
-                          ? "rounded-lg bg-red-500/10 px-4"
-                          : "hover:bg-zinc-900/50"
-                      )}
-                      onClick={() => {
-                        setSelectedPost(post);
-                        setIsWriting(false);
-                      }}
-                    >
-                      <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
-                        {getCommunityCategoryLabel(post.category)}
-                      </span>
-                      <span className="block text-base font-extrabold text-white sm:text-lg">
-                        {post.title}
-                      </span>
-                      <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
-                        <span>{post.authorNickname}</span>
-                        <span>댓글 {post.commentCount}</span>
-                        <span>좋아요 {post.likeCount}</span>
-                        <span>{post.createdAt}</span>
-                        {post.images.length > 0 ? (
-                          <span>이미지 {post.images.length}</span>
-                        ) : null}
-                      </span>
-                      {thumbnailImageUrl ? (
-                        <span className="mt-3 block">
-                          <span className="relative block aspect-[16/9] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
-                            <Image
-                              src={thumbnailImageUrl}
-                              alt={thumbnailImage.name}
-                              fill
-                              unoptimized
-                              sizes="360px"
-                              className="object-cover"
-                              onError={() => {
-                                console.error("community-image-render-error", {
-                                  storedImageValue:
-                                    thumbnailImage.path ??
-                                    thumbnailImage.url ??
-                                    thumbnailImage.dataUrl,
-                                  finalImageUrl: thumbnailImageUrl,
-                                });
-                              }}
-                            />
-                          </span>
+                    return (
+                      <button
+                        key={post.id}
+                        type="button"
+                        className={cn(
+                          "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
+                          isSelected
+                            ? "rounded-lg bg-red-500/10 px-4"
+                            : "hover:bg-zinc-900/50"
+                        )}
+                        onClick={() => {
+                          setSelectedPost(post);
+                          setIsWriting(false);
+                        }}
+                      >
+                        <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
+                          {getCommunityCategoryLabel(post.category)}
                         </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+                        <span className="block text-base font-extrabold text-white sm:text-lg">
+                          {post.title}
+                        </span>
+                        <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
+                          <span>{post.authorNickname}</span>
+                          <span>댓글 {post.commentCount}</span>
+                          <span>좋아요 {post.likeCount}</span>
+                          <span>{post.createdAt}</span>
+                          {post.images.length > 0 ? (
+                            <span>이미지 {post.images.length}</span>
+                          ) : null}
+                        </span>
+                        {thumbnailImageUrl ? (
+                          <span className="mt-3 block">
+                            <span className="relative block aspect-[16/9] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                              <Image
+                                src={thumbnailImageUrl}
+                                alt={thumbnailImage.name}
+                                fill
+                                unoptimized
+                                sizes="360px"
+                                className="object-cover"
+                                onError={() => {
+                                  console.error("community-image-render-error", {
+                                    storedImageValue:
+                                      thumbnailImage.path ??
+                                      thumbnailImage.url ??
+                                      thumbnailImage.dataUrl,
+                                    finalImageUrl: thumbnailImageUrl,
+                                  });
+                                }}
+                              />
+                            </span>
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-4">
+                  <button
+                    type="button"
+                    className={secondaryButtonClassName}
+                    onClick={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    disabled={currentPage <= 1}
+                  >
+                    이전
+                  </button>
+                  <span className="text-sm font-bold text-zinc-400">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className={secondaryButtonClassName}
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
+                    disabled={currentPage >= totalPages}
+                  >
+                    다음
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1025,14 +1182,30 @@ export default function CommunityPage() {
             {selectedPost ? (
               <div className="flex flex-col gap-5">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
-                    <span>{getCommunityCategoryLabel(selectedPost.category)}</span>
-                    <span>{selectedPost.authorNickname}</span>
-                    <span>{selectedPost.createdAt}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
+                        <span>
+                          {getCommunityCategoryLabel(selectedPost.category)}
+                        </span>
+                        <span>{selectedPost.authorNickname}</span>
+                        <span>{selectedPost.createdAt}</span>
+                      </div>
+                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
+                        {selectedPost.title}
+                      </h2>
+                    </div>
+                    {canDeleteSelectedPost ? (
+                      <button
+                        type="button"
+                        className={dangerButtonClassName}
+                        onClick={handleDeletePost}
+                        disabled={isDeletingPost}
+                      >
+                        {isDeletingPost ? "삭제 중" : "삭제"}
+                      </button>
+                    ) : null}
                   </div>
-                  <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                    {selectedPost.title}
-                  </h2>
                   <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-zinc-200">
                     {selectedPost.content}
                   </p>

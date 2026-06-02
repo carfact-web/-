@@ -18,6 +18,15 @@ import type {
 import type { Json } from "@/types/supabase";
 
 const defaultCommunityNickname = "카팩트 사용자";
+const activeCommunityCategories: CommunityCategory[] = [
+  "free",
+  "maintenance",
+  "news",
+  "electric",
+  "imported",
+  "domestic",
+  "partner",
+];
 
 const toLocaleDateTime = (value: string) => {
   const date = new Date(value);
@@ -49,6 +58,20 @@ const createCommunityPostId = () => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeCommunityCategory = (value: string): CommunityCategory => {
+  if (value === "question") {
+    return "free";
+  }
+
+  if (value === "shop_review") {
+    return "partner";
+  }
+
+  return activeCommunityCategories.includes(value as CommunityCategory)
+    ? (value as CommunityCategory)
+    : "free";
+};
 
 const parseStoredCommunityImage = (
   value: string
@@ -109,25 +132,25 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
         return null;
       }
 
-    const rawPath =
-      typeof image.path === "string"
-        ? image.path
-        : typeof image.key === "string"
-          ? image.key
-          : undefined;
-    const path = rawPath?.replace(/^community-images\//, "");
-    const publicUrl = path
-      ? getCommunityImagePublicUrl(path)
-      : typeof image.url === "string" && image.url
-        ? image.url
-        : typeof image.publicUrl === "string" && image.publicUrl
-          ? image.publicUrl
-          : undefined;
+      const rawPath =
+        typeof image.path === "string"
+          ? image.path
+          : typeof image.key === "string"
+            ? image.key
+            : undefined;
+      const path = rawPath?.replace(/^community-images\//, "");
+      const publicUrl = path
+        ? getCommunityImagePublicUrl(path)
+        : typeof image.url === "string" && image.url
+          ? image.url
+          : typeof image.publicUrl === "string" && image.publicUrl
+            ? image.publicUrl
+            : undefined;
 
-    const imageType: CommunityImageAttachment["type"] =
-      image.type === "image/png" || image.type === "image/webp"
-        ? image.type
-        : "image/jpeg";
+      const imageType: CommunityImageAttachment["type"] =
+        image.type === "image/png" || image.type === "image/webp"
+          ? image.type
+          : "image/jpeg";
 
       return {
         id: String(image.id ?? publicUrl ?? path ?? Date.now()),
@@ -220,13 +243,14 @@ const mapCommunityPost = (
 
   return {
     id: row.id,
-    category: row.category,
+    category: normalizeCommunityCategory(row.category),
     title: row.title,
     content: row.content,
     authorNickname:
       row.author_nickname?.trim() ||
       authorNicknames?.[row.user_id]?.trim() ||
       defaultCommunityNickname,
+    userId: row.user_id,
     images,
     likedByMe: interactions?.likedByMe?.has(row.id) ?? false,
     likeCount: counts?.likes?.[row.id] ?? row.like_count,
@@ -653,6 +677,45 @@ export const saveCommunityComment = async (input: {
   }
 
   return mapCommunityComment(data);
+};
+
+export const deleteCommunityPost = async (postId: string) => {
+  if (!supabase) {
+    return false;
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id ?? null;
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!userId) {
+    throw new Error("로그인이 필요합니다.");
+  }
+
+  const { data, error } = await supabase
+    .from("community_posts")
+    .update({
+      is_hidden: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", postId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("삭제 권한이 없거나 이미 삭제된 글입니다.");
+  }
+
+  return true;
 };
 
 export const toggleCommunityLike = async (postId: string, userId: string) => {

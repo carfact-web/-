@@ -17,24 +17,16 @@ export const communityCategories: CommunityCategoryConfig[] = [
   },
   {
     value: "free",
-    label: "자유게시판",
+    label: "자유",
     shortLabel: "자유",
-  },
-  {
-    value: "maintenance",
-    label: "정비후기",
-  },
-  {
-    value: "question",
-    label: "질문",
   },
   {
     value: "news",
     label: "정보&소식",
   },
   {
-    value: "shop_review",
-    label: "업체후기",
+    value: "maintenance",
+    label: "정비관련",
   },
   {
     value: "electric",
@@ -47,6 +39,10 @@ export const communityCategories: CommunityCategoryConfig[] = [
   {
     value: "domestic",
     label: "국산차",
+  },
+  {
+    value: "partner",
+    label: "제휴업체",
   },
 ];
 

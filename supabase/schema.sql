@@ -48,13 +48,12 @@ create table if not exists public.community_posts (
   category text not null check (
     category in (
       'free',
-      'maintenance',
-      'question',
       'news',
-      'shop_review',
+      'maintenance',
       'electric',
       'imported',
-      'domestic'
+      'domestic',
+      'partner'
     )
   ),
   title text not null,

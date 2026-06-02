@@ -3,12 +3,11 @@ import type { Database } from "@/types/supabase";
 export type CommunityCategory =
   | "free"
   | "maintenance"
-  | "question"
   | "news"
-  | "shop_review"
   | "electric"
   | "imported"
-  | "domestic";
+  | "domestic"
+  | "partner";
 
 export type CommunityCategoryFilter = "all" | CommunityCategory;
 
@@ -28,6 +27,7 @@ export interface CommunityPost {
   title: string;
   content: string;
   authorNickname: string;
+  userId: string;
   images: CommunityImageAttachment[];
   imageUploadWarning?: string;
   likedByMe: boolean;
