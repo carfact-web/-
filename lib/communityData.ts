@@ -696,22 +696,20 @@ export const deleteCommunityPost = async (postId: string) => {
     throw new Error("로그인이 필요합니다.");
   }
 
-  const { data, error } = await supabase
+  const { count, error } = await supabase
     .from("community_posts")
     .update({
       is_hidden: true,
       updated_at: new Date().toISOString(),
-    })
+    }, { count: "exact" })
     .eq("id", postId)
-    .eq("user_id", userId)
-    .select("id")
-    .maybeSingle();
+    .eq("user_id", userId);
 
   if (error) {
     throw error;
   }
 
-  if (!data) {
+  if (count === 0) {
     throw new Error("삭제 권한이 없거나 이미 삭제된 글입니다.");
   }
 
