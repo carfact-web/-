@@ -215,7 +215,16 @@ const renderWebp = async (
 
   ctx.drawImage(source, 0, 0, width, height);
 
-  const blob = await canvasToBlob(canvas, OUTPUT_MIME_TYPE, WEBP_QUALITY);
+  let blob = await canvasToBlob(canvas, OUTPUT_MIME_TYPE, WEBP_QUALITY);
+
+  if (!blob || blob.type !== OUTPUT_MIME_TYPE) {
+    const { encode } = await import("@jsquash/webp");
+    const webpBuffer = await encode(ctx.getImageData(0, 0, width, height), {
+      quality: WEBP_QUALITY * 100,
+    });
+
+    blob = new Blob([webpBuffer], { type: OUTPUT_MIME_TYPE });
+  }
 
   if (!blob || blob.type !== OUTPUT_MIME_TYPE) {
     return null;
