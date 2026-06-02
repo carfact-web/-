@@ -50,30 +50,64 @@ const createCommunityPostId = () => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const parseStoredCommunityImage = (
+  value: string
+): Record<string, unknown> | null => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsedValue = JSON.parse(trimmedValue);
+
+    return isRecord(parsedValue) ? parsedValue : null;
+  } catch {
+    return null;
+  }
+};
+
 const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const images = (value as unknown[]).map<CommunityImageAttachment | null>((image) => {
-    if (typeof image === "string") {
-      const isPublicUrl = /^https?:\/\//.test(image);
-      const path = isPublicUrl ? undefined : image;
-      const url = getCommunityImagePublicUrl(image);
+  const images = (value as unknown[]).map<CommunityImageAttachment | null>(
+    (storedImage) => {
+      let image = storedImage;
 
-      return {
-        id: image,
-        name: "커뮤니티 이미지",
-        path,
-        size: 0,
-        type: "image/jpeg",
-        url,
-      } satisfies CommunityImageAttachment;
-    }
+      if (typeof image === "string") {
+        const parsedImage = parseStoredCommunityImage(image);
 
-    if (!isRecord(image)) {
-      return null;
-    }
+        if (parsedImage) {
+          image = parsedImage;
+        } else {
+          const isPublicUrl = /^https?:\/\//.test(image);
+          const path = isPublicUrl ? undefined : image;
+          const url = getCommunityImagePublicUrl(image);
+          const imageType: CommunityImageAttachment["type"] = image
+            .toLowerCase()
+            .endsWith(".webp")
+            ? "image/webp"
+            : image.toLowerCase().endsWith(".png")
+              ? "image/png"
+              : "image/jpeg";
+
+          return {
+            id: image,
+            name: "커뮤니티 이미지",
+            path,
+            size: 0,
+            type: imageType,
+            url,
+          } satisfies CommunityImageAttachment;
+        }
+      }
+
+      if (!isRecord(image)) {
+        return null;
+      }
 
     const rawPath =
       typeof image.path === "string"
@@ -95,15 +129,16 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
         ? image.type
         : "image/jpeg";
 
-    return {
-      id: String(image.id ?? publicUrl ?? path ?? Date.now()),
-      name: String(image.name ?? "커뮤니티 이미지"),
-      path,
-      size: typeof image.size === "number" ? image.size : 0,
-      type: imageType,
-      url: publicUrl,
-    };
-  });
+      return {
+        id: String(image.id ?? publicUrl ?? path ?? Date.now()),
+        name: String(image.name ?? "커뮤니티 이미지"),
+        path,
+        size: typeof image.size === "number" ? image.size : 0,
+        type: imageType,
+        url: publicUrl,
+      };
+    }
+  );
 
   return images.filter((image): image is CommunityImageAttachment =>
     Boolean(image)

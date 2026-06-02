@@ -157,11 +157,6 @@ export const uploadCommunityImages = async (
 export const getPersistableCommunityImages = (
   images: CommunityImageAttachment[]
 ) =>
-  images.map((image) => ({
-    id: image.id,
-    name: image.name,
-    path: image.path,
-    size: image.size,
-    type: image.type,
-    url: image.url,
-  }));
+  images
+    .map((image) => image.path ?? image.url)
+    .filter((image): image is string => Boolean(image));
