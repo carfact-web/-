@@ -85,6 +85,42 @@ export const isSupportedImageFile = (file: File): boolean => {
   return SUPPORTED_EXTENSIONS.some((extension) => lowerName.endsWith(extension));
 };
 
+const isHeicImageFile = (file: File): boolean => {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+
+  return (
+    type === "image/heic" ||
+    type === "image/heif" ||
+    type === "image/heic-sequence" ||
+    type === "image/heif-sequence" ||
+    name.endsWith(".heic") ||
+    name.endsWith(".heif")
+  );
+};
+
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+  const { default: heic2any } = await import("heic2any");
+  const convertedImage = await heic2any({
+    blob: file,
+    quality: 0.92,
+    toType: "image/jpeg",
+  });
+  const convertedBlob = Array.isArray(convertedImage)
+    ? convertedImage[0]
+    : convertedImage;
+
+  if (!(convertedBlob instanceof Blob)) {
+    throw new Error("invalid-heic-conversion");
+  }
+
+  return new File(
+    [convertedBlob],
+    file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+    { type: "image/jpeg" }
+  );
+};
+
 const getResizedDimensions = (
   width: number,
   height: number,
@@ -229,7 +265,10 @@ export const compressImage = async (
       };
     }
 
-    const loadedImage = await loadImageSource(file);
+    const sourceFile = isHeicImageFile(file)
+      ? await convertHeicToJpeg(file)
+      : file;
+    const loadedImage = await loadImageSource(sourceFile);
 
     try {
       let maxDimension = MAX_DIMENSION;
