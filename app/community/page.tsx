@@ -492,6 +492,7 @@ export default function CommunityPage() {
 
   const submitPost = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const form = event.currentTarget;
 
     if (!isAuthReady) {
       return;
@@ -502,7 +503,7 @@ export default function CommunityPage() {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const title = normalizeField(String(formData.get("title") ?? ""), 80);
     const content = normalizeField(String(formData.get("content") ?? ""), 2000);
 
@@ -551,7 +552,7 @@ export default function CommunityPage() {
       setSearchQuery("");
       setCurrentPage(1);
       setActiveCategory(createdPost.category);
-      event.currentTarget.reset();
+      form.reset();
       if (createdPost.imageUploadWarning) {
         setMessage(createdPost.imageUploadWarning);
       }
