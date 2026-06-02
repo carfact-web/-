@@ -218,6 +218,11 @@ const isMissingCommunityAuxTableError = (error: unknown) => {
 const isUniqueViolationError = (error: unknown) =>
   isRecord(error) && String(error.code ?? "") === "23505";
 
+const isMissingRpcFunctionError = (error: unknown) =>
+  isRecord(error) &&
+  (String(error.code ?? "") === "PGRST202" ||
+    String(error.message ?? "").includes("hide_own_community_post"));
+
 const mapCommunityPost = (
   row: CommunityPostRow,
   authorNicknames?: Record<string, string>,
@@ -694,6 +699,23 @@ export const deleteCommunityPost = async (postId: string) => {
 
   if (!userId) {
     throw new Error("로그인이 필요합니다.");
+  }
+
+  const { data: didHidePost, error: rpcError } = await supabase.rpc(
+    "hide_own_community_post" as never,
+    { target_post_id: postId } as never
+  );
+
+  if (!rpcError) {
+    if (!didHidePost) {
+      throw new Error("삭제 권한이 없거나 이미 삭제된 글입니다.");
+    }
+
+    return true;
+  }
+
+  if (!isMissingRpcFunctionError(rpcError)) {
+    throw rpcError;
   }
 
   const { count, error } = await supabase
