@@ -7,6 +7,7 @@ import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { ReviewCard } from "@/components/ReviewCard";
+import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
@@ -138,6 +139,7 @@ export default function CarReportPage() {
   const router = useRouter();
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
@@ -150,7 +152,8 @@ export default function CarReportPage() {
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { reviews } = useReviews(carNumber);
+  const { isAdmin, user } = useAuth();
+  const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
   const brand = vehicle?.brand ?? "";
@@ -226,6 +229,40 @@ export default function CarReportPage() {
   const recentTitle = [brand, model, generation].filter(Boolean).join(" ") || carNumber;
   const reviewPath = `/car/${encodeURIComponent(carNumber)}/review`;
   const reviewLoginPath = `/login?redirectTo=${encodeURIComponent(reviewPath)}`;
+  const getCanManageReview = (review: Review) =>
+    Boolean(user && (review.authorId === user.id || isAdmin));
+  const handleEditReview = (review: Review) => {
+    router.push(
+      reviewPath + "?reviewId=" + encodeURIComponent(String(review.id))
+    );
+  };
+  const handleDeleteReview = async (review: Review) => {
+    const reviewId = String(review.id);
+
+    if (!getCanManageReview(review) || deletingReviewId) {
+      return;
+    }
+
+    if (!window.confirm("후기를 삭제하시겠습니까?")) {
+      return;
+    }
+
+    setDeletingReviewId(reviewId);
+
+    try {
+      const didDelete = await deleteReview(reviewId);
+
+      if (!didDelete) {
+        window.alert("삭제 권한이 없거나 이미 삭제된 후기입니다.");
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "후기 삭제에 실패했습니다."
+      );
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
 
   useEffect(() => {
     if (!isGuestReportAllowed) {
@@ -437,6 +474,11 @@ export default function CarReportPage() {
                 {visibleReviews.map((review) => (
                   <ReviewCard
                     key={review.id}
+                    canDelete={getCanManageReview(review)}
+                    canEdit={getCanManageReview(review)}
+                    isDeleting={deletingReviewId === String(review.id)}
+                    onDelete={() => void handleDeleteReview(review)}
+                    onEdit={() => handleEditReview(review)}
                     review={review}
                     reviewKey={`${carNumber}-${review.id}`}
                   />

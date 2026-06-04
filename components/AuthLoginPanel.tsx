@@ -1,17 +1,14 @@
 "use client";
 
+import { brand } from "@/lib/brand";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
-  "fixed inset-0 z-[100] flex w-full items-center justify-center overflow-y-auto bg-black px-4 py-10 text-white"
+  "fixed inset-0 z-[100] flex w-full items-center justify-center overflow-y-auto bg-[#111111] px-4 py-10 text-white"
 );
 const contentClassName = cn(
   "flex w-full max-w-[600px] flex-col items-center text-center"
 );
-const logoPlaceholderClassName = cn(
-  "relative flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-white/35"
-);
-const plusLineClassName = cn("absolute rounded-full bg-white/60");
 const buttonGroupClassName = cn("mt-10 flex w-[85%] max-w-[600px] flex-col gap-4");
 const socialButtonClassName = cn(
   "relative inline-flex h-[72px] w-full items-center justify-center rounded-2xl px-6 text-base font-bold transition",
@@ -76,18 +73,18 @@ export function AuthLoginPanel({
   return (
     <section className={cn(pageClassName, className)} aria-label="로그인">
       <div className={contentClassName}>
-        <div className={logoPlaceholderClassName} aria-label="카팩트 로고 자리">
-          <span className={cn(plusLineClassName, "h-0.5 w-9")} />
-          <span className={cn(plusLineClassName, "h-9 w-0.5")} />
-        </div>
-
-        <p className="mt-8 text-[56px] font-extrabold leading-none text-white">
-          카팩트
-        </p>
-        <p className="mt-4 text-lg font-semibold uppercase tracking-[8px] text-white/75">
+        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#FF3B30]">
           CARFACT
         </p>
-        <p className="mt-7 w-[calc(100vw-1rem)] max-w-[600px] whitespace-nowrap text-lg leading-7 text-white/80">
+        <h1 className="mt-6 text-[34px] font-black leading-tight text-white sm:text-[44px]">
+          <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
+          <br />
+          <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
+        </h1>
+        <p className="mt-5 max-w-[520px] text-base leading-7 text-white/75 sm:text-lg">
+          {brand.description}
+        </p>
+        <p className="mt-7 w-full max-w-[600px] text-lg leading-7 text-white/80">
           카카오 또는 Google 계정으로 간편하게 시작하세요.
         </p>
 

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 130">
+  <defs>
+    <linearGradient id="red" x1="22" x2="90" y1="10" y2="118">
+      <stop stop-color="#FF3B30"/>
+      <stop offset="1" stop-color="#E01812"/>
+    </linearGradient>
+  </defs>
+  <path d="M25 11h74c13.81 0 25 11.19 25 25v54c0 13.81-11.19 25-25 25H79l27 15v-15H25C11.19 115 0 103.81 0 90V36C0 22.19 11.19 11 25 11Z" fill="url(#red)"/>
+  <path d="M87.1 48.2A32 32 0 0 0 31.8 67h19.5a14.4 14.4 0 0 1 25.4-6.5l10.4-12.3Z" fill="#fff"/>
+  <path d="M29 71h66.6c5.8 0 10.8 4.1 11.9 9.8l1.5 7.4H97.8a8.7 8.7 0 0 0-17 0H52.2a8.7 8.7 0 0 0-17 0h-9.8V74.6c0-2 1.6-3.6 3.6-3.6Z" fill="#fff"/>
+  <path d="M38.6 63.8h48.5L78 74.6H38.6V63.8Z" fill="#FF3B30"/>
+  <circle cx="43.6" cy="90.6" r="6.7" fill="#fff"/>
+  <circle cx="89.4" cy="90.6" r="6.7" fill="#fff"/>
+  <text x="157" y="75" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" letter-spacing="12">CAR</text>
+  <text x="328" y="75" fill="#FF3B30" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" letter-spacing="12">FACT</text>
+  <text x="157" y="112" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="500">실매물을 본 사람들의 </text>
+  <text x="350" y="112" fill="#FF3B30" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">경험</text>
+  <text x="404" y="112" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="500">이 쌓이는 곳</text>
+</svg>

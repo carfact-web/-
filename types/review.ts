@@ -19,6 +19,7 @@ export interface Review {
   tags?: string[];
   helpfulCount?: number;
   reportCount?: number;
+  isHidden?: boolean;
   images?: ReviewImageAttachment[];
   hasImages?: boolean;
   createdAt: string;

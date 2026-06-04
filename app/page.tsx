@@ -1,12 +1,14 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
+import { brand } from "@/lib/brand";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { fetchRecentSupabaseReviews } from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { filterValidReviews } from "@/utils/reviewValidation";
@@ -26,14 +28,14 @@ const panelClassName = cn(
 );
 const inputClassName = cn(
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-4 text-base text-white outline-none transition",
-  "placeholder:text-zinc-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/20"
 );
 const primaryButtonClassName = cn(
-  "mt-3 w-full rounded-lg bg-red-600 px-4 py-4 text-base font-bold text-white transition",
-  "hover:bg-red-500 active:scale-[0.99]"
+  "mt-3 w-full rounded-lg bg-[#FF3B30] px-4 py-4 text-base font-bold text-white transition",
+  "hover:bg-[#f52f25] active:scale-[0.99]"
 );
 const formMessageClassName = cn(
-  "mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+  "mt-3 rounded-lg border border-[#FF3B30]/30 bg-[#FF3B30]/10 px-3 py-2 text-sm text-red-200"
 );
 const recentSectionClassName = cn("max-w-3xl");
 const recentListClassName = cn("space-y-3");
@@ -52,9 +54,6 @@ const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
   "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
 );
-const rotatingCopyClassName = cn(
-  "mt-4 flex h-16 items-start overflow-hidden text-sm leading-6 text-zinc-400 sm:h-16 sm:text-base"
-);
 
 interface RecentFact {
   id: number | string;
@@ -67,12 +66,6 @@ interface RecentFact {
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentPreviewCount = 3;
-const rotatingCopyIntervalMs = 4000;
-const rotatingCopyLines = [
-  ["광고에는 없는 이야기,", "차량번호에는 남아 있습니다."],
-  ["판매글에서는 보이지 않는 이야기,", "카팩트에서 확인하세요."],
-  ["이 차량을 본 사람들이 남긴 이야기,", "카팩트에서 확인하세요."],
-];
 
 const parseJson = <T,>(json: string | null): T | null => {
   if (!json) {
@@ -154,28 +147,57 @@ export default function Home() {
   const [carNumber, setCarNumber] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
-  const [rotatingCopyIndex, setRotatingCopyIndex] = useState(0);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
     getRecentReviewsSnapshot,
     getServerRecentReviewsSnapshot
   );
-  const recentFacts = getRecentFacts(recentReviewsSnapshot);
+  const [remoteRecentFacts, setRemoteRecentFacts] = useState<RecentFact[] | null>(
+    null
+  );
+  const localRecentFacts = getRecentFacts(recentReviewsSnapshot);
+  const recentFacts =
+    isSupabaseConfigured ? remoteRecentFacts ?? [] : localRecentFacts;
   const displayedRecentFacts = showAllRecentFacts
     ? recentFacts
     : recentFacts.slice(0, recentPreviewCount);
   const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
-  const rotatingCopy = rotatingCopyLines[rotatingCopyIndex];
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setRotatingCopyIndex((currentIndex) => {
-        return (currentIndex + 1) % rotatingCopyLines.length;
-      });
-    }, rotatingCopyIntervalMs);
+    let isActive = true;
 
-    return () => window.clearInterval(intervalId);
-  }, []);
+    if (!isSupabaseConfigured) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchRecentSupabaseReviews(20)
+      .then((reviews) => {
+        if (!isActive || reviews === null) {
+          return;
+        }
+
+        setRemoteRecentFacts(
+          reviews.map((review) => ({
+            id: review.id,
+            carNumber: review.vehicleSnapshot?.plateNumber ?? "",
+            vehicle: review.vehicleSnapshot ?? null,
+            content: review.content,
+            createdAt: review.createdAt,
+          }))
+        );
+      })
+      .catch(() => {
+        if (isActive) {
+          setRemoteRecentFacts([]);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [recentReviewsSnapshot]);
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -196,10 +218,10 @@ export default function Home() {
       <div className={shellClassName}>
         <header className={headerClassName}>
           <div>
-            <p className="text-xs font-semibold text-red-500">
-              이 차량을 본 사람들이 남긴 이야기
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
+              CARFACT
             </p>
-            <h1 className="mt-1 text-2xl font-black text-white">카팩트</h1>
+            <p className="mt-1 text-lg font-black text-white">카팩트</p>
           </div>
           {isAuthReady && isAuthenticated ? (
             <button
@@ -218,30 +240,25 @@ export default function Home() {
           )}
         </header>
 
-        <section className="pt-3">
-          <p className="text-3xl font-black leading-tight text-white sm:text-5xl">
-            좋은 차는 이유가 있고,
+        <section className="pt-5">
+          <h1 className="text-3xl font-black leading-tight text-white sm:text-5xl">
+            <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
             <br />
-            안 좋은 차도 이유가 있습니다.
-          </p>
+            <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
+          </h1>
 
-          <div className={rotatingCopyClassName} aria-live="polite">
-            <AnimatePresence mode="wait" initial>
-              <motion.p
-                key={rotatingCopyIndex}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-              >
-                {rotatingCopy.map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))}
-              </motion.p>
-            </AnimatePresence>
-          </div>
+          <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
+            {brand.description}
+          </p>
+        </section>
+
+        <section className="rounded-lg border border-zinc-800 bg-[#111111] p-4 shadow-2xl shadow-black/30 sm:p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
+            CARFACT
+          </p>
+          <p className="text-sm leading-6 text-zinc-400">
+            차량번호로 실제 방문 후기와 커뮤니티 정보를 확인하세요.
+          </p>
         </section>
 
         <form className={panelClassName} onSubmit={goToReport}>
@@ -252,7 +269,7 @@ export default function Home() {
               setFormMessage("");
             }}
             type="text"
-            placeholder="예) 123가4567"
+            placeholder="차량번호 입력 예) 123가4567"
             className={inputClassName}
             aria-invalid={Boolean(formMessage)}
             aria-describedby={formMessage ? "plate-validation" : undefined}

@@ -25,6 +25,11 @@ import {
 } from "@/utils/reviewReports";
 
 interface ReviewCardProps {
+  canDelete?: boolean;
+  canEdit?: boolean;
+  isDeleting?: boolean;
+  onDelete?: () => void;
+  onEdit?: () => void;
   review: Review;
   reviewKey?: string;
 }
@@ -83,6 +88,15 @@ const reportButtonClassName = cn(
   "hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-200 active:scale-[0.98]",
   "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500"
 );
+const editButtonClassName = cn(
+  "inline-flex items-center rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-300 transition",
+  "hover:border-zinc-500 hover:bg-zinc-700 hover:text-white active:scale-[0.98]"
+);
+const deleteButtonClassName = cn(
+  "inline-flex items-center rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200 transition",
+  "hover:border-red-400 hover:bg-red-500/10 active:scale-[0.98]",
+  "disabled:cursor-not-allowed disabled:opacity-50"
+);
 const reportModalPanelClassName = cn(
   "w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-black/60"
 );
@@ -110,7 +124,15 @@ const hiddenReviewClassName = cn(
   "rounded-xl border border-zinc-700 bg-zinc-900/70 p-4 text-sm text-zinc-400"
 );
 
-export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
+export function ReviewCard({
+  canDelete = false,
+  canEdit = false,
+  isDeleting = false,
+  onDelete,
+  onEdit,
+  review,
+  reviewKey,
+}: ReviewCardProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null
   );
@@ -373,6 +395,25 @@ export function ReviewCard({ review, reviewKey }: ReviewCardProps) {
         >
           {reportSnapshot.isReported ? "신고됨" : "🚨 신고"}
         </button>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className={editButtonClassName}
+          >
+            수정
+          </button>
+        ) : null}
+        {canDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className={deleteButtonClassName}
+          >
+            {isDeleting ? "삭제 중" : "삭제"}
+          </button>
+        ) : null}
       </div>
 
       {isReportModalOpen && (

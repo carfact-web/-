@@ -95,13 +95,15 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
 
 export const mapReviewRow = (row: ReviewRow): Review => ({
   id: row.id,
+  authorId: row.author_id ?? undefined,
   authorNickname: row.author_nickname ?? "익명 사용자",
   content: row.content,
   tags: row.tags ?? [],
   images: toReviewImages(row.images),
   hasImages: toReviewImages(row.images).length > 0,
-  helpfulCount: 0,
+  helpfulCount: row.helpful_count,
   reportCount: row.report_count,
+  isHidden: row.is_hidden,
   createdAt: toLocaleDateTime(row.created_at),
   vehicleSnapshot: toVehicleSnapshot(row.vehicle_snapshot),
 });
@@ -170,6 +172,7 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
     .from("reviews")
     .select("*")
     .eq("vehicle_id", vehicle.id)
+    .eq("is_hidden", false)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -179,9 +182,48 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
   return data.map(mapReviewRow);
 };
 
+export const fetchRecentSupabaseReviews = async (limit = 20) => {
+  if (!supabase) {
+    return null;
+  }
+
+  console.info("recent-reviews-query", {
+    table: "reviews",
+    select: "*",
+    filters: { is_hidden: false },
+    order: { created_at: "desc" },
+    limit,
+  });
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("*")
+    .eq("is_hidden", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  console.info(
+    "recent-reviews-query-result",
+    data.map((row) => ({
+      id: row.id,
+      is_hidden: row.is_hidden,
+      created_at: row.created_at,
+      vehicle_plate:
+        toVehicleSnapshot(row.vehicle_snapshot)?.plateNumber ?? null,
+    }))
+  );
+
+  return data.map(mapReviewRow);
+};
+
 export const saveSupabaseReview = async (
   plateNumber: string,
-  review: Review
+  review: Review,
+  authorId: string
 ) => {
   if (!supabase) {
     return null;
@@ -209,6 +251,7 @@ export const saveSupabaseReview = async (
   const payload = {
     id: reviewId,
     vehicle_id: vehicle.id,
+    author_id: authorId,
     author_nickname: authorNickname,
     content: review.content,
     tags: review.tags ?? [],
@@ -218,8 +261,11 @@ export const saveSupabaseReview = async (
       id: vehicle.id,
       plateNumber: sanitizeVehiclePlateNumber(plateNumber),
     } as Json,
+    helpful_count: review.helpfulCount ?? 0,
     report_count: review.reportCount ?? 0,
+    is_hidden: false,
     created_at: now,
+    updated_at: now,
   };
 
   console.log("review-insert-payload", payload);
@@ -242,6 +288,45 @@ export const saveSupabaseReview = async (
   }
 
   return mapReviewRow(data);
+};
+
+export const updateSupabaseReview = async (
+  reviewId: string,
+  input: Pick<Review, "content" | "tags" | "images">
+) => {
+  if (!supabase) {
+    return false;
+  }
+
+  const uploadedImages = await uploadReviewImages(input.images ?? [], reviewId);
+  const { data, error } = await supabase.rpc("update_review", {
+    target_review_id: reviewId,
+    next_content: input.content,
+    next_tags: input.tags ?? [],
+    next_images: getPersistableReviewImages(uploadedImages) as Json,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
+};
+
+export const hideSupabaseReview = async (reviewId: string) => {
+  if (!supabase) {
+    return false;
+  }
+
+  const { data, error } = await supabase.rpc("hide_review", {
+    target_review_id: reviewId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
 };
 
 export const saveSupabaseReviewReport = async (

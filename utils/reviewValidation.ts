@@ -68,4 +68,6 @@ export const validateReviewContent = (
 };
 
 export const filterValidReviews = (reviews: Review[]) =>
-  reviews.filter((review) => validateReviewContent(review.content).isValid);
+  reviews.filter(
+    (review) => !review.isHidden && validateReviewContent(review.content).isValid
+  );

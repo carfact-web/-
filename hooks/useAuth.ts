@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  authRedirectStorageKey,
+  normalizeAuthRedirectPath,
+  saveAuthRedirect,
+} from "@/lib/authRedirect";
 import { createRandomNickname } from "@/lib/nickname";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Database } from "@/types/supabase";
@@ -11,13 +16,14 @@ type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
 type UserRole = UserProfile["role"];
 
 const kakaoOAuthScope = "profile_nickname profile_image";
-export const authRedirectStorageKey = "carfact-auth-redirect-to";
+export { authRedirectStorageKey };
 
 interface UseAuthResult {
   authError: string;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isAuthReady: boolean;
+  isProfileReady: boolean;
   isSuperAdmin: boolean;
   isSupabaseConfigured: boolean;
   profile: UserProfile | null;
@@ -143,6 +149,7 @@ export function useAuth(): UseAuthResult {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(!isSupabaseConfigured);
+  const [isProfileReady, setIsProfileReady] = useState(!isSupabaseConfigured);
   const [authError, setAuthError] = useState("");
   const user = session?.user ?? null;
   const userLabel = useMemo(() => getUserLabel(user), [user]);
@@ -207,9 +214,20 @@ export function useAuth(): UseAuthResult {
 
   useEffect(() => {
     if (!user) {
-      setProfile(null);
+      void Promise.resolve().then(() => {
+        setProfile(null);
+        setIsProfileReady(true);
+      });
       return;
     }
+
+    let isActive = true;
+
+    void Promise.resolve().then(() => {
+      if (isActive) {
+        setIsProfileReady(false);
+      }
+    });
 
     supabase?.auth
       .getUser()
@@ -233,13 +251,27 @@ export function useAuth(): UseAuthResult {
 
     syncUserProfile(user)
       .then((nextProfile) => {
+        if (!isActive) {
+          return;
+        }
+
         setProfile(nextProfile);
+        setIsProfileReady(true);
       })
       .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
         setProfile(null);
+        setIsProfileReady(true);
         // Profile persistence is additive for Kakao channel/AlimTalk readiness.
         // Auth must continue even if the table has not been applied yet.
       });
+
+    return () => {
+      isActive = false;
+    };
   }, [user]);
 
   const signInWithProvider = useCallback(async (
@@ -253,10 +285,19 @@ export function useAuth(): UseAuthResult {
 
     setAuthError("");
 
-    localStorage.setItem(
-      authRedirectStorageKey,
-      redirectTo ?? window.location.href
-    );
+    const nextRedirectTo = redirectTo ?? window.location.href;
+    const nextRedirectPath = normalizeAuthRedirectPath(nextRedirectTo, "/my");
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+
+    saveAuthRedirect(nextRedirectTo);
+    console.log("auth-oauth-redirect-url", {
+      provider,
+      requestedRedirect: nextRedirectTo,
+      resolvedRedirectPath: nextRedirectPath,
+      oauthCallbackUrl: callbackUrl.href,
+      localStorageValue: localStorage.getItem(authRedirectStorageKey),
+      sessionStorageValue: sessionStorage.getItem(authRedirectStorageKey),
+    });
 
     const queryParams: Record<string, string> =
       provider === "google"
@@ -270,7 +311,7 @@ export function useAuth(): UseAuthResult {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + "/auth/callback",
+        redirectTo: callbackUrl.href,
         queryParams,
       },
     });
@@ -294,6 +335,7 @@ export function useAuth(): UseAuthResult {
     if (!supabase) {
       setSession(null);
       setProfile(null);
+      setIsProfileReady(true);
       return;
     }
 
@@ -308,6 +350,7 @@ export function useAuth(): UseAuthResult {
 
     setSession(null);
     setProfile(null);
+    setIsProfileReady(true);
   }, []);
 
   return {
@@ -315,6 +358,7 @@ export function useAuth(): UseAuthResult {
     isAuthenticated: Boolean(user),
     isAdmin,
     isAuthReady,
+    isProfileReady,
     isSuperAdmin,
     isSupabaseConfigured,
     profile,

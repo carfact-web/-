@@ -640,6 +640,48 @@ export const saveCommunityPost = async (input: {
   return savedPost;
 };
 
+export const updateCommunityPost = async (input: {
+  category: CommunityCategory;
+  content: string;
+  images?: CommunityImageAttachment[];
+  isNotice?: boolean;
+  isPinned?: boolean;
+  postId: string;
+  title: string;
+}) => {
+  if (!supabase) {
+    return false;
+  }
+
+  const uploadResult = await uploadCommunityImages(
+    input.images ?? [],
+    input.postId
+  );
+  const persistableImages = getPersistableCommunityImages(uploadResult.images);
+  const { data, error } = await supabase.rpc("update_community_post", {
+    target_post_id: input.postId,
+    next_category: input.category,
+    next_title: input.title,
+    next_content: input.content,
+    next_images: persistableImages as Json,
+    next_is_notice: input.isNotice ?? false,
+    next_is_pinned: input.isPinned ?? false,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (uploadResult.failedCount > 0) {
+    throw new Error(
+      uploadResult.errorMessage ||
+        "일부 이미지를 업로드하지 못해 글 수정이 완료되지 않았습니다."
+    );
+  }
+
+  return Boolean(data);
+};
+
 export const saveCommunityComment = async (input: {
   authorNickname: string;
   content: string;

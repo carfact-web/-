@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthLoginPanel } from "@/components/AuthLoginPanel";
+import { clearAuthRedirect, resolveAuthRedirect } from "@/lib/authRedirect";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -53,9 +55,11 @@ const activityLinkClassName = cn(
 );
 
 export default function MyPage() {
+  const router = useRouter();
   const {
     authError,
     isAuthenticated,
+    isAdmin,
     isAuthReady,
     isSupabaseConfigured,
     session,
@@ -95,6 +99,43 @@ export default function MyPage() {
   );
   const receivedLikeCount =
     accountActivity.communityLikeCount + accountActivity.reviewHelpfulCount;
+
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated) {
+      return;
+    }
+
+    const redirect = resolveAuthRedirect({ fallbackPath: "/my" });
+
+    if (!redirect.redirectTo) {
+      return;
+    }
+
+    clearAuthRedirect();
+
+    if (redirect.resolvedRedirect !== "/my") {
+      console.log("auth-callback-query", {
+        href: redirect.currentHref,
+        search: redirect.currentSearch,
+        redirectParam: redirect.redirectParam,
+        redirectToParam: redirect.redirectToParam,
+        localStorageRedirect: redirect.localStorageRedirect,
+        sessionStorageRedirect: redirect.sessionStorageRedirect,
+      });
+      console.log("auth-callback-resolved-redirect", {
+        source: redirect.source,
+        redirectTo: redirect.redirectTo,
+        resolvedRedirect: redirect.resolvedRedirect,
+        reason: "my-page-pending-redirect",
+      });
+      console.log("auth-callback-final-router", {
+        hasSession: true,
+        target: redirect.resolvedRedirect,
+        source: "my-page-pending-redirect",
+      });
+      router.replace(redirect.resolvedRedirect);
+    }
+  }, [isAuthReady, isAuthenticated, router]);
 
   useEffect(() => {
     if (!isAuthReady || !supabase) {
@@ -273,6 +314,12 @@ export default function MyPage() {
           >
             로그아웃
           </button>
+
+          {isAdmin ? (
+            <Link href="/admin" className={primaryButtonClassName}>
+              관리자 페이지로 이동
+            </Link>
+          ) : null}
 
           {authError ? <p className={errorClassName}>{authError}</p> : null}
         </section>

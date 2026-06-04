@@ -5,7 +5,9 @@ import { mockReviews } from "@/data/mockReviews";
 import { useAuth } from "@/hooks/useAuth";
 import {
   fetchSupabaseReviews,
+  hideSupabaseReview,
   saveSupabaseReview,
+  updateSupabaseReview,
 } from "@/lib/supabaseData";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
@@ -20,6 +22,11 @@ interface UseReviewsResult {
   addReview: (
     review: Review,
     sessionUserId: string
+  ) => Promise<ReviewValidationResult>;
+  deleteReview: (reviewId: string) => Promise<boolean>;
+  updateReview: (
+    reviewId: string,
+    review: Pick<Review, "content" | "tags" | "images">
   ) => Promise<ReviewValidationResult>;
 }
 
@@ -131,7 +138,8 @@ export function useReviews(carNumber: string): UseReviewsResult {
 
       const savedReview = await saveSupabaseReview(
         sanitizedCarNumber,
-        nextReview
+        nextReview,
+        sessionUserId
       );
 
       if (savedReview) {
@@ -155,10 +163,104 @@ export function useReviews(carNumber: string): UseReviewsResult {
     [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
   );
 
+  const updateReview = useCallback(
+    async (
+      reviewId: string,
+      review: Pick<Review, "content" | "tags" | "images">
+    ) => {
+      if (!isAuthReady || !isAuthenticated) {
+        return {
+          isValid: false,
+          message: "로그인 후 후기를 수정할 수 있습니다.",
+          content: review.content,
+        };
+      }
+
+      const validation = validateReviewContent(review.content);
+
+      if (!validation.isValid) {
+        return validation;
+      }
+
+      const didUpdate = await updateSupabaseReview(reviewId, {
+        ...review,
+        content: validation.content,
+      });
+
+      if (!didUpdate) {
+        return {
+          isValid: false,
+          message: "수정 권한이 없거나 이미 삭제된 후기입니다.",
+          content: validation.content,
+        };
+      }
+
+      const savedReviews = parseReviews(
+        localStorage.getItem(reviewStorageKey) || fallbackReviewsJson
+      );
+      const nextReviews = savedReviews.map((savedReview) =>
+        String(savedReview.id) === reviewId
+          ? {
+              ...savedReview,
+              content: validation.content,
+              tags: review.tags ?? [],
+              images: review.images ?? [],
+              hasImages: (review.images ?? []).length > 0,
+            }
+          : savedReview
+      );
+
+      cacheReviews(reviewStorageKey, nextReviews);
+      setRemoteReviewsSnapshot({
+        carNumber: sanitizedCarNumber,
+        reviews: nextReviews,
+      });
+
+      return validation;
+    },
+    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
+  );
+
+  const deleteReview = useCallback(
+    async (reviewId: string) => {
+      if (!isAuthReady || !isAuthenticated) {
+        return false;
+      }
+
+      const didHide = await hideSupabaseReview(reviewId);
+
+      if (!didHide) {
+        return false;
+      }
+
+      const savedReviews = parseReviews(
+        localStorage.getItem(reviewStorageKey) || fallbackReviewsJson
+      );
+      const refreshedReviews = await fetchSupabaseReviews(sanitizedCarNumber);
+      const nextReviews =
+        refreshedReviews ??
+        savedReviews.filter((savedReview) => String(savedReview.id) !== reviewId);
+
+      cacheReviews(reviewStorageKey, nextReviews);
+      setRemoteReviewsSnapshot({
+        carNumber: sanitizedCarNumber,
+        reviews: nextReviews,
+      });
+
+      return true;
+    },
+    [isAuthReady, isAuthenticated, reviewStorageKey, sanitizedCarNumber]
+  );
+
   const remoteReviews =
     remoteReviewsSnapshot?.carNumber === sanitizedCarNumber
       ? remoteReviewsSnapshot.reviews
       : null;
 
-  return { reviews: remoteReviews ?? localReviews, addReview };
+  return {
+    reviews: remoteReviews ?? localReviews,
+    addReview,
+    deleteReview,
+    updateReview,
+  };
 }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
@@ -111,9 +111,11 @@ const readImageFile = async (
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string)
   );
+  const editingReviewId = searchParams.get("reviewId");
   const reviewInputRef = useRef<HTMLTextAreaElement>(null);
   const [review, setReview] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
@@ -121,15 +123,18 @@ export default function ReviewPage() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [reviewImages, setReviewImages] = useState<ReviewImageAttachment[]>([]);
   const {
+    isAdmin,
     isAuthenticated,
     isAuthReady,
     user,
   } = useAuth();
   const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
-  const { addReview } = useReviews(carNumber);
+  const { addReview, reviews, updateReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [didLoadEditingReview, setDidLoadEditingReview] = useState(false);
+  const isEditing = Boolean(editingReviewId);
   const vehicleTitle = vehicle
     ? [vehicle.brand, vehicle.model, vehicle.generation]
         .filter(Boolean)
@@ -162,6 +167,33 @@ export default function ReviewPage() {
     const recentTitle = vehicleTitle || carNumber;
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
   }, [carNumber, isAuthenticated, saveRecentView, vehicle, vehicleTitle]);
+
+  useEffect(() => {
+    if (!editingReviewId || didLoadEditingReview || reviews.length === 0) {
+      return;
+    }
+
+    const editingReview = reviews.find(
+      (currentReview) => String(currentReview.id) === editingReviewId
+    );
+
+    if (!editingReview) {
+      return;
+    }
+
+    void Promise.resolve().then(() => {
+      if (!user || (editingReview.authorId !== user.id && !isAdmin)) {
+        setValidationMessage("후기 수정 권한이 없습니다.");
+        setDidLoadEditingReview(true);
+        return;
+      }
+
+      setReview(editingReview.content);
+      setSelectedTags(editingReview.tags ?? []);
+      setReviewImages(editingReview.images ?? []);
+      setDidLoadEditingReview(true);
+    });
+  }, [didLoadEditingReview, editingReviewId, isAdmin, reviews, user]);
 
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -281,28 +313,37 @@ export default function ReviewPage() {
       return;
     }
 
-    const newReview: Review = {
-      id: Date.now(),
-      authorNickname,
-      content: validation.content,
-      tags: selectedTags,
-      images: reviewImages,
-      hasImages: reviewImages.length > 0,
-      createdAt: new Date().toLocaleString(),
-      vehicleSnapshot: vehicle ?? undefined,
-    };
-
     let saveResult;
 
     try {
-      saveResult = await addReview(newReview, sessionUserId);
+      if (editingReviewId) {
+        saveResult = await updateReview(editingReviewId, {
+          content: validation.content,
+          tags: selectedTags,
+          images: reviewImages,
+        });
+      } else {
+        const newReview: Review = {
+          id: Date.now(),
+          authorId: sessionUserId,
+          authorNickname,
+          content: validation.content,
+          tags: selectedTags,
+          images: reviewImages,
+          hasImages: reviewImages.length > 0,
+          createdAt: new Date().toLocaleString(),
+          vehicleSnapshot: vehicle ?? undefined,
+        };
+
+        saveResult = await addReview(newReview, sessionUserId);
+      }
     } catch (error) {
       console.error("review-save-error", error);
       setIsSubmitting(false);
       setValidationMessage(
         error instanceof Error
           ? error.message
-          : "후기 저장 실패: 알 수 없는 Supabase 오류"
+          : "후기 저장 실패: 알 수 없는 오류"
       );
       return;
     }
@@ -346,7 +387,9 @@ export default function ReviewPage() {
             ← 홈으로
           </button>
 
-          <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
+          <h1 className="text-5xl font-bold mb-6">
+            {isEditing ? "후기 수정" : "후기 남기기"}
+          </h1>
 
           <div className={panelClassName}>
             <p className="text-sm text-zinc-400">로그인 상태를 확인하고 있습니다.</p>
@@ -379,7 +422,9 @@ export default function ReviewPage() {
           ← 홈으로
         </button>
 
-        <h1 className="text-5xl font-bold mb-6">후기 남기기</h1>
+        <h1 className="text-5xl font-bold mb-6">
+          {isEditing ? "후기 수정" : "후기 남기기"}
+        </h1>
 
         <p className="text-2xl text-gray-300 mb-10">
           차량번호: <span className="text-red-400 font-bold">{carNumber}</span>
@@ -395,7 +440,9 @@ export default function ReviewPage() {
           )}
         >
           <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.65)]" />
-          <span>차량 이야기가 등록되었어요.</span>
+              <span>
+                {isEditing ? "차량 이야기가 수정되었어요." : "차량 이야기가 등록되었어요."}
+              </span>
         </div>
 
         <div className={panelClassName}>
@@ -506,7 +553,13 @@ export default function ReviewPage() {
           disabled={isSubmitting}
           className={submitButtonClassName}
         >
-          {isSubmitting ? "등록 중..." : "후기 등록하기"}
+          {isSubmitting
+            ? isEditing
+              ? "수정 중..."
+              : "등록 중..."
+            : isEditing
+              ? "후기 수정하기"
+              : "후기 등록하기"}
         </button>
         </div>
       </div>

@@ -2,30 +2,31 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { authRedirectStorageKey } from "@/hooks/useAuth";
+import { resolveAuthRedirect } from "@/lib/authRedirect";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const getSafeRedirectPath = () => {
-  const fallbackPath = "/my";
-  const redirectTo = localStorage.getItem(authRedirectStorageKey);
+  const redirect = resolveAuthRedirect({
+    fallbackPath: "/my",
+    shouldClear: true,
+  });
 
-  localStorage.removeItem(authRedirectStorageKey);
+  console.log("auth-callback-query", {
+    href: redirect.currentHref,
+    search: redirect.currentSearch,
+    redirectParam: redirect.redirectParam,
+    redirectToParam: redirect.redirectToParam,
+    localStorageRedirect: redirect.localStorageRedirect,
+    sessionStorageRedirect: redirect.sessionStorageRedirect,
+  });
+  console.log("auth-callback-resolved-redirect", {
+    source: redirect.source,
+    redirectTo: redirect.redirectTo,
+    resolvedRedirect: redirect.resolvedRedirect,
+    reason: redirect.redirectTo ? "ok" : "missing redirect",
+  });
 
-  if (!redirectTo) {
-    return fallbackPath;
-  }
-
-  try {
-    const url = new URL(redirectTo, window.location.origin);
-
-    if (url.origin !== window.location.origin) {
-      return fallbackPath;
-    }
-
-    return url.pathname + url.search + url.hash;
-  } catch {
-    return fallbackPath;
-  }
+  return redirect.resolvedRedirect;
 };
 
 export default function AuthCallbackPage() {
@@ -33,6 +34,11 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
+      console.log("auth-callback-final-router", {
+        hasSession: false,
+        target: "/login",
+        reason: "supabase not configured",
+      });
       router.replace("/login");
       return;
     }
@@ -66,7 +72,15 @@ export default function AuthCallbackPage() {
         userId: userResult.data.user?.id ?? null,
       });
 
-      router.replace(sessionResult.data.session ? getSafeRedirectPath() : "/login");
+      const finalRouterTarget = sessionResult.data.session
+        ? getSafeRedirectPath()
+        : "/login";
+
+      console.log("auth-callback-final-router", {
+        hasSession: Boolean(sessionResult.data.session),
+        target: finalRouterTarget,
+      });
+      router.replace(finalRouterTarget);
     };
 
     handleAuthCallback()
@@ -74,8 +88,13 @@ export default function AuthCallbackPage() {
         console.log("supabase-auth-callback-error", {
           error: error instanceof Error ? error.message : "callback failed",
         });
+        console.log("auth-callback-final-router", {
+          hasSession: false,
+          target: "/login",
+          reason: "callback error",
+        });
         router.replace("/login");
-      })
+      });
   }, [router]);
 
   return (

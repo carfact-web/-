@@ -3,6 +3,11 @@
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthLoginPanel } from "@/components/AuthLoginPanel";
+import {
+  authRedirectStorageKey,
+  resolveAuthRedirect,
+  saveAuthRedirect,
+} from "@/lib/authRedirect";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
@@ -17,7 +22,9 @@ export default function LoginPage() {
   } = useAuth();
 
   const getRedirectTo = useCallback(() => {
-    const redirectTo = new URLSearchParams(window.location.search).get("redirectTo");
+    const searchParams = new URLSearchParams(window.location.search);
+    const redirectTo =
+      searchParams.get("redirect") ?? searchParams.get("redirectTo");
 
     if (!redirectTo) {
       return window.location.origin + "/";
@@ -36,22 +43,39 @@ export default function LoginPage() {
     }
   }, []);
   const getRedirectPath = useCallback(() => {
-    try {
-      const url = new URL(getRedirectTo(), window.location.origin);
+    return resolveAuthRedirect({ fallbackPath: "/my", shouldClear: true })
+      .resolvedRedirect;
+  }, []);
 
-      if (url.origin !== window.location.origin) {
-        return "/";
-      }
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
 
-      return `${url.pathname}${url.search}${url.hash}`;
-    } catch {
-      return "/";
+    if (!searchParams.get("redirect") && !searchParams.get("redirectTo")) {
+      return;
     }
+
+    const redirectTo = getRedirectTo();
+
+    saveAuthRedirect(redirectTo);
+    console.log("auth-login-redirect-save", {
+      redirectParam: searchParams.get("redirect"),
+      redirectToParam: searchParams.get("redirectTo"),
+      storedRedirect: redirectTo,
+      localStorageValue: localStorage.getItem(authRedirectStorageKey),
+      sessionStorageValue: sessionStorage.getItem(authRedirectStorageKey),
+    });
   }, [getRedirectTo]);
 
   useEffect(() => {
     if (isAuthReady && isAuthenticated) {
-      router.replace(getRedirectPath());
+      const target = getRedirectPath();
+
+      console.log("auth-callback-final-router", {
+        hasSession: true,
+        target,
+        source: "login-authenticated",
+      });
+      router.replace(target);
     }
   }, [getRedirectPath, isAuthenticated, isAuthReady, router]);
 

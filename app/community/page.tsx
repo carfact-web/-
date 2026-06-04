@@ -20,6 +20,7 @@ import {
   saveCommunityComment,
   saveCommunityPost,
   toggleCommunityLike,
+  updateCommunityPost,
 } from "@/lib/communityData";
 import type {
   CommunityCategory,
@@ -195,6 +196,11 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [isWriting, setIsWriting] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [writeTitle, setWriteTitle] = useState("");
+  const [writeContent, setWriteContent] = useState("");
+  const [writeIsNotice, setWriteIsNotice] = useState(false);
+  const [writeIsPinned, setWriteIsPinned] = useState(false);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -259,6 +265,7 @@ export default function CommunityPage() {
   const canDeleteSelectedPost = Boolean(
     user && selectedPost && (selectedPost.userId === user.id || isAdmin)
   );
+  const canEditSelectedPost = canDeleteSelectedPost;
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -355,11 +362,15 @@ export default function CommunityPage() {
   }, [activeCategory, loadPosts]);
 
   useEffect(() => {
-    setCurrentPage(1);
+    void Promise.resolve().then(() => {
+      setCurrentPage(1);
+    });
   }, [activeCategory, normalizedSearchQuery, sortOption]);
 
   useEffect(() => {
-    setCurrentPage((page) => Math.min(Math.max(1, page), totalPages));
+    void Promise.resolve().then(() => {
+      setCurrentPage((page) => Math.min(Math.max(1, page), totalPages));
+    });
   }, [totalPages]);
 
   const selectedPostId = selectedPost?.id;
@@ -431,6 +442,39 @@ export default function CommunityPage() {
 
     setSelectedPost(null);
     setWriteCategory(activeCategory === "all" ? "free" : activeCategory);
+    setEditingPostId(null);
+    setWriteTitle("");
+    setWriteContent("");
+    setWriteIsNotice(false);
+    setWriteIsPinned(false);
+    setPostImages([]);
+    setIsWriting(true);
+    setMessage("");
+  };
+
+  const cancelWriting = () => {
+    setIsWriting(false);
+    setEditingPostId(null);
+    setWriteTitle("");
+    setWriteContent("");
+    setWriteIsNotice(false);
+    setWriteIsPinned(false);
+    setPostImages([]);
+    setMessage("");
+  };
+
+  const startEditingSelectedPost = () => {
+    if (!selectedPost || !canEditSelectedPost) {
+      return;
+    }
+
+    setEditingPostId(selectedPost.id);
+    setWriteCategory(selectedPost.category);
+    setWriteTitle(selectedPost.title);
+    setWriteContent(selectedPost.content);
+    setWriteIsNotice(selectedPost.isNotice);
+    setWriteIsPinned(selectedPost.isPinned);
+    setPostImages(selectedPost.images.slice(0, maxCommunityImages));
     setIsWriting(true);
     setMessage("");
   };
@@ -535,6 +579,58 @@ export default function CommunityPage() {
       }
 
       const authorNickname = await getAuthorNickname();
+      if (editingPostId) {
+        const didUpdate = await updateCommunityPost({
+          category: writeCategory,
+          content,
+          images: postImages,
+          isNotice: isNoticePost,
+          isPinned: isPinnedPost,
+          postId: editingPostId,
+          title,
+        });
+
+        if (!didUpdate) {
+          setMessage("수정 권한이 없거나 이미 삭제된 게시글입니다.");
+          return;
+        }
+
+        setPosts((current) =>
+          current.map((post) =>
+            post.id === editingPostId
+              ? {
+                  ...post,
+                  category: writeCategory,
+                  content,
+                  images: postImages,
+                  isNotice: isNoticePost,
+                  isPinned: isPinnedPost,
+                  title,
+                }
+              : post
+          )
+        );
+        setSelectedPost((current) =>
+          current && current.id === editingPostId
+            ? {
+                ...current,
+                category: writeCategory,
+                content,
+                images: postImages,
+                isNotice: isNoticePost,
+                isPinned: isPinnedPost,
+                title,
+              }
+            : current
+        );
+        setIsWriting(false);
+        setEditingPostId(null);
+        setPostImages([]);
+        setMessage("게시글을 수정했습니다.");
+        form.reset();
+        return;
+      }
+
       const createdPost = await saveCommunityPost({
         authorNickname,
         category: writeCategory,
@@ -553,7 +649,12 @@ export default function CommunityPage() {
       setPosts((current) => [createdPost, ...current]);
       setSelectedPost(createdPost);
       setIsWriting(false);
+      setEditingPostId(null);
       setPostImages([]);
+      setWriteTitle("");
+      setWriteContent("");
+      setWriteIsNotice(false);
+      setWriteIsPinned(false);
       setSearchInput("");
       setSearchQuery("");
       setCurrentPage(1);
@@ -952,15 +1053,19 @@ export default function CommunityPage() {
           <section className={panelClassName} aria-label="커뮤니티 글쓰기">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-extrabold">글쓰기</h2>
+                <h2 className="text-xl font-extrabold">
+                  {editingPostId ? "게시글 수정" : "글쓰기"}
+                </h2>
                 <p className={mutedTextClassName}>
-                  작성자명은 내 계정 닉네임으로 표시됩니다.
+                  {editingPostId
+                    ? "게시글 내용을 수정합니다."
+                    : "작성자명은 내 계정 닉네임으로 표시됩니다."}
                 </p>
               </div>
               <button
                 type="button"
                 className={secondaryButtonClassName}
-                onClick={() => setIsWriting(false)}
+                onClick={cancelWriting}
               >
                 취소
               </button>
@@ -986,6 +1091,8 @@ export default function CommunityPage() {
                 className={inputClassName}
                 name="title"
                 placeholder="제목"
+                value={writeTitle}
+                onChange={(event) => setWriteTitle(event.currentTarget.value)}
                 maxLength={80}
                 required
               />
@@ -993,6 +1100,8 @@ export default function CommunityPage() {
                 className={cn(inputClassName, "min-h-40 resize-y")}
                 name="content"
                 placeholder="내용"
+                value={writeContent}
+                onChange={(event) => setWriteContent(event.currentTarget.value)}
                 maxLength={2000}
                 required
               />
@@ -1061,6 +1170,10 @@ export default function CommunityPage() {
                     <input
                       type="checkbox"
                       name="isNotice"
+                      checked={writeIsNotice}
+                      onChange={(event) =>
+                        setWriteIsNotice(event.currentTarget.checked)
+                      }
                       className="h-4 w-4 accent-red-500"
                     />
                     공지글
@@ -1069,6 +1182,10 @@ export default function CommunityPage() {
                     <input
                       type="checkbox"
                       name="isPinned"
+                      checked={writeIsPinned}
+                      onChange={(event) =>
+                        setWriteIsPinned(event.currentTarget.checked)
+                      }
                       className="h-4 w-4 accent-red-500"
                     />
                     상단 고정
@@ -1080,7 +1197,13 @@ export default function CommunityPage() {
                 className={primaryButtonClassName}
                 disabled={isSubmitting}
               >
-                등록
+                {isSubmitting
+                  ? editingPostId
+                    ? "수정 중"
+                    : "등록 중"
+                  : editingPostId
+                    ? "수정"
+                    : "등록"}
               </button>
             </form>
           </section>
@@ -1234,15 +1357,24 @@ export default function CommunityPage() {
                         {selectedPost.title}
                       </h2>
                     </div>
-                    {canDeleteSelectedPost ? (
-                      <button
-                        type="button"
-                        className={dangerButtonClassName}
-                        onClick={handleDeletePost}
-                        disabled={isDeletingPost}
-                      >
-                        {isDeletingPost ? "삭제 중" : "삭제"}
-                      </button>
+                    {canEditSelectedPost ? (
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className={secondaryButtonClassName}
+                          onClick={startEditingSelectedPost}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          className={dangerButtonClassName}
+                          onClick={handleDeletePost}
+                          disabled={isDeletingPost}
+                        >
+                          {isDeletingPost ? "삭제 중" : "삭제"}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                   <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-zinc-200">

@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
 
-type TabIconName = "home" | "recent" | "community" | "my";
+type TabIconName = "home" | "recent" | "community" | "my" | "admin";
 
 const navClassName = cn(
   "fixed inset-x-0 bottom-0 z-50 w-screen overflow-hidden border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
 );
 const navInnerClassName = cn(
-  "mx-auto grid w-full max-w-3xl grid-cols-4 gap-1 box-border px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
+  "mx-auto grid w-full max-w-3xl gap-1 box-border px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
 );
 const tabButtonClassName = cn(
   "inline-flex h-14 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs font-semibold transition",
@@ -94,6 +95,29 @@ function TabIcon({ icon }: { icon: TabIconName }) {
     );
   }
 
+  if (icon === "admin") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
+        <path
+          d="M12 3 5 6v5.5c0 4.2 2.9 7.9 7 9.5 4.1-1.6 7-5.3 7-9.5V6l-7-3Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M9 12.5 11 14.5 15.5 9.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
       <path
@@ -110,6 +134,10 @@ function TabIcon({ icon }: { icon: TabIconName }) {
 
 export function BottomTabNav() {
   const pathname = usePathname();
+  const { isAdmin } = useAuth();
+  const visibleTabs = isAdmin
+    ? [...tabs, { href: "/admin", label: "관리자", icon: "admin" as const, matchPrefix: true }]
+    : tabs;
 
   const isActive = (href: string, matchPrefix: boolean) => {
     if (matchPrefix) {
@@ -120,8 +148,13 @@ export function BottomTabNav() {
 
   return (
     <nav className={navClassName} aria-label="하단 탐색">
-      <div className={navInnerClassName}>
-        {tabs.map((tab) => (
+      <div
+        className={cn(
+          navInnerClassName,
+          isAdmin ? "grid-cols-5" : "grid-cols-4"
+        )}
+      >
+        {visibleTabs.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}
