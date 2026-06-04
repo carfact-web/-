@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { brand } from "@/lib/brand";
 import { cn } from "@/utils/cn";
 
@@ -73,19 +74,21 @@ export function AuthLoginPanel({
   return (
     <section className={cn(pageClassName, className)} aria-label="로그인">
       <div className={contentClassName}>
-        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#FF3B30]">
-          CARFACT
-        </p>
-        <h1 className="mt-6 text-[34px] font-black leading-tight text-white sm:text-[44px]">
+        <Image
+          src="/brand/carfact-wordmark.webp"
+          alt="CARFACT"
+          width={688}
+          height={520}
+          priority
+          className="h-auto w-[240px] max-w-[80vw] sm:w-[280px] md:w-[320px]"
+        />
+        <h1 className="mt-8 text-[34px] font-black leading-tight text-white sm:text-[44px]">
           <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
           <br />
           <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
         </h1>
         <p className="mt-5 max-w-[520px] text-base leading-7 text-white/75 sm:text-lg">
           {brand.description}
-        </p>
-        <p className="mt-7 w-full max-w-[600px] text-lg leading-7 text-white/80">
-          카카오 또는 Google 계정으로 간편하게 시작하세요.
         </p>
 
         <div className={buttonGroupClassName}>
@@ -98,7 +101,7 @@ export function AuthLoginPanel({
             <span className={iconSlotClassName}>
               <KakaoIcon />
             </span>
-            카카오로 로그인
+            카카오 로그인
           </button>
 
           <button
@@ -110,7 +113,7 @@ export function AuthLoginPanel({
             <span className={iconSlotClassName}>
               <GoogleIcon />
             </span>
-            Google로 로그인
+            Google 로그인
           </button>
         </div>
 
