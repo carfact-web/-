@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -54,6 +55,13 @@ const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
   "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
 );
+const heroCopyFrameClassName = cn(
+  "relative h-24 overflow-hidden sm:h-32"
+);
+const heroCopyClassName = cn(
+  "absolute inset-x-0 top-0 text-3xl font-black leading-tight text-white sm:text-5xl"
+);
+const heroHighlightClassName = cn("text-[#FF3B30]");
 
 interface RecentFact {
   id: number | string;
@@ -66,6 +74,29 @@ interface RecentFact {
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentPreviewCount = 3;
+const heroCopyIntervalMs = 3500;
+const heroCopies = [
+  [
+    [{ text: "좋은 차", highlight: true }, { text: "는 이유가 있고," }],
+    [{ text: "안 좋은 차", highlight: true }, { text: "도 이유가 있습니다." }],
+  ],
+  [
+    [{ text: "판매글에는 없는 이야기," }],
+    [{ text: "카팩트", highlight: true }, { text: "에서 확인하세요." }],
+  ],
+  [
+    [{ text: "실매물", highlight: true }, { text: "을 본 사람들의" }],
+    [{ text: "경험", highlight: true }, { text: "이 쌓이는 곳" }],
+  ],
+  [
+    [{ text: "차량번호", highlight: true }, { text: " 하나로," }],
+    [{ text: "사람들의 " }, { text: "실제 후기", highlight: true }, { text: "를 확인하세요." }],
+  ],
+  [
+    [{ text: "광고", highlight: true }, { text: "보다 가까운 건," }],
+    [{ text: "실제로 본 사람의 이야기", highlight: true }, { text: "입니다." }],
+  ],
+];
 
 const parseJson = <T,>(json: string | null): T | null => {
   if (!json) {
@@ -147,6 +178,7 @@ export default function Home() {
   const [carNumber, setCarNumber] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
+  const [heroCopyIndex, setHeroCopyIndex] = useState(0);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
     getRecentReviewsSnapshot,
@@ -162,6 +194,17 @@ export default function Home() {
     ? recentFacts
     : recentFacts.slice(0, recentPreviewCount);
   const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
+  const heroCopy = heroCopies[heroCopyIndex];
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setHeroCopyIndex((currentIndex) => {
+        return (currentIndex + 1) % heroCopies.length;
+      });
+    }, heroCopyIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -241,11 +284,33 @@ export default function Home() {
         </header>
 
         <section className="pt-5">
-          <h1 className="text-3xl font-black leading-tight text-white sm:text-5xl">
-            <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
-            <br />
-            <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
-          </h1>
+          <div className={heroCopyFrameClassName} aria-live="polite">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.h1
+                key={heroCopyIndex}
+                className={heroCopyClassName}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+              >
+                {heroCopy.map((line, lineIndex) => (
+                  <span key={lineIndex} className="block">
+                    {line.map((segment) => (
+                      <span
+                        key={segment.text}
+                        className={
+                          segment.highlight ? heroHighlightClassName : undefined
+                        }
+                      >
+                        {segment.text}
+                      </span>
+                    ))}
+                  </span>
+                ))}
+              </motion.h1>
+            </AnimatePresence>
+          </div>
 
           <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
             {brand.description}
