@@ -75,12 +75,12 @@ export function AuthLoginPanel({
     <section className={cn(pageClassName, className)} aria-label="로그인">
       <div className={contentClassName}>
         <Image
-          src="/brand/carfact-icon-transparent.png"
+          src="/brand/carfact-login-icon.png"
           alt="CARFACT 아이콘"
-          width={497}
-          height={531}
+          width={543}
+          height={512}
           priority
-          className="h-auto w-[220px] max-w-[72vw] md:w-[260px]"
+          className="h-[88px] w-[88px] object-contain md:h-24 md:w-24"
         />
         <p
           className="mt-4 text-[34px] font-black leading-none md:text-[40px]"
