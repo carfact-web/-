@@ -75,14 +75,14 @@ export function AuthLoginPanel({
     <section className={cn(pageClassName, className)} aria-label="로그인">
       <div className={contentClassName}>
         <Image
-          src="/brand/carfact-wordmark.webp"
+          src="/brand/carfact-wordmark-transparent.png"
           alt="CARFACT"
-          width={688}
-          height={520}
+          width={873}
+          height={674}
           priority
-          className="h-auto w-[240px] max-w-[80vw] sm:w-[280px] md:w-[320px]"
+          className="h-auto w-[220px] max-w-[72vw] md:w-[260px]"
         />
-        <h1 className="mt-8 text-[34px] font-black leading-tight text-white sm:text-[44px]">
+        <h1 className="mt-6 text-[34px] font-black leading-tight text-white sm:text-[44px]">
           <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
           <br />
           <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
