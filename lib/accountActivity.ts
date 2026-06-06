@@ -52,9 +52,12 @@ export const fetchAccountActivity = async (
   }
 
   const [reviewsResult, communityPosts] = await Promise.all([
-    // The production reviews table currently has no user identifier column,
-    // so account-scoped review activity cannot be queried without a schema change.
-    Promise.resolve({ data: [] as ReviewRow[], error: null }),
+    supabase
+      .from("reviews")
+      .select("*")
+      .eq("author_id", userId)
+      .eq("is_hidden", false)
+      .order("created_at", { ascending: false }),
     fetchCommunityPostsByAuthor(userId),
   ]);
 
@@ -62,7 +65,8 @@ export const fetchAccountActivity = async (
     throw reviewsResult.error;
   }
 
-  const reviews = reviewsResult.data.map(mapReviewRow);
+  const reviewRows = (reviewsResult.data ?? []) as ReviewRow[];
+  const reviews = reviewRows.map((review) => mapReviewRow(review));
   const reviewHelpfulCount = reviews.reduce(
     (total, review) => total + (review.helpfulCount ?? 0),
     0
