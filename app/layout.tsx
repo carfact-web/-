@@ -17,6 +17,24 @@ export const metadata: Metadata = {
   title: "카팩트",
   description: "카팩트 - 이 차량을 본 사람들이 남긴 이야기",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=20260606-carfact-logo", sizes: "any" },
+      {
+        url: "/icon.png?v=20260606-carfact-logo",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    shortcut: ["/favicon.ico?v=20260606-carfact-logo"],
+    apple: [
+      {
+        url: "/apple-icon.png?v=20260606-carfact-logo",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
   openGraph: {
     title: "카팩트",
     description: "이 차량을 본 사람들이 남긴 이야기",

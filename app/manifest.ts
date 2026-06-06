@@ -9,5 +9,25 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#09090b",
     theme_color: "#ef4444",
+    icons: [
+      {
+        src: "/icon.png?v=20260606-carfact-logo",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon.png?v=20260606-carfact-logo",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/apple-icon.png?v=20260606-carfact-logo",
+        sizes: "180x180",
+        type: "image/png",
+        purpose: "any",
+      },
+    ],
   };
 }
