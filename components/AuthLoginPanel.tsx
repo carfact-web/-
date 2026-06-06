@@ -5,18 +5,18 @@ import { brand } from "@/lib/brand";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
-  "fixed inset-0 z-[100] flex w-full items-center justify-center overflow-y-auto bg-[#111111] px-4 py-10 text-white"
+  "fixed inset-0 z-[100] flex w-full items-center justify-center overflow-y-auto bg-white px-4 py-10 text-[#111111]"
 );
 const contentClassName = cn(
   "flex w-full max-w-[600px] flex-col items-center text-center"
 );
-const buttonGroupClassName = cn("mt-10 flex w-[85%] max-w-[600px] flex-col gap-4");
+const buttonGroupClassName = cn("mt-12 flex w-[85%] max-w-[600px] flex-col gap-4");
 const socialButtonClassName = cn(
-  "relative inline-flex h-[72px] w-full items-center justify-center rounded-2xl px-6 text-base font-bold transition",
+  "relative inline-flex h-[72px] w-full items-center justify-center rounded-2xl px-6 text-[18.667px] font-bold transition",
   "active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
 );
 const iconSlotClassName = cn(
-  "absolute left-6 flex h-7 w-7 items-center justify-center"
+  "absolute left-6 flex h-[31px] w-[31px] items-center justify-center"
 );
 const errorClassName = cn(
   "mt-5 w-[85%] max-w-[600px] rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
@@ -32,7 +32,7 @@ interface AuthLoginPanelProps {
 
 function KakaoIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[31px] w-[31px]">
       <path
         d="M12 4C7.03 4 3 7.18 3 11.1c0 2.45 1.58 4.61 3.99 5.88l-.72 2.64a.42.42 0 0 0 .64.46l3.13-2.08c.63.13 1.29.2 1.96.2 4.97 0 9-3.18 9-7.1S16.97 4 12 4Z"
         fill="currentColor"
@@ -43,7 +43,7 @@ function KakaoIcon() {
 
 function GoogleIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[31px] w-[31px]">
       <path
         d="M21.6 12.23c0-.78-.07-1.53-.2-2.23H12v4.22h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.23c1.89-1.74 2.98-4.3 2.98-7.52Z"
         fill="#4285F4"
@@ -74,30 +74,29 @@ export function AuthLoginPanel({
   return (
     <section className={cn(pageClassName, className)} aria-label="로그인">
       <div className={contentClassName}>
-        <Image
-          src="/brand/carfact-login-icon.png"
-          alt="CARFACT 아이콘"
-          width={543}
-          height={512}
-          priority
-          className="h-[88px] w-[88px] object-contain md:h-24 md:w-24"
-        />
-        <p
-          className="mt-4 text-[34px] font-black leading-none md:text-[40px]"
-          style={{
-            fontFamily: "Pretendard, SUIT, Arial, sans-serif",
-            letterSpacing: "0.12em",
-          }}
-        >
-          <span className="text-white">CAR</span>
-          <span className="text-[#FF3B30]">FACT</span>
-        </p>
-        <h1 className="mt-6 text-[34px] font-black leading-tight text-white sm:text-[44px]">
+        <div className="flex h-[180px] w-[240px] items-start justify-center overflow-hidden">
+          <Image
+            src="/brand/carfact-login-logo.jpg"
+            alt="CARFACT 로고"
+            width={1254}
+            height={1254}
+            priority
+            className="h-auto w-[240px] object-contain"
+          />
+        </div>
+        <h1 className="mt-4 text-[34px] font-black leading-tight text-[#111111] sm:text-[44px]">
           <span className="text-[#FF3B30]">실매물</span>을 본 사람들의
           <br />
           <span className="text-[#FF3B30]">경험</span>이 쌓이는 곳
         </h1>
-        <p className="mt-5 max-w-[520px] text-base leading-7 text-white/75 sm:text-lg">
+        <p className="mt-7 max-w-[520px] text-base leading-7 text-[#111111]/70 sm:hidden">
+          수많은 실제 방문
+          <br />
+          후기와 정보를 모아,
+          <br />
+          더 현명한 자동차 선택을 돕습니다.
+        </p>
+        <p className="mt-7 hidden max-w-[520px] text-base leading-7 text-[#111111]/70 sm:block sm:text-lg">
           {brand.description}
         </p>
 
@@ -116,7 +115,7 @@ export function AuthLoginPanel({
 
           <button
             type="button"
-            className={cn(socialButtonClassName, "bg-white text-[#202124]")}
+            className={cn(socialButtonClassName, "bg-[#F3F3F3] text-[#202124]")}
             onClick={onGoogleLogin}
             disabled={disabled}
           >

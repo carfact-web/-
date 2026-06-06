@@ -88,7 +88,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black pb-24">
+    <main className="min-h-screen bg-white pb-24">
       <AuthLoginPanel
         authError={authError}
         disabled={!isSupabaseConfigured || !isAuthReady}
