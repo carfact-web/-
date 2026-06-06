@@ -8,6 +8,7 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useVehicle } from "@/hooks/useVehicle";
+import { fetchSupabaseReviewById } from "@/lib/supabaseData";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
@@ -126,10 +127,11 @@ export default function ReviewPage() {
     isAdmin,
     isAuthenticated,
     isAuthReady,
+    isProfileReady,
     user,
   } = useAuth();
   const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
-  const { addReview, reviews, updateReview } = useReviews(carNumber);
+  const { addReview, updateReview } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -169,31 +171,102 @@ export default function ReviewPage() {
   }, [carNumber, isAuthenticated, saveRecentView, vehicle, vehicleTitle]);
 
   useEffect(() => {
-    if (!editingReviewId || didLoadEditingReview || reviews.length === 0) {
+    if (!editingReviewId || didLoadEditingReview || !isAuthReady) {
       return;
     }
 
-    const editingReview = reviews.find(
-      (currentReview) => String(currentReview.id) === editingReviewId
-    );
-
-    if (!editingReview) {
+    if (!isAuthenticated || !user || !isProfileReady) {
       return;
     }
 
-    void Promise.resolve().then(() => {
-      if (!user || (editingReview.authorId !== user.id && !isAdmin)) {
-        setValidationMessage("후기 수정 권한이 없습니다.");
+    let isActive = true;
+
+    const loadEditingReview = async () => {
+      try {
+        const { data: sessionData, error: sessionError } =
+          supabase
+            ? await supabase.auth.getSession()
+            : { data: { session: null }, error: null };
+
+        if (!isActive) {
+          return;
+        }
+
+        if (sessionError) {
+          setValidationMessage(sessionError.message);
+          setDidLoadEditingReview(true);
+          return;
+        }
+
+        const sessionUserId = sessionData.session?.user.id ?? null;
+        const editingReviewResult = await fetchSupabaseReviewById(editingReviewId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!editingReviewResult) {
+          setValidationMessage("수정할 후기를 찾지 못했습니다.");
+          setDidLoadEditingReview(true);
+          return;
+        }
+
+        const { review: editingReview, row } = editingReviewResult;
+        const rowWithPossibleUserId = row as { user_id?: string | null };
+        const reviewUserId = rowWithPossibleUserId.user_id ?? null;
+        const reviewAuthorId = row.author_id ?? editingReview.authorId ?? null;
+        const canEdit = Boolean(
+          sessionUserId &&
+            (reviewUserId === sessionUserId ||
+              reviewAuthorId === sessionUserId ||
+              isAdmin)
+        );
+
+        console.log("review-edit-auth-check", {
+          sessionUserId,
+          reviewUserId,
+          reviewAuthorId,
+          canEdit,
+        });
+
+        if (!canEdit) {
+          setValidationMessage("후기 수정 권한이 없습니다.");
+          setDidLoadEditingReview(true);
+          return;
+        }
+
+        setReview(editingReview.content);
+        setSelectedTags(editingReview.tags ?? []);
+        setReviewImages(editingReview.images ?? []);
         setDidLoadEditingReview(true);
-        return;
-      }
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
 
-      setReview(editingReview.content);
-      setSelectedTags(editingReview.tags ?? []);
-      setReviewImages(editingReview.images ?? []);
-      setDidLoadEditingReview(true);
-    });
-  }, [didLoadEditingReview, editingReviewId, isAdmin, reviews, user]);
+        setValidationMessage(
+          error instanceof Error
+            ? error.message
+            : "후기 정보를 불러오지 못했습니다."
+        );
+        setDidLoadEditingReview(true);
+      }
+    };
+
+    void Promise.resolve().then(loadEditingReview);
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    didLoadEditingReview,
+    editingReviewId,
+    isAdmin,
+    isAuthenticated,
+    isAuthReady,
+    isProfileReady,
+    user,
+  ]);
 
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {

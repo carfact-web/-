@@ -1,5 +1,5 @@
 import { bannedReviewWords } from "@/data/bannedWords";
-import { sanitizeUserText } from "@/utils/inputSanitizer";
+import { sanitizeMultilineUserText } from "@/utils/inputSanitizer";
 import type { Review } from "@/types/review";
 
 export interface ReviewValidationResult {
@@ -22,7 +22,7 @@ const normalizeForFilter = (value: string) =>
 export const validateReviewContent = (
   content: string
 ): ReviewValidationResult => {
-  const trimmedContent = sanitizeUserText(content);
+  const trimmedContent = sanitizeMultilineUserText(content);
 
   if (!trimmedContent) {
     return {

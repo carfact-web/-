@@ -412,7 +412,7 @@ export default function CarReportPage() {
                             </div>
                           )}
 
-                          <p className="line-clamp-2 text-sm leading-6 text-gray-200">
+                          <p className="whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-200">
                             {item.review.content}
                           </p>
 

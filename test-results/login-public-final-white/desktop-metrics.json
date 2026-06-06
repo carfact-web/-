@@ -1,0 +1,29 @@
+{
+  "url": "https://www.carfact.kr/login",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "bodyText": "실매물을 본 사람들의\n경험이 쌓이는 곳\n\n수많은 실제 방문 후기와 정보를 모아, 더 현명한 자동차 선택을 돕습니다.\n\n카카오 로그인\nGoogle 로그인\n홈\n최근조회\n커뮤니티\n내 계정",
+  "logo": {
+    "src": "/_next/image?url=%2Fbrand%2Fcarfact-login-logo.jpg&w=1080&q=75",
+    "width": 96,
+    "height": 96,
+    "objectFit": "contain"
+  },
+  "kakao": {
+    "height": 72,
+    "fontSize": "18.667px",
+    "iconWidth": "31px",
+    "iconHeight": "31px",
+    "background": "rgb(254, 229, 0)"
+  },
+  "google": {
+    "height": 72,
+    "fontSize": "18.667px",
+    "iconWidth": "31px",
+    "iconHeight": "31px",
+    "background": "rgb(243, 243, 243)"
+  },
+  "horizontalOverflow": false
+}
