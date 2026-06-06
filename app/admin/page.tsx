@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -66,8 +67,10 @@ interface AdminUserProfile {
   id: string;
   nickname: string | null;
   nickname_changed: boolean;
+  nickname_change_available: number;
   role: AdminRole;
   is_suspended: boolean;
+  is_verified_dealer: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -196,6 +199,8 @@ export default function AdminPage() {
   const [noticeSearch, setNoticeSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [isVerifiedDealerFeatureReady, setIsVerifiedDealerFeatureReady] =
+    useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
@@ -282,6 +287,7 @@ export default function AdminPage() {
         reportsResult,
         noticesResult,
         popupNoticesResult,
+        verifiedDealerFeatureResult,
       ] =
         await Promise.all([
           supabase.rpc("admin_get_dashboard_stats"),
@@ -303,6 +309,9 @@ export default function AdminPage() {
           supabase.rpc("admin_list_popup_notices", {
             search_text: noticeSearch.trim(),
           }),
+          supabase.rpc("list_verified_dealer_profiles", {
+            target_user_ids: [],
+          }),
         ]);
 
       if (statsResult.error) throw statsResult.error;
@@ -312,6 +321,8 @@ export default function AdminPage() {
       if (reportsResult.error) throw reportsResult.error;
       if (noticesResult.error) throw noticesResult.error;
       if (popupNoticesResult.error) throw popupNoticesResult.error;
+
+      setIsVerifiedDealerFeatureReady(!verifiedDealerFeatureResult.error);
 
       const nextStats = statsResult.data?.[0];
 
@@ -778,6 +789,74 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
+  const setVerifiedDealer = async (account: AdminUserProfile) => {
+    if (!supabase) {
+      return;
+    }
+
+    if (!isVerifiedDealerFeatureReady) {
+      setActionMessage("인증딜러 기능 DB 마이그레이션이 아직 적용되지 않았습니다.");
+      return;
+    }
+
+    const nextIsVerifiedDealer = !account.is_verified_dealer;
+    const label = nextIsVerifiedDealer ? "ON" : "OFF";
+
+    if (!window.confirm((account.nickname ?? account.id) + " 인증딜러를 " + label + " 처리하시겠습니까?")) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc("admin_set_user_verified_dealer", {
+      next_is_verified_dealer: nextIsVerifiedDealer,
+      target_user_id: account.id,
+    });
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setActionMessage("대상 회원의 인증딜러 상태를 변경하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("인증딜러를 " + label + " 처리했습니다.");
+    await loadAdminData();
+  };
+
+  const grantNicknameChangeTicket = async (account: AdminUserProfile) => {
+    if (!supabase) {
+      return;
+    }
+
+    if (!window.confirm((account.nickname ?? account.id) + " 닉네임 변경권을 1회 부여하시겠습니까?")) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc("admin_grant_nickname_change_ticket", {
+      grant_amount: 1,
+      target_user_id: account.id,
+    });
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (typeof data !== "number") {
+      setActionMessage("닉네임 변경권을 부여하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("닉네임 변경권을 1회 부여했습니다. 현재 변경권: " + data);
+    await loadAdminData();
+  };
+
   const upsertCommunityNotice = async (notice?: AdminCommunityPost) => {
     if (!supabase) {
       return;
@@ -1114,7 +1193,7 @@ export default function AdminPage() {
                       </td>
                       <td className={tableCellClassName}>
                         <p className="max-w-sm font-bold text-white">{post.title}</p>
-                        <p className="mt-1 line-clamp-2 max-w-sm text-xs text-zinc-500">
+                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                           {post.content}
                         </p>
                         <p className="mt-2 text-xs text-zinc-500">
@@ -1243,7 +1322,7 @@ export default function AdminPage() {
                         />
                       </td>
                       <td className={tableCellClassName}>
-                        <p className="line-clamp-3 max-w-lg text-white">
+                        <p className="max-w-lg whitespace-pre-wrap break-words leading-[1.7] text-white">
                           {review.content}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500">
@@ -1299,7 +1378,9 @@ export default function AdminPage() {
                 <tr>
                   <th className={tableHeadCellClassName}>회원 ID</th>
                   <th className={tableHeadCellClassName}>닉네임</th>
+                  <th className={tableHeadCellClassName}>변경권</th>
                   <th className={tableHeadCellClassName}>Role</th>
+                  <th className={tableHeadCellClassName}>인증딜러</th>
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>가입일</th>
                   <th className={tableHeadCellClassName}>관리</th>
@@ -1315,10 +1396,37 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className={tableCellClassName}>
-                        {account.nickname ?? "닉네임 없음"}
+                        <VerifiedNickname
+                          isVerifiedDealer={account.is_verified_dealer}
+                        >
+                          {account.nickname ?? "닉네임 없음"}
+                        </VerifiedNickname>
+                      </td>
+                      <td className={tableCellClassName}>
+                        <span className="font-mono text-sm font-bold text-zinc-100">
+                          {account.nickname_change_available.toLocaleString()}
+                        </span>
                       </td>
                       <td className={tableCellClassName}>
                         <RoleBadge role={account.role} />
+                      </td>
+                      <td className={tableCellClassName}>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-bold",
+                            !isVerifiedDealerFeatureReady
+                              ? "border-zinc-700 bg-zinc-900 text-zinc-500"
+                              : account.is_verified_dealer
+                              ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
+                              : "border-zinc-700 bg-zinc-900 text-zinc-400"
+                          )}
+                        >
+                          {!isVerifiedDealerFeatureReady
+                            ? "DB 미적용"
+                            : account.is_verified_dealer
+                              ? "ON"
+                              : "OFF"}
+                        </span>
                       </td>
                       <td className={tableCellClassName}>
                         <AccountStatusBadge isSuspended={account.is_suspended} />
@@ -1335,6 +1443,26 @@ export default function AdminPage() {
                             onClick={() => void setUserSuspended(account)}
                           >
                             {account.is_suspended ? "정지해제" : "정지"}
+                          </button>
+                          <button
+                            type="button"
+                            className={actionButtonClassName}
+                            disabled={!isVerifiedDealerFeatureReady}
+                            onClick={() => void setVerifiedDealer(account)}
+                            title={
+                              isVerifiedDealerFeatureReady
+                                ? undefined
+                                : "인증딜러 기능 DB 미적용"
+                            }
+                          >
+                            {account.is_verified_dealer ? "인증딜러 회수" : "인증딜러 부여"}
+                          </button>
+                          <button
+                            type="button"
+                            className={actionButtonClassName}
+                            onClick={() => void grantNicknameChangeTicket(account)}
+                          >
+                            닉네임 변경권 +1
                           </button>
                           <button
                             type="button"
@@ -1357,7 +1485,7 @@ export default function AdminPage() {
                     </tr>
                   ))
                 ) : (
-                  <EmptyTableRow colSpan={6} message="회원이 없습니다." />
+                  <EmptyTableRow colSpan={8} message="회원이 없습니다." />
                 )}
               </tbody>
             </table>
@@ -1417,10 +1545,10 @@ export default function AdminPage() {
                         <p className="text-xs font-bold text-red-300">
                           {report.report_type}
                         </p>
-                        <p className="mt-1 max-w-sm font-bold text-white">
+                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words font-bold leading-[1.7] text-white">
                           {report.target_title ?? report.target_content}
                         </p>
-                        <p className="mt-1 line-clamp-2 max-w-sm text-xs text-zinc-500">
+                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                           {report.target_content}
                         </p>
                         <p className="mt-2 text-xs text-zinc-500">
@@ -1485,7 +1613,7 @@ export default function AdminPage() {
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
                           <p className="max-w-sm font-bold text-white">{notice.title}</p>
-                          <p className="mt-1 line-clamp-2 max-w-sm text-xs text-zinc-500">
+                          <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                             {notice.content}
                           </p>
                         </td>
@@ -1547,7 +1675,7 @@ export default function AdminPage() {
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
                           <p className="max-w-sm font-bold text-white">{notice.title}</p>
-                          <p className="mt-1 line-clamp-2 max-w-sm text-xs text-zinc-500">
+                          <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                             {notice.content}
                           </p>
                           {notice.link_url ? (

@@ -288,8 +288,10 @@ export interface Database {
           id: string;
           nickname: string | null;
           nickname_changed: boolean;
+          nickname_change_available: number;
           role: "user" | "admin" | "super_admin";
           is_suspended: boolean;
+          is_verified_dealer: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -297,8 +299,10 @@ export interface Database {
           id: string;
           nickname?: string | null;
           nickname_changed?: boolean;
+          nickname_change_available?: number;
           role?: "user" | "admin" | "super_admin";
           is_suspended?: boolean;
+          is_verified_dealer?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -306,8 +310,10 @@ export interface Database {
           id?: string;
           nickname?: string | null;
           nickname_changed?: boolean;
+          nickname_change_available?: number;
           role?: "user" | "admin" | "super_admin";
           is_suspended?: boolean;
+          is_verified_dealer?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -541,8 +547,10 @@ export interface Database {
           id: string;
           nickname: string | null;
           nickname_changed: boolean;
+          nickname_change_available: number;
           role: "user" | "admin" | "super_admin";
           is_suspended: boolean;
+          is_verified_dealer: boolean;
           created_at: string;
           updated_at: string;
         }[];
@@ -580,6 +588,13 @@ export interface Database {
         };
         Returns: boolean;
       };
+      admin_grant_nickname_change_ticket: {
+        Args: {
+          target_user_id: string;
+          grant_amount?: number;
+        };
+        Returns: number;
+      };
       admin_set_user_role: {
         Args: {
           target_user_id: string;
@@ -593,6 +608,22 @@ export interface Database {
           next_is_suspended: boolean;
         };
         Returns: boolean;
+      };
+      admin_set_user_verified_dealer: {
+        Args: {
+          target_user_id: string;
+          next_is_verified_dealer: boolean;
+        };
+        Returns: boolean;
+      };
+      list_verified_dealer_profiles: {
+        Args: {
+          target_user_ids: string[];
+        };
+        Returns: {
+          id: string;
+          is_verified_dealer: boolean;
+        }[];
       };
       admin_upsert_community_notice: {
         Args: {

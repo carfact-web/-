@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthLoginPanel } from "@/components/AuthLoginPanel";
+import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { clearAuthRedirect, resolveAuthRedirect } from "@/lib/authRedirect";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -71,9 +72,10 @@ export default function MyPage() {
   } = useAuth();
   const {
     canChangeNickname,
+    isVerifiedDealer,
     isProfileReady,
     nickname,
-    nicknameChanged,
+    nicknameChangeAvailable,
     profileError,
     reviewNickname,
     updateNickname,
@@ -259,7 +261,9 @@ export default function MyPage() {
           <div className={statusClassName}>
             <p className="font-semibold text-white">로그인됨</p>
             <p className="mt-1 break-all text-zinc-400">
-              {reviewNickname || userLabel}
+              <VerifiedNickname isVerifiedDealer={isVerifiedDealer}>
+                {reviewNickname || userLabel}
+              </VerifiedNickname>
               {user?.email ? " · " + user.email : ""}
             </p>
           </div>
@@ -286,7 +290,10 @@ export default function MyPage() {
                 </form>
               ) : (
                 <p className="mt-1 break-all text-zinc-400">
-                  {reviewNickname} · 닉네임 변경 완료
+                  <VerifiedNickname isVerifiedDealer={isVerifiedDealer}>
+                    {reviewNickname}
+                  </VerifiedNickname>
+                  {" · 닉네임 변경 완료"}
                 </p>
               )
             ) : (
@@ -298,9 +305,12 @@ export default function MyPage() {
             {profileError ? (
               <p className="mt-3 text-sm text-red-200">{profileError}</p>
             ) : null}
-            {!nicknameChanged && isProfileReady ? (
+            {isProfileReady ? (
               <p className="mt-3 text-xs text-zinc-500">
                 닉네임은 최초 1회만 변경할 수 있습니다.
+                {nicknameChangeAvailable > 0
+                  ? " 현재 변경권 " + nicknameChangeAvailable + "회 보유 중입니다."
+                  : ""}
               </p>
             ) : null}
           </div>

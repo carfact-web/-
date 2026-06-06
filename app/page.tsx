@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
 import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
@@ -65,6 +66,8 @@ const heroHighlightClassName = cn("text-[#FF3B30]");
 
 interface RecentFact {
   id: number | string;
+  authorIsVerifiedDealer: boolean;
+  authorNickname: string;
   carNumber: string;
   vehicle: Vehicle | null;
   content: string;
@@ -151,6 +154,8 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
 
       return reviews.map((review) => ({
         id: review.id,
+        authorIsVerifiedDealer: review.authorIsVerifiedDealer ?? false,
+        authorNickname: review.authorNickname ?? "익명 사용자",
         carNumber,
         vehicle: review.vehicleSnapshot ?? savedVehicle,
         content: review.content,
@@ -224,6 +229,8 @@ export default function Home() {
         setRemoteRecentFacts(
           reviews.map((review) => ({
             id: review.id,
+            authorIsVerifiedDealer: review.authorIsVerifiedDealer ?? false,
+            authorNickname: review.authorNickname ?? "익명 사용자",
             carNumber: review.vehicleSnapshot?.plateNumber ?? "",
             vehicle: review.vehicleSnapshot ?? null,
             content: review.content,
@@ -402,11 +409,17 @@ export default function Home() {
                       </span>
                     </div>
 
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-300">
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-[1.7] text-zinc-300">
                       {fact.content}
                     </p>
 
                     <div className={recentMetaClassName}>
+                      <VerifiedNickname
+                        isVerifiedDealer={fact.authorIsVerifiedDealer}
+                      >
+                        {fact.authorNickname}
+                      </VerifiedNickname>
+                      <span aria-hidden>·</span>
                       <span>{mileage}</span>
                       {fact.createdAt && <span aria-hidden>·</span>}
                       {fact.createdAt && <span>{fact.createdAt}</span>}

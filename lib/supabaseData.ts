@@ -7,6 +7,7 @@ import {
   getPersistableReviewImages,
   uploadReviewImages,
 } from "@/lib/reviewImages";
+import { fetchVerifiedDealerMap } from "@/lib/verifiedDealers";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import type { Json } from "@/types/supabase";
 import type {
@@ -93,10 +94,16 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
   updatedAt: row.updated_at,
 });
 
-export const mapReviewRow = (row: ReviewRow): Review => ({
+export const mapReviewRow = (
+  row: ReviewRow,
+  verifiedDealers: Record<string, boolean> = {}
+): Review => ({
   id: row.id,
   authorId: row.author_id ?? undefined,
   authorNickname: row.author_nickname ?? "익명 사용자",
+  authorIsVerifiedDealer: row.author_id
+    ? verifiedDealers[row.author_id] ?? false
+    : false,
   content: row.content,
   tags: row.tags ?? [],
   images: toReviewImages(row.images),
@@ -179,7 +186,40 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
     throw error;
   }
 
-  return data.map(mapReviewRow);
+  const verifiedDealers = await fetchVerifiedDealerMap(
+    data.map((review) => review.author_id)
+  );
+
+  return data.map((review) => mapReviewRow(review, verifiedDealers));
+};
+
+export const fetchSupabaseReviewById = async (reviewId: string) => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("*")
+    .eq("id", reviewId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const verifiedDealers = await fetchVerifiedDealerMap(
+    data.author_id ? [data.author_id] : []
+  );
+
+  return {
+    review: mapReviewRow(data, verifiedDealers),
+    row: data,
+  };
 };
 
 export const fetchRecentSupabaseReviews = async (limit = 20) => {
@@ -217,7 +257,11 @@ export const fetchRecentSupabaseReviews = async (limit = 20) => {
     }))
   );
 
-  return data.map(mapReviewRow);
+  const verifiedDealers = await fetchVerifiedDealerMap(
+    data.map((review) => review.author_id)
+  );
+
+  return data.map((review) => mapReviewRow(review, verifiedDealers));
 };
 
 export const saveSupabaseReview = async (
@@ -287,7 +331,9 @@ export const saveSupabaseReview = async (
     throw createSupabaseFailureError("db-insert", error);
   }
 
-  return mapReviewRow(data);
+  const verifiedDealers = await fetchVerifiedDealerMap([data.author_id]);
+
+  return mapReviewRow(data, verifiedDealers);
 };
 
 export const updateSupabaseReview = async (

@@ -15,6 +15,7 @@ export interface Review {
   id: number | string;
   authorId?: string;
   authorNickname?: string;
+  authorIsVerifiedDealer?: boolean;
   content: string;
   tags?: string[];
   helpfulCount?: number;

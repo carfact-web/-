@@ -37,8 +37,10 @@ const validateNickname = (value: string) => {
 interface UseUserProfileResult {
   canChangeNickname: boolean;
   ensureReviewNickname: () => Promise<string>;
+  isVerifiedDealer: boolean;
   isProfileReady: boolean;
   nickname: string;
+  nicknameChangeAvailable: number;
   nicknameChanged: boolean;
   profileError: string;
   reviewNickname: string;
@@ -199,8 +201,18 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
   }, [ensureReviewNickname, user]);
 
   const nickname = profile?.nickname?.trim() ?? "";
+  const nicknameChangeAvailable = profile?.nickname_change_available ?? 0;
   const nicknameChanged = profile?.nickname_changed ?? false;
   const reviewNickname = useMemo(() => nickname, [nickname]);
+
+  useEffect(() => {
+    console.log("user-profile-state", {
+      hasProfile: Boolean(profile),
+      isVerifiedDealer: profile?.is_verified_dealer ?? false,
+      profileId: profile?.id ?? null,
+      userId: user?.id ?? null,
+    });
+  }, [profile, user?.id]);
 
   const updateNickname = useCallback(
     async (value: string) => {
@@ -209,7 +221,7 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
         return false;
       }
 
-      if (nicknameChanged) {
+      if (nicknameChanged && nicknameChangeAvailable <= 0) {
         setProfileError("닉네임은 최초 1회만 변경할 수 있습니다.");
         return false;
       }
@@ -246,14 +258,16 @@ export function useUserProfile(user: User | null): UseUserProfileResult {
       setProfile(data);
       return true;
     },
-    [nicknameChanged, user]
+    [nicknameChangeAvailable, nicknameChanged, user]
   );
 
   return {
-    canChangeNickname: Boolean(user) && !nicknameChanged,
+    canChangeNickname: Boolean(user) && (!nicknameChanged || nicknameChangeAvailable > 0),
     ensureReviewNickname,
+    isVerifiedDealer: profile?.is_verified_dealer ?? false,
     isProfileReady,
     nickname,
+    nicknameChangeAvailable,
     nicknameChanged,
     profileError,
     reviewNickname,

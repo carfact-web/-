@@ -6,6 +6,7 @@ import {
   getPersistableCommunityImages,
   uploadCommunityImages,
 } from "@/lib/communityImages";
+import { fetchVerifiedDealerMap } from "@/lib/verifiedDealers";
 import type {
   CommunityCategory,
   CommunityCategoryFilter,
@@ -225,7 +226,7 @@ const isMissingRpcFunctionError = (error: unknown) =>
 
 const mapCommunityPost = (
   row: CommunityPostRow,
-  authorNicknames?: Record<string, string>,
+  authorProfiles?: Record<string, { isVerifiedDealer: boolean; nickname?: string }>,
   counts?: {
     comments?: Record<string, number>;
     likes?: Record<string, number>;
@@ -253,8 +254,10 @@ const mapCommunityPost = (
     content: row.content,
     authorNickname:
       row.author_nickname?.trim() ||
-      authorNicknames?.[row.user_id]?.trim() ||
+      authorProfiles?.[row.user_id]?.nickname?.trim() ||
       defaultCommunityNickname,
+    authorIsVerifiedDealer:
+      authorProfiles?.[row.user_id]?.isVerifiedDealer ?? false,
     userId: row.user_id,
     isNotice: row.is_notice ?? false,
     isPinned: row.is_pinned ?? false,
@@ -269,11 +272,15 @@ const mapCommunityPost = (
   };
 };
 
-const mapCommunityComment = (row: CommunityCommentRow): CommunityComment => ({
+const mapCommunityComment = (
+  row: CommunityCommentRow,
+  authorProfiles: Record<string, { isVerifiedDealer: boolean; nickname?: string }> = {}
+): CommunityComment => ({
   id: row.id,
   postId: row.post_id,
   content: row.content,
   authorNickname: row.author_nickname?.trim() || defaultCommunityNickname,
+  authorIsVerifiedDealer: authorProfiles[row.user_id]?.isVerifiedDealer ?? false,
   createdAt: toLocaleDateTime(row.created_at),
 });
 
@@ -315,40 +322,45 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
   };
 };
 
-const fetchCommunityAuthorNicknames = async (posts: CommunityPostRow[]) => {
-  if (!supabase || posts.length === 0) {
-    return {};
-  }
-
-  const missingNicknameUserIds = Array.from(
-    new Set(
-      posts
-        .filter((post) => !post.author_nickname?.trim())
-        .map((post) => post.user_id)
-        .filter(Boolean)
-    )
+const fetchCommunityAuthorProfiles = async (
+  userIds: Array<string | null | undefined>,
+  missingNicknameUserIds: string[] = []
+) => {
+  const targetUserIds = Array.from(
+    new Set(userIds.filter((userId): userId is string => Boolean(userId)))
   );
 
-  if (missingNicknameUserIds.length === 0) {
+  if (!supabase || targetUserIds.length === 0) {
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("id,nickname")
-    .in("id", missingNicknameUserIds);
+  const [verifiedDealers, nicknameResult] = await Promise.all([
+    fetchVerifiedDealerMap(targetUserIds),
+    missingNicknameUserIds.length > 0
+      ? supabase
+          .from("user_profiles")
+          .select("id,nickname")
+          .in("id", missingNicknameUserIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-  if (error) {
-    console.warn("community-author-profile-error", error);
-    return {};
+  if (nicknameResult.error) {
+    console.warn("community-author-profile-error", nicknameResult.error);
   }
 
-  return data.reduce<Record<string, string>>((nicknames, profile) => {
-    if (profile.nickname?.trim()) {
-      nicknames[profile.id] = profile.nickname.trim();
-    }
+  return targetUserIds.reduce<
+    Record<string, { isVerifiedDealer: boolean; nickname?: string }>
+  >((profiles, userId) => {
+    const nickname = (nicknameResult.data ?? []).find(
+      (profile) => profile.id === userId
+    )?.nickname;
 
-    return nicknames;
+    profiles[userId] = {
+      isVerifiedDealer: verifiedDealers[userId] ?? false,
+      nickname: nickname?.trim() || undefined,
+    };
+
+    return profiles;
   }, {});
 };
 
@@ -443,14 +455,25 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
   }
 
   const postIds = posts.map((post) => post.id);
-  const [counts, authorNicknames, interactions] = await Promise.all([
+  const missingNicknameUserIds = Array.from(
+    new Set(
+      posts
+        .filter((post) => !post.author_nickname?.trim())
+        .map((post) => post.user_id)
+        .filter(Boolean)
+    )
+  );
+  const [counts, authorProfiles, interactions] = await Promise.all([
     fetchCommunityPostCounts(postIds),
-    fetchCommunityAuthorNicknames(posts),
+    fetchCommunityAuthorProfiles(
+      posts.map((post) => post.user_id),
+      missingNicknameUserIds
+    ),
     fetchCommunityInteractionState(postIds),
   ]);
 
   return posts.map((post) =>
-    mapCommunityPost(post, authorNicknames, counts, interactions)
+    mapCommunityPost(post, authorProfiles, counts, interactions)
   );
 };
 
@@ -475,14 +498,25 @@ export const fetchCommunityPostsByAuthor = async (authorId: string) => {
   }
 
   const postIds = posts.map((post) => post.id);
-  const [counts, authorNicknames, interactions] = await Promise.all([
+  const missingNicknameUserIds = Array.from(
+    new Set(
+      posts
+        .filter((post) => !post.author_nickname?.trim())
+        .map((post) => post.user_id)
+        .filter(Boolean)
+    )
+  );
+  const [counts, authorProfiles, interactions] = await Promise.all([
     fetchCommunityPostCounts(postIds),
-    fetchCommunityAuthorNicknames(posts),
+    fetchCommunityAuthorProfiles(
+      posts.map((post) => post.user_id),
+      missingNicknameUserIds
+    ),
     fetchCommunityInteractionState(postIds),
   ]);
 
   return posts.map((post) =>
-    mapCommunityPost(post, authorNicknames, counts, interactions)
+    mapCommunityPost(post, authorProfiles, counts, interactions)
   );
 };
 
@@ -509,7 +543,11 @@ export const fetchCommunityComments = async (postId: string) => {
     throw error;
   }
 
-  return data.map(mapCommunityComment);
+  const authorProfiles = await fetchCommunityAuthorProfiles(
+    data.map((comment) => comment.user_id)
+  );
+
+  return data.map((comment) => mapCommunityComment(comment, authorProfiles));
 };
 
 export const saveCommunityPost = async (input: {
@@ -624,8 +662,12 @@ export const saveCommunityPost = async (input: {
 
   console.log("community-post-images-db", data.images);
 
+  const verifiedDealers = await fetchVerifiedDealerMap([sessionUserId]);
   const savedPost = mapCommunityPost(data, {
-    [sessionUserId]: basePayload.author_nickname,
+    [sessionUserId]: {
+      isVerifiedDealer: verifiedDealers[sessionUserId] ?? false,
+      nickname: basePayload.author_nickname,
+    },
   });
 
   if (uploadResult.failedCount > 0) {
@@ -732,7 +774,14 @@ export const saveCommunityComment = async (input: {
     throw new Error("community-comment-empty-response");
   }
 
-  return mapCommunityComment(data);
+  const verifiedDealers = await fetchVerifiedDealerMap([input.userId]);
+
+  return mapCommunityComment(data, {
+    [input.userId]: {
+      isVerifiedDealer: verifiedDealers[input.userId] ?? false,
+      nickname: input.authorNickname || defaultCommunityNickname,
+    },
+  });
 };
 
 export const deleteCommunityPost = async (postId: string) => {

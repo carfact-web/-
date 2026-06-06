@@ -27,6 +27,7 @@ export interface CommunityPost {
   title: string;
   content: string;
   authorNickname: string;
+  authorIsVerifiedDealer: boolean;
   userId: string;
   isNotice: boolean;
   isPinned: boolean;
@@ -46,6 +47,7 @@ export interface CommunityComment {
   postId: string;
   content: string;
   authorNickname: string;
+  authorIsVerifiedDealer: boolean;
   createdAt: string;
 }
 

@@ -40,6 +40,7 @@ create table if not exists public.user_profiles (
   nickname text,
   nickname_changed boolean not null default false,
   role text not null default 'user' check (role in ('user', 'admin', 'super_admin')),
+  is_verified_dealer boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -104,6 +105,9 @@ alter table public.user_profiles
 
 alter table public.user_profiles
   add column if not exists role text not null default 'user';
+
+alter table public.user_profiles
+  add column if not exists is_verified_dealer boolean not null default false;
 
 alter table public.user_profiles
   drop constraint if exists user_profiles_role_check;
@@ -260,16 +264,28 @@ create trigger prevent_user_profile_nickname_rechange_trigger
 create or replace function public.prevent_user_profile_role_self_change()
 returns trigger
 language plpgsql
+security definer
+set search_path = public
 as $$
 begin
-  if tg_op = 'INSERT' and auth.uid() is not null and new.role <> 'user' then
-    raise exception 'profile role cannot be set by client';
+  if public.current_user_has_admin_role() then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' and auth.uid() is not null and (
+    new.role <> 'user'
+    or new.is_verified_dealer <> false
+  ) then
+    raise exception 'profile privileged fields cannot be set by client';
   end if;
 
   if tg_op = 'UPDATE'
     and auth.uid() is not null
-    and new.role is distinct from old.role then
-    raise exception 'profile role cannot be changed by client';
+    and (
+      new.role is distinct from old.role
+      or new.is_verified_dealer is distinct from old.is_verified_dealer
+    ) then
+    raise exception 'profile privileged fields cannot be changed by client';
   end if;
 
   return new;
@@ -299,6 +315,27 @@ $$;
 
 revoke all on function public.current_user_has_admin_role() from public;
 grant execute on function public.current_user_has_admin_role() to authenticated;
+
+create or replace function public.list_verified_dealer_profiles(target_user_ids uuid[])
+returns table (
+  id uuid,
+  is_verified_dealer boolean
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    profile.id,
+    profile.is_verified_dealer
+  from public.user_profiles as profile
+  where profile.id = any(target_user_ids)
+    and profile.is_verified_dealer = true;
+$$;
+
+revoke all on function public.list_verified_dealer_profiles(uuid[]) from public;
+grant execute on function public.list_verified_dealer_profiles(uuid[]) to anon;
+grant execute on function public.list_verified_dealer_profiles(uuid[]) to authenticated;
 
 create or replace function public.enforce_community_notice_permissions()
 returns trigger

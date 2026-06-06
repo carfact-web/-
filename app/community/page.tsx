@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -30,7 +31,10 @@ import type {
   CommunityPost,
 } from "@/types/community";
 import { compressImage, isSupportedImageFile } from "@/utils/imageCompression";
-import { sanitizeUserText } from "@/utils/inputSanitizer";
+import {
+  sanitizeMultilineUserText,
+  sanitizeUserText,
+} from "@/utils/inputSanitizer";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
@@ -94,6 +98,11 @@ const reportCancelButtonClassName = cn(
 
 const normalizeField = (value: string, maxLength: number) =>
   sanitizeUserText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
+const normalizeMultilineField = (value: string, maxLength: number) =>
+  sanitizeMultilineUserText(value)
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .slice(0, maxLength);
 
 const allowedCommunityImageTypes = [
   "image/jpeg",
@@ -551,7 +560,10 @@ export default function CommunityPage() {
 
     const formData = new FormData(form);
     const title = normalizeField(String(formData.get("title") ?? ""), 80);
-    const content = normalizeField(String(formData.get("content") ?? ""), 2000);
+    const content = normalizeMultilineField(
+      String(formData.get("content") ?? ""),
+      2000
+    );
     const isNoticePost = isAdmin && formData.get("isNotice") === "on";
     const isPinnedPost = isAdmin && formData.get("isPinned") === "on";
 
@@ -689,7 +701,10 @@ export default function CommunityPage() {
 
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const content = normalizeField(String(formData.get("comment") ?? ""), 500);
+    const content = normalizeMultilineField(
+      String(formData.get("comment") ?? ""),
+      500
+    );
 
     if (content.length < 2) {
       setMessage("댓글은 2자 이상 입력해주세요.");
@@ -1274,7 +1289,11 @@ export default function CommunityPage() {
                           {post.title}
                         </span>
                         <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
-                          <span>{post.authorNickname}</span>
+                          <VerifiedNickname
+                            isVerifiedDealer={post.authorIsVerifiedDealer}
+                          >
+                            {post.authorNickname}
+                          </VerifiedNickname>
                           <span>댓글 {post.commentCount}</span>
                           <span>좋아요 {post.likeCount}</span>
                           <span>{post.createdAt}</span>
@@ -1350,7 +1369,11 @@ export default function CommunityPage() {
                         </span>
                         {selectedPost.isNotice ? <span>공지</span> : null}
                         {selectedPost.isPinned ? <span>상단고정</span> : null}
-                        <span>{selectedPost.authorNickname}</span>
+                        <VerifiedNickname
+                          isVerifiedDealer={selectedPost.authorIsVerifiedDealer}
+                        >
+                          {selectedPost.authorNickname}
+                        </VerifiedNickname>
                         <span>{selectedPost.createdAt}</span>
                       </div>
                       <h2 className="mt-2 text-2xl font-extrabold leading-tight">
@@ -1377,7 +1400,7 @@ export default function CommunityPage() {
                       </div>
                     ) : null}
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-zinc-200">
+                  <p className="mt-4 whitespace-pre-wrap break-words text-base leading-[1.7] text-zinc-200">
                     {selectedPost.content}
                   </p>
                   {selectedPost.images.length > 0 ? (
@@ -1465,10 +1488,14 @@ export default function CommunityPage() {
                           className="rounded-lg border border-zinc-800 bg-black p-3"
                         >
                           <div className="flex flex-wrap gap-2 text-xs font-bold text-zinc-500">
-                            <span>{comment.authorNickname}</span>
+                            <VerifiedNickname
+                              isVerifiedDealer={comment.authorIsVerifiedDealer}
+                            >
+                              {comment.authorNickname}
+                            </VerifiedNickname>
                             <span>{comment.createdAt}</span>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-200">
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-[1.7] text-zinc-200">
                             {comment.content}
                           </p>
                         </div>

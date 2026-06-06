@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { VerifiedNickname } from "@/components/VerifiedNickname";
 import type { Review } from "@/types/review";
 import { updateSupabaseReviewHelpfulCount } from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
@@ -43,7 +44,9 @@ const tagClassName = cn(
   "rounded-full bg-red-500/15 px-3 py-1 text-xs font-medium text-red-300",
   "ring-1 ring-red-500/25"
 );
-const contentClassName = cn("mb-4 whitespace-pre-wrap text-sm leading-6 text-gray-100");
+const contentClassName = cn(
+  "mb-4 whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-100"
+);
 const imageGridClassName = cn("mb-4 grid grid-cols-3 gap-2 sm:max-w-sm");
 const imageThumbnailClassName = cn(
   "relative aspect-square overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 transition",
@@ -332,7 +335,14 @@ export function ReviewCard({
       {reportToast}
 
       <div className={headerClassName}>
-        <p className={nicknameClassName}>{authorNickname}</p>
+        <p>
+          <VerifiedNickname
+            className={nicknameClassName}
+            isVerifiedDealer={review.authorIsVerifiedDealer}
+          >
+            {authorNickname}
+          </VerifiedNickname>
+        </p>
         <p className={createdAtClassName}>{review.createdAt}</p>
       </div>
 
