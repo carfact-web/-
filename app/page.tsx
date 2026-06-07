@@ -12,7 +12,6 @@ import {
   reviewsChangeEventName,
 } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
-import { brand } from "@/lib/brand";
 import { fetchCommunityNotices } from "@/lib/communityData";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
@@ -31,7 +30,7 @@ import type { Vehicle } from "@/types/vehicle";
 const pageClassName = cn(
   "min-h-screen bg-[#08090b] px-4 py-5 text-white sm:px-6 sm:py-8",
 );
-const shellClassName = cn("mx-auto flex w-full max-w-3xl flex-col gap-8");
+const shellClassName = cn("mx-auto flex w-full max-w-3xl flex-col gap-6 sm:gap-8");
 const headerClassName = cn(
   "border-b border-zinc-800/80 pb-3",
 );
@@ -78,9 +77,9 @@ const noticeTickerClassName = cn(
   "mt-2 block min-w-0 truncate text-sm font-bold text-white transition",
   "hover:text-white",
 );
-const heroCopyFrameClassName = cn("relative h-24 overflow-hidden sm:h-32");
+const heroCopyFrameClassName = cn("relative h-20 overflow-hidden sm:h-32");
 const heroCopyClassName = cn(
-  "absolute inset-x-0 top-0 text-3xl font-black leading-tight text-white sm:text-5xl",
+  "absolute inset-x-0 top-0 text-[1.65rem] font-black leading-[1.14] text-white sm:text-5xl sm:leading-tight",
 );
 const heroHighlightClassName = cn("text-[#FF3B30]");
 
@@ -454,7 +453,7 @@ export default function Home() {
           )}
         </header>
 
-        <section className="pt-5">
+        <section className="pt-4 sm:pt-5">
           <div className={heroCopyFrameClassName} aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
               <motion.h1
@@ -483,17 +482,20 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
-            {brand.description}
+          <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300 sm:mt-5 sm:text-lg">
+            수많은 실제 방문 후기와 정보를 모아,
+            <br className="sm:hidden" />
+            <span className="hidden sm:inline"> </span>더 현명한 중고차 구매를
+            돕습니다.
           </p>
         </section>
 
         <section className="rounded-lg border border-zinc-800 bg-[#111111] p-4 shadow-2xl shadow-black/30 sm:p-5">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
-            차량 조회
+            차량번호 조회
           </p>
           <p className="text-sm leading-6 text-zinc-400">
-            차량번호로 실제 방문 후기와 커뮤니티 정보를 확인하세요.
+            이 차량을 본 사람들의 실제 후기를 확인하세요.
           </p>
         </section>
 
