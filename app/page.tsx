@@ -39,9 +39,14 @@ const homeLogoClassName = cn("h-10 w-auto object-contain sm:h-12");
 const panelClassName = cn(
   "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
 );
+const plateInputFrameClassName = cn(
+  "relative",
+  "before:pointer-events-none before:absolute before:left-4 before:top-1/2 before:z-10 before:h-2 before:w-2 before:-translate-y-1/2 before:rounded-full before:bg-zinc-400 before:shadow-[inset_0_1px_1px_rgba(0,0,0,0.45)] before:content-['']",
+  "after:pointer-events-none after:absolute after:right-4 after:top-1/2 after:z-10 after:h-2 after:w-2 after:-translate-y-1/2 after:rounded-full after:bg-zinc-400 after:shadow-[inset_0_1px_1px_rgba(0,0,0,0.45)] after:content-['']",
+);
 const inputClassName = cn(
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-4 text-base text-white outline-none transition",
-  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/20",
+  "w-full rounded-lg border-2 border-[#222] bg-[linear-gradient(#ffffff,#f2f2f2)] px-12 py-4 text-center text-[26px] font-extrabold tracking-[1.5px] text-zinc-950 shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] outline-none transition sm:text-[32px] sm:tracking-[2px]",
+  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/30",
 );
 const primaryButtonClassName = cn(
   "mt-3 w-full rounded-lg bg-[#FF3B30] px-4 py-4 text-base font-bold text-white transition",
@@ -211,6 +216,17 @@ const maskPlateNumber = (plateNumber: string) => {
   }
 
   return normalizedPlateNumber.slice(0, -3) + "XXX";
+};
+
+const formatPlateNumberForDisplay = (plateNumber: string) => {
+  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+  const match = normalizedPlateNumber.match(/^(\d{2,3}[가-힣])(\d{4})$/);
+
+  if (!match) {
+    return normalizedPlateNumber;
+  }
+
+  return match[1] + " " + match[2];
 };
 
 const formatTopVehicleModel = (
@@ -500,18 +516,21 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="mt-5">
+          <div className={cn("mt-5", plateInputFrameClassName)}>
             <input
-              value={carNumber}
+              value={formatPlateNumberForDisplay(carNumber)}
               onChange={(e) => {
                 setCarNumber(sanitizeVehiclePlateNumber(e.target.value));
                 setFormMessage("");
               }}
               type="text"
-              placeholder="차량번호 입력 예) 123가4567"
+              inputMode="text"
+              autoComplete="off"
+              placeholder="123마4567"
               className={inputClassName}
               aria-invalid={Boolean(formMessage)}
               aria-describedby={formMessage ? "plate-validation" : undefined}
+              aria-label="차량번호"
             />
           </div>
 
