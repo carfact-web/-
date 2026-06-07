@@ -10,7 +10,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
 import type { Json } from "@/types/supabase";
 
-type AdminTab = "dashboard" | "posts" | "reviews" | "users" | "reports" | "notices";
+type AdminTab =
+  | "dashboard"
+  | "posts"
+  | "reviews"
+  | "users"
+  | "reports"
+  | "notices";
 type AdminRole = "user" | "admin" | "super_admin";
 type CommunityCategory =
   | "free"
@@ -27,6 +33,70 @@ interface AdminStats {
   reports: number;
   reviews: number;
   users: number;
+}
+
+interface AdminTrafficTopVehicle {
+  vehicle_id: string;
+  view_count: number;
+  car_number: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  generation: string | null;
+  model_detail: string | null;
+  year: string | null;
+  fuel_type: string | null;
+  mileage: string | null;
+}
+
+interface AdminTrafficTopModel {
+  model_name: string | null;
+  manufacturer: string | null;
+  view_count: number;
+}
+
+interface AdminTrafficTopReview {
+  review_id: string;
+  vehicle_id: string | null;
+  view_count: number;
+  content: string | null;
+  author_nickname: string | null;
+  car_number: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  generation: string | null;
+  year: string | null;
+  created_at: string | null;
+}
+
+interface AdminTrafficBreakdownItem {
+  label: string;
+  visitor_count: number;
+  percentage?: number;
+}
+
+interface AdminTrafficTimeItem {
+  label: string;
+  visitor_count: number;
+}
+
+interface AdminTrafficStats {
+  todayVisitors: number;
+  sevenDayVisitors: number;
+  thirtyDayVisitors: number;
+  totalVisitors: number;
+  todayReviews: number;
+  totalReviews: number;
+  totalUsers: number;
+  topVehicles: AdminTrafficTopVehicle[];
+  topModels: AdminTrafficTopModel[];
+  topReviews: AdminTrafficTopReview[];
+  deviceBreakdown: AdminTrafficBreakdownItem[];
+  browserBreakdown: AdminTrafficBreakdownItem[];
+  osBreakdown: AdminTrafficBreakdownItem[];
+  referrerTop: AdminTrafficBreakdownItem[];
+  pathTop: AdminTrafficBreakdownItem[];
+  hourlyVisitors: AdminTrafficTimeItem[];
+  dailyVisitors: AdminTrafficTimeItem[];
 }
 
 interface AdminCommunityPost {
@@ -120,41 +190,61 @@ const emptyStats: AdminStats = {
   users: 0,
 };
 
+const emptyTrafficStats: AdminTrafficStats = {
+  todayVisitors: 0,
+  sevenDayVisitors: 0,
+  thirtyDayVisitors: 0,
+  totalVisitors: 0,
+  todayReviews: 0,
+  totalReviews: 0,
+  totalUsers: 0,
+  topVehicles: [],
+  topModels: [],
+  topReviews: [],
+  deviceBreakdown: [],
+  browserBreakdown: [],
+  osBreakdown: [],
+  referrerTop: [],
+  pathTop: [],
+  hourlyVisitors: [],
+  dailyVisitors: [],
+};
+
 const pageClassName = cn(
-  "min-h-screen bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8"
+  "min-h-screen bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8",
 );
 const shellClassName = cn("mx-auto flex w-full max-w-[1600px] flex-col gap-5");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-xl shadow-black/20 sm:p-5"
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-xl shadow-black/20 sm:p-5",
 );
 const mutedTextClassName = cn("text-sm leading-relaxed text-zinc-400");
 const tabButtonClassName = cn(
   "rounded-lg border border-zinc-800 px-3 py-2 text-sm font-bold text-zinc-300 transition",
-  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
 );
 const activeTabButtonClassName = cn(
-  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500"
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
 );
 const actionButtonClassName = cn(
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-bold text-zinc-100 transition",
-  "hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+  "hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50",
 );
 const dangerButtonClassName = cn(
   actionButtonClassName,
-  "border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20"
+  "border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20",
 );
 const tableClassName = cn("min-w-full divide-y divide-zinc-800 text-sm");
 const tableHeadCellClassName = cn(
-  "whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-zinc-500"
+  "whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-zinc-500",
 );
 const tableCellClassName = cn("px-3 py-3 align-top text-zinc-200");
 const inputClassName = cn(
   "min-h-10 w-full rounded-lg border border-zinc-800 bg-black px-3 text-sm text-white outline-none transition",
-  "placeholder:text-zinc-600 focus:border-red-500"
+  "placeholder:text-zinc-600 focus:border-red-500",
 );
 const checkboxClassName = cn(
   "h-4 w-4 rounded border-zinc-700 bg-black text-red-500",
-  "focus:ring-2 focus:ring-red-500/40 focus:ring-offset-0"
+  "focus:ring-2 focus:ring-red-500/40 focus:ring-offset-0",
 );
 
 const formatDate = (value: string) => {
@@ -173,6 +263,84 @@ const formatDate = (value: string) => {
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const toNullableString = (value: unknown) =>
+  typeof value === "string" ? value : null;
+
+const getJsonString = (value: Json, key: string) =>
+  isRecord(value) ? toNullableString(value[key]) : null;
+
+const toNumber = (value: unknown) => {
+  const numberValue =
+    typeof value === "number" && Number.isFinite(value)
+      ? value
+      : Number(value ?? 0);
+
+  return Number.isFinite(numberValue) ? numberValue : 0;
+};
+
+const toTrafficTopVehicles = (value: Json): AdminTrafficTopVehicle[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        vehicle_id: String(item.vehicle_id ?? ""),
+        view_count: toNumber(item.view_count),
+        car_number: toNullableString(item.car_number),
+        manufacturer: toNullableString(item.manufacturer),
+        model: toNullableString(item.model),
+        generation: toNullableString(item.generation),
+        model_detail: toNullableString(item.model_detail),
+        year: toNullableString(item.year),
+        fuel_type: toNullableString(item.fuel_type),
+        mileage: toNullableString(item.mileage),
+      }))
+    : [];
+
+const toTrafficTopModels = (value: Json): AdminTrafficTopModel[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        model_name: toNullableString(item.model_name),
+        manufacturer: toNullableString(item.manufacturer),
+        view_count: toNumber(item.view_count),
+      }))
+    : [];
+
+const toTrafficTopReviews = (value: Json): AdminTrafficTopReview[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        review_id: String(item.review_id ?? ""),
+        vehicle_id: toNullableString(item.vehicle_id),
+        view_count: toNumber(item.view_count),
+        content: toNullableString(item.content),
+        author_nickname: toNullableString(item.author_nickname),
+        car_number: toNullableString(item.car_number),
+        manufacturer: toNullableString(item.manufacturer),
+        model: toNullableString(item.model),
+        generation: toNullableString(item.generation),
+        year: toNullableString(item.year),
+        created_at: toNullableString(item.created_at),
+      }))
+    : [];
+
+const toTrafficBreakdownItems = (value: Json): AdminTrafficBreakdownItem[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        label: String(item.label ?? ""),
+        visitor_count: toNumber(item.visitor_count),
+        percentage:
+          item.percentage === undefined ? undefined : toNumber(item.percentage),
+      }))
+    : [];
+
+const toTrafficTimeItems = (value: Json): AdminTrafficTimeItem[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        label: String(item.label ?? ""),
+        visitor_count: toNumber(item.visitor_count),
+      }))
+    : [];
+
 export default function AdminPage() {
   const router = useRouter();
   const {
@@ -186,6 +354,8 @@ export default function AdminPage() {
   } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [stats, setStats] = useState<AdminStats>(emptyStats);
+  const [trafficStats, setTrafficStats] =
+    useState<AdminTrafficStats>(emptyTrafficStats);
   const [posts, setPosts] = useState<AdminCommunityPost[]>([]);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [users, setUsers] = useState<AdminUserProfile[]>([]);
@@ -207,22 +377,25 @@ export default function AdminPage() {
   const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
 
   const hasProfile = Boolean(profile);
-  const isCheckingRole = isAuthReady && isAuthenticated && (!isProfileReady || !hasProfile);
+  const isCheckingRole =
+    isAuthReady && isAuthenticated && (!isProfileReady || !hasProfile);
   const canAccess =
     isAuthReady && isAuthenticated && isProfileReady && hasProfile && isAdmin;
   const selectedPosts = useMemo(
     () => posts.filter((post) => selectedPostIds.includes(post.id)),
-    [posts, selectedPostIds]
+    [posts, selectedPostIds],
   );
   const selectedReviews = useMemo(
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
-    [reviews, selectedReviewIds]
+    [reviews, selectedReviewIds],
   );
   const selectedReports = useMemo(
-    () => reports.filter((report) => selectedReportIds.includes(report.report_id)),
-    [reports, selectedReportIds]
+    () =>
+      reports.filter((report) => selectedReportIds.includes(report.report_id)),
+    [reports, selectedReportIds],
   );
-  const allPostsSelected = posts.length > 0 && selectedPosts.length === posts.length;
+  const allPostsSelected =
+    posts.length > 0 && selectedPosts.length === posts.length;
   const allReviewsSelected =
     reviews.length > 0 && selectedReviews.length === reviews.length;
   const allReportsSelected =
@@ -234,7 +407,14 @@ export default function AdminPage() {
     if (activeTab === "reports") return reportSearch;
     if (activeTab === "notices") return noticeSearch;
     return "";
-  }, [activeTab, noticeSearch, postSearch, reportSearch, reviewSearch, userSearch]);
+  }, [
+    activeTab,
+    noticeSearch,
+    postSearch,
+    reportSearch,
+    reviewSearch,
+    userSearch,
+  ]);
 
   useEffect(() => {
     if (!isAuthReady) {
@@ -287,32 +467,33 @@ export default function AdminPage() {
         reportsResult,
         noticesResult,
         popupNoticesResult,
+        trafficStatsResult,
         verifiedDealerFeatureResult,
-      ] =
-        await Promise.all([
-          supabase.rpc("admin_get_dashboard_stats"),
-          supabase.rpc("admin_list_community_posts", {
-            search_text: postSearch.trim(),
-          }),
-          supabase.rpc("admin_list_reviews", {
-            search_text: reviewSearch.trim(),
-          }),
-          supabase.rpc("admin_list_user_profiles", {
-            search_text: userSearch.trim(),
-          }),
-          supabase.rpc("admin_list_reports", {
-            search_text: reportSearch.trim(),
-          }),
-          supabase.rpc("admin_list_community_posts", {
-            search_text: noticeSearch.trim(),
-          }),
-          supabase.rpc("admin_list_popup_notices", {
-            search_text: noticeSearch.trim(),
-          }),
-          supabase.rpc("list_verified_dealer_profiles", {
-            target_user_ids: [],
-          }),
-        ]);
+      ] = await Promise.all([
+        supabase.rpc("admin_get_dashboard_stats"),
+        supabase.rpc("admin_list_community_posts", {
+          search_text: postSearch.trim(),
+        }),
+        supabase.rpc("admin_list_reviews", {
+          search_text: reviewSearch.trim(),
+        }),
+        supabase.rpc("admin_list_user_profiles", {
+          search_text: userSearch.trim(),
+        }),
+        supabase.rpc("admin_list_reports", {
+          search_text: reportSearch.trim(),
+        }),
+        supabase.rpc("admin_list_community_posts", {
+          search_text: noticeSearch.trim(),
+        }),
+        supabase.rpc("admin_list_popup_notices", {
+          search_text: noticeSearch.trim(),
+        }),
+        supabase.rpc("admin_get_traffic_stats"),
+        supabase.rpc("list_verified_dealer_profiles", {
+          target_user_ids: [],
+        }),
+      ]);
 
       if (statsResult.error) throw statsResult.error;
       if (postsResult.error) throw postsResult.error;
@@ -321,10 +502,12 @@ export default function AdminPage() {
       if (reportsResult.error) throw reportsResult.error;
       if (noticesResult.error) throw noticesResult.error;
       if (popupNoticesResult.error) throw popupNoticesResult.error;
+      if (trafficStatsResult.error) throw trafficStatsResult.error;
 
       setIsVerifiedDealerFeatureReady(!verifiedDealerFeatureResult.error);
 
       const nextStats = statsResult.data?.[0];
+      const nextTrafficStats = trafficStatsResult.data?.[0];
 
       setStats({
         comments: Number(nextStats?.comments_count ?? 0),
@@ -333,25 +516,65 @@ export default function AdminPage() {
         reviews: Number(nextStats?.reviews_count ?? 0),
         users: Number(nextStats?.users_count ?? 0),
       });
+      setTrafficStats({
+        todayVisitors: Number(nextTrafficStats?.today_visitors ?? 0),
+        sevenDayVisitors: Number(nextTrafficStats?.seven_day_visitors ?? 0),
+        thirtyDayVisitors: Number(nextTrafficStats?.thirty_day_visitors ?? 0),
+        totalVisitors: Number(nextTrafficStats?.total_visitors ?? 0),
+        todayReviews: Number(nextTrafficStats?.today_reviews_count ?? 0),
+        totalReviews: Number(nextTrafficStats?.total_reviews_count ?? 0),
+        totalUsers: Number(nextTrafficStats?.total_users_count ?? 0),
+        topVehicles: toTrafficTopVehicles(nextTrafficStats?.top_vehicles ?? []),
+        topModels: toTrafficTopModels(nextTrafficStats?.top_models ?? []),
+        topReviews: toTrafficTopReviews(nextTrafficStats?.top_reviews ?? []),
+        deviceBreakdown: toTrafficBreakdownItems(
+          nextTrafficStats?.device_breakdown ?? [],
+        ),
+        browserBreakdown: toTrafficBreakdownItems(
+          nextTrafficStats?.browser_breakdown ?? [],
+        ),
+        osBreakdown: toTrafficBreakdownItems(
+          nextTrafficStats?.os_breakdown ?? [],
+        ),
+        referrerTop: toTrafficBreakdownItems(
+          nextTrafficStats?.referrer_top ?? [],
+        ),
+        pathTop: toTrafficBreakdownItems(nextTrafficStats?.path_top ?? []),
+        hourlyVisitors: toTrafficTimeItems(
+          nextTrafficStats?.hourly_visitors ?? [],
+        ),
+        dailyVisitors: toTrafficTimeItems(
+          nextTrafficStats?.daily_visitors ?? [],
+        ),
+      });
       setPosts((postsResult.data ?? []) as AdminCommunityPost[]);
       setReviews((reviewsResult.data ?? []) as AdminReview[]);
       setUsers((usersResult.data ?? []) as AdminUserProfile[]);
       setReports((reportsResult.data ?? []) as AdminReport[]);
       setNotices(
         ((noticesResult.data ?? []) as AdminCommunityPost[]).filter(
-          (notice) => notice.is_notice
-        )
+          (notice) => notice.is_notice,
+        ),
       );
       setPopupNotices((popupNoticesResult.data ?? []) as AdminPopupNotice[]);
       setSelectedPostIds([]);
       setSelectedReviewIds([]);
       setSelectedReportIds([]);
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "관리자 데이터를 불러오지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "관리자 데이터를 불러오지 못했습니다."),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [canAccess, noticeSearch, postSearch, reportSearch, reviewSearch, userSearch]);
+  }, [
+    canAccess,
+    noticeSearch,
+    postSearch,
+    reportSearch,
+    reviewSearch,
+    userSearch,
+  ]);
 
   useEffect(() => {
     if (!canAccess) {
@@ -371,7 +594,7 @@ export default function AdminPage() {
       next_is_hidden?: boolean;
       next_is_notice?: boolean;
       next_is_pinned?: boolean;
-    }
+    },
   ) => {
     if (!supabase) {
       return;
@@ -379,12 +602,15 @@ export default function AdminPage() {
 
     setActionMessage("");
 
-    const { data, error } = await supabase.rpc("admin_set_community_post_state", {
-      next_is_hidden: patch.next_is_hidden ?? null,
-      next_is_notice: patch.next_is_notice ?? null,
-      next_is_pinned: patch.next_is_pinned ?? null,
-      target_post_id: post.id,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_set_community_post_state",
+      {
+        next_is_hidden: patch.next_is_hidden ?? null,
+        next_is_notice: patch.next_is_notice ?? null,
+        next_is_pinned: patch.next_is_pinned ?? null,
+        target_post_id: post.id,
+      },
+    );
 
     if (error) {
       setActionMessage(error.message);
@@ -402,7 +628,7 @@ export default function AdminPage() {
 
   const updatePostsHidden = async (
     targetPosts: AdminCommunityPost[],
-    nextIsHidden: boolean
+    nextIsHidden: boolean,
   ) => {
     if (!supabase || targetPosts.length === 0) {
       return;
@@ -420,10 +646,12 @@ export default function AdminPage() {
             next_is_notice: null,
             next_is_pinned: null,
             target_post_id: post.id,
-          })
-        )
+          }),
+        ),
       );
-      const failedResult = results.find((result) => result.error || !result.data);
+      const failedResult = results.find(
+        (result) => result.error || !result.data,
+      );
 
       if (failedResult?.error) {
         throw failedResult.error;
@@ -436,11 +664,13 @@ export default function AdminPage() {
       setActionMessage(
         nextIsHidden
           ? "선택한 게시글을 숨김 처리했습니다."
-          : "선택한 게시글 숨김을 해제했습니다."
+          : "선택한 게시글 숨김을 해제했습니다.",
       );
       await loadAdminData();
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "게시글 상태를 변경하지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "게시글 상태를 변경하지 못했습니다."),
+      );
     }
   };
 
@@ -449,7 +679,9 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")) {
+    if (
+      !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
+    ) {
       return;
     }
 
@@ -467,10 +699,12 @@ export default function AdminPage() {
         targetPosts.map((post) =>
           client.rpc("admin_delete_community_post", {
             target_post_id: post.id,
-          })
-        )
+          }),
+        ),
       );
-      const failedResult = results.find((result) => result.error || !result.data);
+      const failedResult = results.find(
+        (result) => result.error || !result.data,
+      );
 
       if (failedResult?.error) {
         throw failedResult.error;
@@ -483,7 +717,9 @@ export default function AdminPage() {
       setActionMessage("선택한 게시글을 영구삭제했습니다.");
       await loadAdminData();
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "게시글을 영구삭제하지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "게시글을 영구삭제하지 못했습니다."),
+      );
     }
   };
 
@@ -492,7 +728,9 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")) {
+    if (
+      !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
+    ) {
       return;
     }
 
@@ -549,7 +787,7 @@ export default function AdminPage() {
 
   const updateReviewsHidden = async (
     targetReviews: AdminReview[],
-    nextIsHidden: boolean
+    nextIsHidden: boolean,
   ) => {
     if (!supabase || targetReviews.length === 0) {
       return;
@@ -565,10 +803,12 @@ export default function AdminPage() {
           client.rpc("admin_set_review_hidden", {
             next_is_hidden: nextIsHidden,
             target_review_id: review.id,
-          })
-        )
+          }),
+        ),
       );
-      const failedResult = results.find((result) => result.error || !result.data);
+      const failedResult = results.find(
+        (result) => result.error || !result.data,
+      );
 
       if (failedResult?.error) {
         throw failedResult.error;
@@ -581,11 +821,13 @@ export default function AdminPage() {
       setActionMessage(
         nextIsHidden
           ? "선택한 후기를 숨김 처리했습니다."
-          : "선택한 후기 숨김을 해제했습니다."
+          : "선택한 후기 숨김을 해제했습니다.",
       );
       await loadAdminData();
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "후기 상태를 변경하지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "후기 상태를 변경하지 못했습니다."),
+      );
     }
   };
 
@@ -594,7 +836,9 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")) {
+    if (
+      !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
+    ) {
       return;
     }
 
@@ -612,10 +856,12 @@ export default function AdminPage() {
         targetReviews.map((review) =>
           client.rpc("admin_delete_review", {
             target_review_id: review.id,
-          })
-        )
+          }),
+        ),
       );
-      const failedResult = results.find((result) => result.error || !result.data);
+      const failedResult = results.find(
+        (result) => result.error || !result.data,
+      );
 
       if (failedResult?.error) {
         throw failedResult.error;
@@ -628,7 +874,9 @@ export default function AdminPage() {
       setActionMessage("선택한 후기를 영구삭제했습니다.");
       await loadAdminData();
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "후기를 영구삭제하지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "후기를 영구삭제하지 못했습니다."),
+      );
     }
   };
 
@@ -637,7 +885,9 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")) {
+    if (
+      !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
+    ) {
       return;
     }
 
@@ -678,7 +928,7 @@ export default function AdminPage() {
 
   const updateReportTargetsHidden = async (
     targetReports: AdminReport[],
-    nextIsHidden: boolean
+    nextIsHidden: boolean,
   ) => {
     if (!supabase || targetReports.length === 0) {
       return;
@@ -702,10 +952,12 @@ export default function AdminPage() {
             : client.rpc("admin_set_review_hidden", {
                 next_is_hidden: nextIsHidden,
                 target_review_id: report.target_id,
-              })
-        )
+              }),
+        ),
       );
-      const failedResult = results.find((result) => result.error || !result.data);
+      const failedResult = results.find(
+        (result) => result.error || !result.data,
+      );
 
       if (failedResult?.error) {
         throw failedResult.error;
@@ -718,11 +970,13 @@ export default function AdminPage() {
       setActionMessage(
         nextIsHidden
           ? "선택한 신고 대상을 숨김 처리했습니다."
-          : "선택한 신고 대상 숨김을 해제했습니다."
+          : "선택한 신고 대상 숨김을 해제했습니다.",
       );
       await loadAdminData();
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "신고 대상 상태를 변경하지 못했습니다."));
+      setActionMessage(
+        getErrorMessage(error, "신고 대상 상태를 변경하지 못했습니다."),
+      );
     }
   };
 
@@ -734,7 +988,11 @@ export default function AdminPage() {
     const nextIsSuspended = !account.is_suspended;
     const label = nextIsSuspended ? "정지" : "해제";
 
-    if (!window.confirm(`${account.nickname ?? account.id} 계정을 ${label}하시겠습니까?`)) {
+    if (
+      !window.confirm(
+        `${account.nickname ?? account.id} 계정을 ${label}하시겠습니까?`,
+      )
+    ) {
       return;
     }
 
@@ -759,12 +1017,19 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
-  const setUserRole = async (account: AdminUserProfile, nextRole: "user" | "admin") => {
+  const setUserRole = async (
+    account: AdminUserProfile,
+    nextRole: "user" | "admin",
+  ) => {
     if (!supabase) {
       return;
     }
 
-    if (!window.confirm(`${account.nickname ?? account.id} 계정 role을 ${nextRole}(으)로 변경하시겠습니까?`)) {
+    if (
+      !window.confirm(
+        `${account.nickname ?? account.id} 계정 role을 ${nextRole}(으)로 변경하시겠습니까?`,
+      )
+    ) {
       return;
     }
 
@@ -795,23 +1060,35 @@ export default function AdminPage() {
     }
 
     if (!isVerifiedDealerFeatureReady) {
-      setActionMessage("인증딜러 기능 DB 마이그레이션이 아직 적용되지 않았습니다.");
+      setActionMessage(
+        "인증딜러 기능 DB 마이그레이션이 아직 적용되지 않았습니다.",
+      );
       return;
     }
 
     const nextIsVerifiedDealer = !account.is_verified_dealer;
     const label = nextIsVerifiedDealer ? "ON" : "OFF";
 
-    if (!window.confirm((account.nickname ?? account.id) + " 인증딜러를 " + label + " 처리하시겠습니까?")) {
+    if (
+      !window.confirm(
+        (account.nickname ?? account.id) +
+          " 인증딜러를 " +
+          label +
+          " 처리하시겠습니까?",
+      )
+    ) {
       return;
     }
 
     setActionMessage("");
 
-    const { data, error } = await supabase.rpc("admin_set_user_verified_dealer", {
-      next_is_verified_dealer: nextIsVerifiedDealer,
-      target_user_id: account.id,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_set_user_verified_dealer",
+      {
+        next_is_verified_dealer: nextIsVerifiedDealer,
+        target_user_id: account.id,
+      },
+    );
 
     if (error) {
       setActionMessage(error.message);
@@ -832,16 +1109,24 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm((account.nickname ?? account.id) + " 닉네임 변경권을 1회 부여하시겠습니까?")) {
+    if (
+      !window.confirm(
+        (account.nickname ?? account.id) +
+          " 닉네임 변경권을 1회 부여하시겠습니까?",
+      )
+    ) {
       return;
     }
 
     setActionMessage("");
 
-    const { data, error } = await supabase.rpc("admin_grant_nickname_change_ticket", {
-      grant_amount: 1,
-      target_user_id: account.id,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_grant_nickname_change_ticket",
+      {
+        grant_amount: 1,
+        target_user_id: account.id,
+      },
+    );
 
     if (error) {
       setActionMessage(error.message);
@@ -878,13 +1163,16 @@ export default function AdminPage() {
 
     setActionMessage("");
 
-    const { data, error } = await supabase.rpc("admin_upsert_community_notice", {
-      next_category: notice?.category ?? "news",
-      next_content: nextContent,
-      next_is_pinned: nextPinned,
-      next_title: nextTitle,
-      target_post_id: notice?.id ?? null,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_upsert_community_notice",
+      {
+        next_category: notice?.category ?? "news",
+        next_content: nextContent,
+        next_is_pinned: nextPinned,
+        next_title: nextTitle,
+        target_post_id: notice?.id ?? null,
+      },
+    );
 
     if (error) {
       setActionMessage(error.message);
@@ -907,9 +1195,12 @@ export default function AdminPage() {
 
     setActionMessage("");
 
-    const { data, error } = await supabase.rpc("admin_delete_community_notice", {
-      target_post_id: notice.id,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_delete_community_notice",
+      {
+        target_post_id: notice.id,
+      },
+    );
 
     if (error) {
       setActionMessage(error.message);
@@ -972,7 +1263,9 @@ export default function AdminPage() {
       return;
     }
 
-    setActionMessage(notice ? "팝업공지를 수정했습니다." : "팝업공지를 작성했습니다.");
+    setActionMessage(
+      notice ? "팝업공지를 수정했습니다." : "팝업공지를 작성했습니다.",
+    );
     await loadAdminData();
   };
 
@@ -1033,7 +1326,9 @@ export default function AdminPage() {
         <div className={shellClassName}>
           <section className={panelClassName}>
             <p className={mutedTextClassName}>
-              {isAuthReady ? "관리자 권한을 확인하고 있습니다." : "로그인 상태를 확인하고 있습니다."}
+              {isAuthReady
+                ? "관리자 권한을 확인하고 있습니다."
+                : "로그인 상태를 확인하고 있습니다."}
             </p>
           </section>
         </div>
@@ -1049,9 +1344,7 @@ export default function AdminPage() {
             <p className="text-sm font-bold text-red-200">
               관리자 권한이 없습니다.
             </p>
-            <p className={cn(mutedTextClassName, "mt-2")}>
-              홈으로 이동합니다.
-            </p>
+            <p className={cn(mutedTextClassName, "mt-2")}>홈으로 이동합니다.</p>
           </section>
         </div>
       </main>
@@ -1064,7 +1357,9 @@ export default function AdminPage() {
         <div className={shellClassName}>
           <section className={panelClassName}>
             <p className={mutedTextClassName}>
-              {isAuthenticated ? "홈으로 이동합니다." : "로그인 페이지로 이동합니다."}
+              {isAuthenticated
+                ? "홈으로 이동합니다."
+                : "로그인 페이지로 이동합니다."}
             </p>
           </section>
         </div>
@@ -1078,9 +1373,12 @@ export default function AdminPage() {
         <header className="flex flex-col gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold text-red-400">ADMIN</p>
-            <h1 className="mt-1 text-2xl font-black text-white">관리자 페이지</h1>
+            <h1 className="mt-1 text-2xl font-black text-white">
+              관리자 페이지
+            </h1>
             <p className="mt-2 text-sm text-zinc-400">
-              {profile?.nickname ?? user?.email ?? "관리자"} 계정으로 접속 중입니다.
+              {profile?.nickname ?? user?.email ?? "관리자"} 계정으로 접속
+              중입니다.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1107,7 +1405,7 @@ export default function AdminPage() {
               type="button"
               className={cn(
                 tabButtonClassName,
-                activeTab === tab.value && activeTabButtonClassName
+                activeTab === tab.value && activeTabButtonClassName,
               )}
               onClick={() => setActiveTab(tab.value)}
             >
@@ -1136,21 +1434,33 @@ export default function AdminPage() {
 
         {isLoading ? (
           <section className={panelClassName}>
-            <p className={mutedTextClassName}>관리자 데이터를 불러오는 중입니다.</p>
+            <p className={mutedTextClassName}>
+              관리자 데이터를 불러오는 중입니다.
+            </p>
           </section>
         ) : null}
 
-        {activeTab === "dashboard" ? <DashboardPanel stats={stats} /> : null}
+        {activeTab === "dashboard" ? (
+          <DashboardPanel
+            reviews={reviews}
+            stats={stats}
+            trafficStats={trafficStats}
+          />
+        ) : null}
 
         {activeTab === "posts" ? (
           <AdminTablePanel count={posts.length} title="게시글 관리">
             <BulkActionBar
               selectedCount={selectedPosts.length}
-              hasVisibleSelection={selectedPosts.some((post) => !post.is_hidden)}
+              hasVisibleSelection={selectedPosts.some(
+                (post) => !post.is_hidden,
+              )}
               hasHiddenSelection={selectedPosts.some((post) => post.is_hidden)}
               canPermanentDelete={isSuperAdmin}
               onHide={() => void updatePostsHidden(selectedPosts, true)}
-              onPermanentDelete={() => void permanentlyDeletePosts(selectedPosts)}
+              onPermanentDelete={() =>
+                void permanentlyDeletePosts(selectedPosts)
+              }
               onUnhide={() => void updatePostsHidden(selectedPosts, false)}
             />
             <table className={tableClassName}>
@@ -1162,7 +1472,9 @@ export default function AdminPage() {
                       disabled={!posts.length}
                       label="게시글 전체 선택"
                       onChange={(checked) =>
-                        setSelectedPostIds(checked ? posts.map((post) => post.id) : [])
+                        setSelectedPostIds(
+                          checked ? posts.map((post) => post.id) : [],
+                        )
                       }
                     />
                   </th>
@@ -1186,13 +1498,15 @@ export default function AdminPage() {
                             setSelectedPostIds((current) =>
                               checked
                                 ? Array.from(new Set([...current, post.id]))
-                                : current.filter((id) => id !== post.id)
+                                : current.filter((id) => id !== post.id),
                             )
                           }
                         />
                       </td>
                       <td className={tableCellClassName}>
-                        <p className="max-w-sm font-bold text-white">{post.title}</p>
+                        <p className="max-w-sm font-bold text-white">
+                          {post.title}
+                        </p>
                         <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                           {post.content}
                         </p>
@@ -1274,11 +1588,17 @@ export default function AdminPage() {
           <AdminTablePanel count={reviews.length} title="후기 관리">
             <BulkActionBar
               selectedCount={selectedReviews.length}
-              hasVisibleSelection={selectedReviews.some((review) => !review.is_hidden)}
-              hasHiddenSelection={selectedReviews.some((review) => review.is_hidden)}
+              hasVisibleSelection={selectedReviews.some(
+                (review) => !review.is_hidden,
+              )}
+              hasHiddenSelection={selectedReviews.some(
+                (review) => review.is_hidden,
+              )}
               canPermanentDelete={isSuperAdmin}
               onHide={() => void updateReviewsHidden(selectedReviews, true)}
-              onPermanentDelete={() => void permanentlyDeleteReviews(selectedReviews)}
+              onPermanentDelete={() =>
+                void permanentlyDeleteReviews(selectedReviews)
+              }
               onUnhide={() => void updateReviewsHidden(selectedReviews, false)}
             />
             <table className={tableClassName}>
@@ -1291,7 +1611,7 @@ export default function AdminPage() {
                       label="후기 전체 선택"
                       onChange={(checked) =>
                         setSelectedReviewIds(
-                          checked ? reviews.map((review) => review.id) : []
+                          checked ? reviews.map((review) => review.id) : [],
                         )
                       }
                     />
@@ -1316,7 +1636,7 @@ export default function AdminPage() {
                             setSelectedReviewIds((current) =>
                               checked
                                 ? Array.from(new Set([...current, review.id]))
-                                : current.filter((id) => id !== review.id)
+                                : current.filter((id) => id !== review.id),
                             )
                           }
                         />
@@ -1330,7 +1650,9 @@ export default function AdminPage() {
                         </p>
                       </td>
                       <td className={tableCellClassName}>
-                        {review.author_nickname ?? review.author_id ?? "익명 사용자"}
+                        {review.author_nickname ??
+                          review.author_id ??
+                          "익명 사용자"}
                       </td>
                       <td className={tableCellClassName}>
                         <HiddenStatus isHidden={review.is_hidden} />
@@ -1417,8 +1739,8 @@ export default function AdminPage() {
                             !isVerifiedDealerFeatureReady
                               ? "border-zinc-700 bg-zinc-900 text-zinc-500"
                               : account.is_verified_dealer
-                              ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
-                              : "border-zinc-700 bg-zinc-900 text-zinc-400"
+                                ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
+                                : "border-zinc-700 bg-zinc-900 text-zinc-400",
                           )}
                         >
                           {!isVerifiedDealerFeatureReady
@@ -1429,7 +1751,9 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className={tableCellClassName}>
-                        <AccountStatusBadge isSuspended={account.is_suspended} />
+                        <AccountStatusBadge
+                          isSuspended={account.is_suspended}
+                        />
                       </td>
                       <td className={tableCellClassName}>
                         {formatDate(account.created_at)}
@@ -1455,12 +1779,16 @@ export default function AdminPage() {
                                 : "인증딜러 기능 DB 미적용"
                             }
                           >
-                            {account.is_verified_dealer ? "인증딜러 회수" : "인증딜러 부여"}
+                            {account.is_verified_dealer
+                              ? "인증딜러 회수"
+                              : "인증딜러 부여"}
                           </button>
                           <button
                             type="button"
                             className={actionButtonClassName}
-                            onClick={() => void grantNicknameChangeTicket(account)}
+                            onClick={() =>
+                              void grantNicknameChangeTicket(account)
+                            }
                           >
                             닉네임 변경권 +1
                           </button>
@@ -1496,10 +1824,18 @@ export default function AdminPage() {
           <AdminTablePanel count={reports.length} title="신고 관리">
             <BulkActionBar
               selectedCount={selectedReports.length}
-              hasVisibleSelection={selectedReports.some((report) => !report.is_hidden)}
-              hasHiddenSelection={selectedReports.some((report) => report.is_hidden)}
-              onHide={() => void updateReportTargetsHidden(selectedReports, true)}
-              onUnhide={() => void updateReportTargetsHidden(selectedReports, false)}
+              hasVisibleSelection={selectedReports.some(
+                (report) => !report.is_hidden,
+              )}
+              hasHiddenSelection={selectedReports.some(
+                (report) => report.is_hidden,
+              )}
+              onHide={() =>
+                void updateReportTargetsHidden(selectedReports, true)
+              }
+              onUnhide={() =>
+                void updateReportTargetsHidden(selectedReports, false)
+              }
             />
             <table className={tableClassName}>
               <thead>
@@ -1511,7 +1847,9 @@ export default function AdminPage() {
                       label="신고 전체 선택"
                       onChange={(checked) =>
                         setSelectedReportIds(
-                          checked ? reports.map((report) => report.report_id) : []
+                          checked
+                            ? reports.map((report) => report.report_id)
+                            : [],
                         )
                       }
                     />
@@ -1535,8 +1873,12 @@ export default function AdminPage() {
                           onChange={(checked) =>
                             setSelectedReportIds((current) =>
                               checked
-                                ? Array.from(new Set([...current, report.report_id]))
-                                : current.filter((id) => id !== report.report_id)
+                                ? Array.from(
+                                    new Set([...current, report.report_id]),
+                                  )
+                                : current.filter(
+                                    (id) => id !== report.report_id,
+                                  ),
                             )
                           }
                         />
@@ -1569,11 +1911,16 @@ export default function AdminPage() {
                       </td>
                       <td className={tableCellClassName}>
                         {report.target_path ? (
-                          <Link className={actionButtonClassName} href={report.target_path}>
+                          <Link
+                            className={actionButtonClassName}
+                            href={report.target_path}
+                          >
                             대상 보기
                           </Link>
                         ) : (
-                          <span className="text-xs text-zinc-500">연결 없음</span>
+                          <span className="text-xs text-zinc-500">
+                            연결 없음
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -1612,7 +1959,9 @@ export default function AdminPage() {
                     notices.map((notice) => (
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
-                          <p className="max-w-sm font-bold text-white">{notice.title}</p>
+                          <p className="max-w-sm font-bold text-white">
+                            {notice.title}
+                          </p>
                           <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                             {notice.content}
                           </p>
@@ -1644,7 +1993,10 @@ export default function AdminPage() {
                       </tr>
                     ))
                   ) : (
-                    <EmptyTableRow colSpan={4} message="공지 내역이 없습니다." />
+                    <EmptyTableRow
+                      colSpan={4}
+                      message="공지 내역이 없습니다."
+                    />
                   )}
                 </tbody>
               </table>
@@ -1674,7 +2026,9 @@ export default function AdminPage() {
                     popupNotices.map((notice) => (
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
-                          <p className="max-w-sm font-bold text-white">{notice.title}</p>
+                          <p className="max-w-sm font-bold text-white">
+                            {notice.title}
+                          </p>
                           <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
                             {notice.content}
                           </p>
@@ -1718,7 +2072,10 @@ export default function AdminPage() {
                       </tr>
                     ))
                   ) : (
-                    <EmptyTableRow colSpan={4} message="팝업공지 내역이 없습니다." />
+                    <EmptyTableRow
+                      colSpan={4}
+                      message="팝업공지 내역이 없습니다."
+                    />
                   )}
                 </tbody>
               </table>
@@ -1765,7 +2122,10 @@ function SearchBar({
 
   return (
     <section className={panelClassName}>
-      <label className="block text-xs font-bold text-zinc-500" htmlFor="admin-search">
+      <label
+        className="block text-xs font-bold text-zinc-500"
+        htmlFor="admin-search"
+      >
         검색
       </label>
       <input
@@ -1780,8 +2140,26 @@ function SearchBar({
   );
 }
 
-function DashboardPanel({ stats }: { stats: AdminStats }) {
-  const items = [
+function DashboardPanel({
+  reviews,
+  stats,
+  trafficStats,
+}: {
+  reviews: AdminReview[];
+  stats: AdminStats;
+  trafficStats: AdminTrafficStats;
+}) {
+  const reviewsById = new Map(reviews.map((review) => [review.id, review]));
+  const trafficItems = [
+    { label: "오늘 방문자", value: trafficStats.todayVisitors },
+    { label: "7일 방문자", value: trafficStats.sevenDayVisitors },
+    { label: "30일 방문자", value: trafficStats.thirtyDayVisitors },
+    { label: "총 방문자", value: trafficStats.totalVisitors },
+    { label: "오늘 후기수", value: trafficStats.todayReviews },
+    { label: "총 후기수", value: trafficStats.totalReviews },
+    { label: "총 회원수", value: trafficStats.totalUsers },
+  ];
+  const contentItems = [
     { label: "회원수", value: stats.users },
     { label: "게시글수", value: stats.communityPosts },
     { label: "후기수", value: stats.reviews },
@@ -1790,21 +2168,438 @@ function DashboardPanel({ stats }: { stats: AdminStats }) {
   ];
 
   return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">대시보드</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-lg border border-zinc-800 bg-black p-4"
-          >
-            <p className="text-xs font-bold text-zinc-500">{item.label}</p>
-            <p className="mt-2 text-2xl font-black text-white">
-              {item.value.toLocaleString()}
-            </p>
-          </div>
-        ))}
+    <div className="space-y-4">
+      <section className={panelClassName}>
+        <h2 className="text-lg font-black text-white">트래픽 통계</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {trafficItems.map((item) => (
+            <StatCard key={item.label} label={item.label} value={item.value} />
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <TrafficBreakdownPanel
+          emptyMessage="기기 통계가 없습니다."
+          items={trafficStats.deviceBreakdown.map((item) => ({
+            ...item,
+            label: formatTrafficLabel(item.label),
+          }))}
+          title="모바일 / PC / 태블릿 비율"
+        />
+        <TrafficBreakdownPanel
+          emptyMessage="브라우저 통계가 없습니다."
+          items={trafficStats.browserBreakdown}
+          title="브라우저별 방문 비율"
+        />
+        <TrafficBreakdownPanel
+          emptyMessage="OS 통계가 없습니다."
+          items={trafficStats.osBreakdown}
+          title="OS별 방문 비율"
+        />
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-4">
+        <TrafficBreakdownPanel
+          emptyMessage="유입경로 기록이 없습니다."
+          items={trafficStats.referrerTop.map((item) => ({
+            ...item,
+            label: item.label === "direct" ? "직접 유입" : item.label,
+          }))}
+          title="유입경로 TOP10"
+        />
+        <TrafficBreakdownPanel
+          emptyMessage="접속 페이지 기록이 없습니다."
+          items={trafficStats.pathTop.map((item) => ({
+            ...item,
+            label: item.label === "unknown" ? "알 수 없음" : item.label,
+          }))}
+          title="접속 페이지 TOP10"
+        />
+        <TrafficTimePanel
+          emptyMessage="시간대별 기록이 없습니다."
+          items={trafficStats.hourlyVisitors}
+          title="시간대별 방문자 수"
+        />
+        <TrafficTimePanel
+          emptyMessage="일자별 기록이 없습니다."
+          items={trafficStats.dailyVisitors}
+          title="일자별 방문자 수"
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <TrafficVehicleRankingPanel
+          emptyMessage="차량 조회 기록이 없습니다."
+          items={trafficStats.topVehicles}
+          title="조회수 TOP10 차량"
+        />
+        <TrafficModelRankingPanel
+          emptyMessage="모델 조회 기록이 없습니다."
+          items={trafficStats.topModels}
+          title="조회수 TOP10 모델"
+        />
+        <TrafficRankingPanel
+          emptyMessage="후기 조회 기록이 없습니다."
+          items={trafficStats.topReviews.map((item) => {
+            const review = reviewsById.get(item.review_id);
+            const snapshot = review?.vehicle_snapshot;
+            const manufacturer =
+              item.manufacturer ??
+              (snapshot ? getJsonString(snapshot, "brand") : null);
+            const model =
+              item.model ??
+              (snapshot ? getJsonString(snapshot, "model") : null);
+            const carNumber =
+              item.car_number ??
+              (snapshot ? getJsonString(snapshot, "plateNumber") : null);
+            const year =
+              item.year ?? (snapshot ? getJsonString(snapshot, "year") : null);
+
+            return {
+              id: item.review_id,
+              meta: [
+                year ? year + "년" : "",
+                item.author_nickname ? "작성자 " + item.author_nickname : "",
+                item.content,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              title: formatTrafficVehicleTitle({
+                carNumber,
+                manufacturer,
+                model,
+              }),
+              viewCount: item.view_count,
+            };
+          })}
+          title="조회수 TOP10 후기"
+        />
+      </div>
+
+      <section className={panelClassName}>
+        <h2 className="text-lg font-black text-white">콘텐츠 현황</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {contentItems.map((item) => (
+            <StatCard key={item.label} label={item.label} value={item.value} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-black p-4">
+      <p className="text-xs font-bold text-zinc-500">{label}</p>
+      <p className="mt-2 text-2xl font-black text-white">
+        {value.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+function formatTrafficLabel(label: string) {
+  return (
+    {
+      desktop: "PC",
+      mobile: "모바일",
+      tablet: "태블릿",
+      unknown: "알 수 없음",
+    }[label] ?? label
+  );
+}
+
+function formatTrafficVehicleTitle({
+  carNumber,
+  manufacturer,
+  model,
+}: {
+  carNumber: string | null;
+  manufacturer: string | null;
+  model: string | null;
+}) {
+  const vehicleName = [manufacturer, model].filter(Boolean).join(" ");
+
+  if (vehicleName && carNumber) {
+    return vehicleName + " · " + carNumber;
+  }
+
+  return vehicleName || carNumber || "차량 정보 없음";
+}
+
+function formatTrafficVehicleModel(item: AdminTrafficTopVehicle) {
+  return item.model_detail ?? item.generation ?? item.model ?? "차종 정보 없음";
+}
+
+function formatTrafficVehicleMeta(item: AdminTrafficTopVehicle) {
+  return [
+    item.year ? item.year + "년형" : "",
+    item.fuel_type,
+    formatMileage(item.mileage),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function formatMileage(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const numericValue = Number(value.replace(/[^0-9]/g, ""));
+
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    return numericValue.toLocaleString() + "km";
+  }
+
+  return value;
+}
+
+function formatTrafficModelName(item: AdminTrafficTopModel) {
+  const modelName = item.model_name?.trim();
+  const manufacturer = item.manufacturer?.trim();
+
+  if (!modelName && !manufacturer) {
+    return "모델 정보 없음";
+  }
+
+  if (!manufacturer || !modelName) {
+    return modelName || manufacturer || "모델 정보 없음";
+  }
+
+  if (modelName.toLowerCase().includes(manufacturer.toLowerCase())) {
+    return modelName;
+  }
+
+  return manufacturer + " " + modelName;
+}
+
+function TrafficBreakdownPanel({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: AdminTrafficBreakdownItem[];
+  title: string;
+}) {
+  const visibleItems = items.filter((item) => item.visitor_count > 0);
+
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      {visibleItems.length ? (
+        <div className="mt-4 space-y-3">
+          {visibleItems.map((item) => (
+            <div key={item.label}>
+              <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                <span className="truncate font-bold text-zinc-200">
+                  {item.label}
+                </span>
+                <span className="shrink-0 font-black text-zinc-100">
+                  {item.visitor_count.toLocaleString()}
+                  {item.percentage !== undefined
+                    ? ` · ${item.percentage.toFixed(1)}%`
+                    : ""}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-red-500"
+                  style={{
+                    width:
+                      Math.max(2, Math.min(item.percentage ?? 0, 100)) + "%",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function TrafficTimePanel({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: AdminTrafficTimeItem[];
+  title: string;
+}) {
+  const maxValue = Math.max(1, ...items.map((item) => item.visitor_count));
+  const hasVisitors = items.some((item) => item.visitor_count > 0);
+
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      {hasVisitors ? (
+        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto pr-1">
+          {items.map((item) => (
+            <div
+              key={item.label}
+              className="grid grid-cols-[5.5rem_1fr_3rem] items-center gap-2 text-xs"
+            >
+              <span className="truncate font-bold text-zinc-500">
+                {item.label}
+              </span>
+              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-red-500"
+                  style={{
+                    width:
+                      Math.max(2, (item.visitor_count / maxValue) * 100) + "%",
+                  }}
+                />
+              </div>
+              <span className="text-right font-black text-zinc-100">
+                {item.visitor_count.toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function TrafficVehicleRankingPanel({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: AdminTrafficTopVehicle[];
+  title: string;
+}) {
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      {items.length ? (
+        <ol className="mt-4 space-y-2">
+          {items.map((item, index) => (
+            <li
+              key={item.vehicle_id || index}
+              className="grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-lg border border-zinc-800 bg-black p-3"
+            >
+              <span className="pt-0.5 text-sm font-black text-red-400">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black text-white">
+                  {item.car_number ?? "차량번호 없음"}
+                </span>
+                <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
+                  {formatTrafficVehicleModel(item)}
+                </span>
+                {formatTrafficVehicleMeta(item) ? (
+                  <span className="mt-1 block truncate text-xs text-zinc-500">
+                    {formatTrafficVehicleMeta(item)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
+                조회수 {item.view_count.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function TrafficModelRankingPanel({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: AdminTrafficTopModel[];
+  title: string;
+}) {
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      {items.length ? (
+        <ol className="mt-4 space-y-2">
+          {items.map((item, index) => (
+            <li
+              key={(item.manufacturer ?? "") + (item.model_name ?? "") + index}
+              className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg border border-zinc-800 bg-black p-3"
+            >
+              <span className="text-sm font-black text-red-400">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-white">
+                  {formatTrafficModelName(item)}
+                </span>
+              </span>
+              <span className="text-right text-sm font-black text-zinc-100">
+                조회수 {item.view_count.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function TrafficRankingPanel({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: { id: string; meta: string; title: string; viewCount: number }[];
+  title: string;
+}) {
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      {items.length ? (
+        <ol className="mt-4 space-y-2">
+          {items.map((item, index) => (
+            <li
+              key={item.id || index}
+              className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg border border-zinc-800 bg-black p-3"
+            >
+              <span className="text-sm font-black text-red-400">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-white">
+                  {item.title}
+                </span>
+                {item.meta ? (
+                  <span className="mt-1 block truncate text-xs text-zinc-500">
+                    {item.meta}
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-sm font-black text-zinc-100">
+                조회 {item.viewCount.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
+      )}
     </section>
   );
 }
@@ -1912,10 +2707,19 @@ function SelectionCheckbox({
   );
 }
 
-function EmptyTableRow({ colSpan, message }: { colSpan: number; message: string }) {
+function EmptyTableRow({
+  colSpan,
+  message,
+}: {
+  colSpan: number;
+  message: string;
+}) {
   return (
     <tr>
-      <td className="px-3 py-8 text-center text-sm text-zinc-500" colSpan={colSpan}>
+      <td
+        className="px-3 py-8 text-center text-sm text-zinc-500"
+        colSpan={colSpan}
+      >
         {message}
       </td>
     </tr>
@@ -1961,7 +2765,12 @@ function RoleBadge({ role }: { role: AdminRole }) {
         : "border-zinc-700 text-zinc-300";
 
   return (
-    <span className={cn("rounded-full border px-2 py-1 text-xs font-bold", roleClassName)}>
+    <span
+      className={cn(
+        "rounded-full border px-2 py-1 text-xs font-bold",
+        roleClassName,
+      )}
+    >
       {role}
     </span>
   );

@@ -1,66 +1,86 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
-import { getReviewStorageKey, reviewsChangeEventName } from "@/hooks/useReviews";
+import {
+  getReviewStorageKey,
+  reviewsChangeEventName,
+} from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
 import { brand } from "@/lib/brand";
+import { fetchCommunityNotices } from "@/lib/communityData";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { fetchRecentSupabaseReviews } from "@/lib/supabaseData";
+import {
+  fetchHomeTrafficRankings,
+  fetchRecentSupabaseReviews,
+  type HomeTrafficRankings,
+} from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { filterValidReviews } from "@/utils/reviewValidation";
 import type { FormEvent } from "react";
+import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn(
-  "min-h-screen bg-[#08090b] px-4 py-5 text-white sm:px-6 sm:py-8"
+  "min-h-screen bg-[#08090b] px-4 py-5 text-white sm:px-6 sm:py-8",
 );
 const shellClassName = cn("mx-auto flex w-full max-w-3xl flex-col gap-8");
 const headerClassName = cn(
-  "flex items-center justify-between border-b border-zinc-800/80 pb-4"
+  "border-b border-zinc-800/80 pb-3",
 );
+const headerTopClassName = cn("flex items-center justify-between gap-3");
+const homeLogoClassName = cn("h-10 w-auto object-contain sm:h-12");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5"
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
 );
 const inputClassName = cn(
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-4 text-base text-white outline-none transition",
-  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/20"
+  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/20",
 );
 const primaryButtonClassName = cn(
   "mt-3 w-full rounded-lg bg-[#FF3B30] px-4 py-4 text-base font-bold text-white transition",
-  "hover:bg-[#f52f25] active:scale-[0.99]"
+  "hover:bg-[#f52f25] active:scale-[0.99]",
 );
 const formMessageClassName = cn(
-  "mt-3 rounded-lg border border-[#FF3B30]/30 bg-[#FF3B30]/10 px-3 py-2 text-sm text-red-200"
+  "mt-3 rounded-lg border border-[#FF3B30]/30 bg-[#FF3B30]/10 px-3 py-2 text-sm text-red-200",
 );
 const recentSectionClassName = cn("max-w-3xl");
 const recentListClassName = cn("space-y-3");
 const recentCardClassName = cn(
   "block rounded-lg border border-zinc-800 bg-zinc-950 p-4 transition",
-  "hover:border-zinc-700 hover:bg-zinc-900"
+  "hover:border-zinc-700 hover:bg-zinc-900",
 );
 const recentMetaClassName = cn(
-  "mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500"
+  "mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500",
 );
 const recentToggleButtonClassName = cn(
   "mt-4 inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-zinc-300 transition",
-  "hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
+  "hover:bg-zinc-900 hover:text-white active:scale-[0.98]",
+);
+const topRankingCardClassName = cn(
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
+);
+const topRankingItemClassName = cn(
+  "grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-lg border border-zinc-800 bg-black p-3",
 );
 const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
-  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]"
+  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]",
 );
-const heroCopyFrameClassName = cn(
-  "relative h-24 overflow-hidden sm:h-32"
+const noticeTickerClassName = cn(
+  "mt-2 block min-w-0 truncate text-sm font-bold text-white transition",
+  "hover:text-white",
 );
+const heroCopyFrameClassName = cn("relative h-24 overflow-hidden sm:h-32");
 const heroCopyClassName = cn(
-  "absolute inset-x-0 top-0 text-3xl font-black leading-tight text-white sm:text-5xl"
+  "absolute inset-x-0 top-0 text-3xl font-black leading-tight text-white sm:text-5xl",
 );
 const heroHighlightClassName = cn("text-[#FF3B30]");
 
@@ -78,6 +98,7 @@ const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentPreviewCount = 3;
 const heroCopyIntervalMs = 3500;
+const noticeRollIntervalMs = 3000;
 const heroCopies = [
   [
     [{ text: "좋은 차", highlight: true }, { text: "는 이유가 있고," }],
@@ -85,7 +106,7 @@ const heroCopies = [
   ],
   [
     [{ text: "판매글에는 없는 이야기," }],
-    [{ text: "카팩트", highlight: true }, { text: "에서 확인하세요." }],
+    [{ text: "후기", highlight: true }, { text: "에서 확인하세요." }],
   ],
   [
     [{ text: "실매물", highlight: true }, { text: "을 본 사람들의" }],
@@ -93,7 +114,11 @@ const heroCopies = [
   ],
   [
     [{ text: "차량번호", highlight: true }, { text: " 하나로," }],
-    [{ text: "사람들의 " }, { text: "실제 후기", highlight: true }, { text: "를 확인하세요." }],
+    [
+      { text: "사람들의 " },
+      { text: "실제 후기", highlight: true },
+      { text: "를 확인하세요." },
+    ],
   ],
   [
     [{ text: "광고", highlight: true }, { text: "보다 가까운 건," }],
@@ -147,9 +172,11 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
   return Object.entries(reviewsByCar)
     .flatMap(([storageKey, reviewsJson]) => {
       const carNumber = storageKey.slice(reviewStorageKeyPrefix.length);
-      const reviews = filterValidReviews(parseJson<Review[]>(reviewsJson) ?? []);
+      const reviews = filterValidReviews(
+        parseJson<Review[]>(reviewsJson) ?? [],
+      );
       const savedVehicle = parseJson<Vehicle>(
-        localStorage.getItem(getVehicleStorageKey(carNumber))
+        localStorage.getItem(getVehicleStorageKey(carNumber)),
       );
 
       return reviews.map((review) => ({
@@ -177,6 +204,45 @@ const getRecentFactTime = (fact: RecentFact) => {
   return Number.isNaN(idTime) ? 0 : idTime;
 };
 
+const maskPlateNumber = (plateNumber: string) => {
+  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+
+  if (normalizedPlateNumber.length <= 3) {
+    return normalizedPlateNumber || "차량번호 없음";
+  }
+
+  return normalizedPlateNumber.slice(0, -3) + "XXX";
+};
+
+const formatTopVehicleModel = (
+  vehicle: HomeTrafficRankings["topVehicles"][number],
+) =>
+  vehicle.modelDetail ??
+  vehicle.generation ??
+  vehicle.model ??
+  "차종 정보 없음";
+
+const formatTopModelName = (
+  model: HomeTrafficRankings["topModels"][number],
+) => {
+  const modelName = model.modelName?.trim();
+  const manufacturer = model.manufacturer?.trim();
+
+  if (!modelName && !manufacturer) {
+    return "모델 정보 없음";
+  }
+
+  if (!manufacturer || !modelName) {
+    return modelName || manufacturer || "모델 정보 없음";
+  }
+
+  if (modelName.toLowerCase().includes(manufacturer.toLowerCase())) {
+    return modelName;
+  }
+
+  return manufacturer + " " + modelName;
+};
+
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, signOut } = useAuth();
@@ -184,22 +250,29 @@ export default function Home() {
   const [formMessage, setFormMessage] = useState("");
   const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
   const [heroCopyIndex, setHeroCopyIndex] = useState(0);
+  const [noticeIndex, setNoticeIndex] = useState(0);
+  const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
+  const [trafficRankings, setTrafficRankings] =
+    useState<HomeTrafficRankings | null>(null);
   const recentReviewsSnapshot = useSyncExternalStore(
     subscribeToRecentReviews,
     getRecentReviewsSnapshot,
-    getServerRecentReviewsSnapshot
+    getServerRecentReviewsSnapshot,
   );
-  const [remoteRecentFacts, setRemoteRecentFacts] = useState<RecentFact[] | null>(
-    null
-  );
+  const [remoteRecentFacts, setRemoteRecentFacts] = useState<
+    RecentFact[] | null
+  >(null);
   const localRecentFacts = getRecentFacts(recentReviewsSnapshot);
-  const recentFacts =
-    isSupabaseConfigured ? remoteRecentFacts ?? [] : localRecentFacts;
+  const recentFacts = isSupabaseConfigured
+    ? (remoteRecentFacts ?? [])
+    : localRecentFacts;
   const displayedRecentFacts = showAllRecentFacts
     ? recentFacts
     : recentFacts.slice(0, recentPreviewCount);
   const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
   const heroCopy = heroCopies[heroCopyIndex];
+  const activeNotice =
+    homeNotices[noticeIndex % Math.max(homeNotices.length, 1)];
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -235,7 +308,7 @@ export default function Home() {
             vehicle: review.vehicleSnapshot ?? null,
             content: review.content,
             createdAt: review.createdAt,
-          }))
+          })),
         );
       })
       .catch(() => {
@@ -248,6 +321,76 @@ export default function Home() {
       isActive = false;
     };
   }, [recentReviewsSnapshot]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isSupabaseConfigured) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchCommunityNotices(5)
+      .then((notices) => {
+        if (!isActive) {
+          return;
+        }
+
+        setHomeNotices(notices);
+        setNoticeIndex(0);
+      })
+      .catch(() => {
+        if (isActive) {
+          setHomeNotices([]);
+          setNoticeIndex(0);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (homeNotices.length < 2) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNoticeIndex((currentIndex) => (currentIndex + 1) % homeNotices.length);
+    }, noticeRollIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [homeNotices.length]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isSupabaseConfigured) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchHomeTrafficRankings()
+      .then((rankings) => {
+        if (!isActive) {
+          return;
+        }
+
+        setTrafficRankings(rankings);
+      })
+      .catch(() => {
+        if (isActive) {
+          setTrafficRankings({ topVehicles: [], topModels: [] });
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -267,26 +410,47 @@ export default function Home() {
     <main className={pageClassName}>
       <div className={shellClassName}>
         <header className={headerClassName}>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
-              CARFACT
-            </p>
-            <p className="mt-1 text-lg font-black text-white">카팩트</p>
-          </div>
-          {isAuthReady && isAuthenticated ? (
-            <button
-              type="button"
-              className={authButtonClassName}
-              onClick={() => {
-                void signOut();
-              }}
-            >
-              로그아웃
-            </button>
-          ) : (
-            <Link href="/login" className={authButtonClassName}>
-              로그인
+          <div className={headerTopClassName}>
+            <Link href="/" aria-label="카팩트 홈">
+              <Image
+                src="/brand/carfact-home-logo.png"
+                alt="카팩트"
+                width={48}
+                height={51}
+                priority
+                className={homeLogoClassName}
+              />
             </Link>
+            {isAuthReady && isAuthenticated ? (
+              <button
+                type="button"
+                className={authButtonClassName}
+                onClick={() => {
+                  void signOut();
+                }}
+              >
+                로그아웃
+              </button>
+            ) : (
+              <Link href="/login" className={authButtonClassName}>
+                로그인
+              </Link>
+            )}
+          </div>
+          {activeNotice ? (
+            <Link
+              href={
+                "/community?category=notice&post=" +
+                encodeURIComponent(activeNotice.id)
+              }
+              className={noticeTickerClassName}
+            >
+              📢 {activeNotice.title}
+            </Link>
+          ) : (
+            <p className={noticeTickerClassName}>
+              📢 현재 등록된 공지사항이 없습니다
+            </p>
           )}
         </header>
 
@@ -326,7 +490,7 @@ export default function Home() {
 
         <section className="rounded-lg border border-zinc-800 bg-[#111111] p-4 shadow-2xl shadow-black/30 sm:p-5">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
-            CARFACT
+            차량 조회
           </p>
           <p className="text-sm leading-6 text-zinc-400">
             차량번호로 실제 방문 후기와 커뮤니티 정보를 확인하세요.
@@ -362,14 +526,20 @@ export default function Home() {
           </button>
         </form>
 
+        {trafficRankings &&
+        (trafficRankings.topVehicles.length ||
+          trafficRankings.topModels.length) ? (
+          <section className="grid gap-4 md:grid-cols-2">
+            <HomeTopVehiclesPanel rankings={trafficRankings} />
+            <HomeTopModelsPanel rankings={trafficRankings} />
+          </section>
+        ) : null}
+
         <section className={recentSectionClassName}>
           <div className="mb-3">
             <h2 className="text-xl font-black text-white">
-              최근 등록된 차량 이야기
+              📌 최근 작성된 후기
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              최근 작성된 후기를 최신순으로 보여드립니다.
-            </p>
           </div>
 
           {recentFacts.length === 0 ? (
@@ -397,6 +567,9 @@ export default function Home() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
+                        <p className="truncate text-base font-black text-white">
+                          {maskPlateNumber(fact.carNumber)}
+                        </p>
                         <p className="truncate text-base font-bold text-zinc-100">
                           {vehicleTitle}
                         </p>
@@ -433,7 +606,9 @@ export default function Home() {
                   onClick={() => setShowAllRecentFacts((value) => !value)}
                   className={recentToggleButtonClassName}
                 >
-                  {showAllRecentFacts ? "최근 3개만 보기" : "전체 이야기 보기 →"}
+                  {showAllRecentFacts
+                    ? "최근 3개만 보기"
+                    : "전체 이야기 보기 →"}
                 </button>
               )}
             </div>
@@ -441,5 +616,77 @@ export default function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
+  return (
+    <div className={topRankingCardClassName}>
+      <h2 className="text-lg font-black text-white">🔥 실시간 인기 차량</h2>
+      {rankings.topVehicles.length ? (
+        <ol className="mt-4 space-y-2">
+          {rankings.topVehicles.map((vehicle, index) => (
+            <li
+              key={vehicle.vehicleId || index}
+              className={topRankingItemClassName}
+            >
+              <span className="pt-0.5 text-sm font-black text-red-400">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black text-white">
+                  {maskPlateNumber(vehicle.carNumber ?? "")}
+                </span>
+                <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
+                  {[vehicle.manufacturer, vehicle.model]
+                    .filter(Boolean)
+                    .join(" ") || "차량 정보 없음"}
+                </span>
+                <span className="mt-1 block truncate text-xs text-zinc-500">
+                  {formatTopVehicleModel(vehicle)}
+                </span>
+              </span>
+              <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
+                조회 {vehicle.viewCount.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-4 text-sm text-zinc-500">인기 차량 기록이 없습니다.</p>
+      )}
+    </div>
+  );
+}
+
+function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
+  return (
+    <div className={topRankingCardClassName}>
+      <h2 className="text-lg font-black text-white">🔥 실시간 인기 모델</h2>
+      {rankings.topModels.length ? (
+        <ol className="mt-4 space-y-2">
+          {rankings.topModels.map((model, index) => (
+            <li
+              key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
+              className={topRankingItemClassName}
+            >
+              <span className="text-sm font-black text-red-400">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-white">
+                  {formatTopModelName(model)}
+                </span>
+              </span>
+              <span className="text-right text-sm font-black text-zinc-100">
+                조회 {model.viewCount.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-4 text-sm text-zinc-500">인기 모델 기록이 없습니다.</p>
+      )}
+    </div>
   );
 }

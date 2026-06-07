@@ -10,6 +10,7 @@ export type CommunityCategory =
   | "partner";
 
 export type CommunityCategoryFilter = "all" | CommunityCategory;
+export type CommunityBoardFilter = "notice" | CommunityCategoryFilter;
 
 export interface CommunityImageAttachment {
   id: string;

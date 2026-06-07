@@ -1,16 +1,20 @@
 import type {
+  CommunityBoardFilter,
   CommunityCategory,
-  CommunityCategoryFilter,
 } from "@/types/community";
 
 export interface CommunityCategoryConfig {
   description?: string;
   label: string;
   shortLabel?: string;
-  value: CommunityCategoryFilter;
+  value: CommunityBoardFilter;
 }
 
 export const communityCategories: CommunityCategoryConfig[] = [
+  {
+    value: "notice",
+    label: "공지사항",
+  },
   {
     value: "all",
     label: "전체",
@@ -47,15 +51,17 @@ export const communityCategories: CommunityCategoryConfig[] = [
 ];
 
 export const writableCommunityCategories = communityCategories.filter(
-  (category): category is CommunityCategoryConfig & { value: CommunityCategory } =>
-    category.value !== "all"
+  (
+    category,
+  ): category is CommunityCategoryConfig & { value: CommunityCategory } =>
+    category.value !== "all" && category.value !== "notice",
 );
 
-export const getCommunityCategoryLabel = (value: CommunityCategoryFilter) =>
+export const getCommunityCategoryLabel = (value: CommunityBoardFilter) =>
   communityCategories.find((category) => category.value === value)?.label ??
   "커뮤니티";
 
 export const isCommunityCategory = (
-  value: string
-): value is CommunityCategoryFilter =>
+  value: string,
+): value is CommunityBoardFilter =>
   communityCategories.some((category) => category.value === value);

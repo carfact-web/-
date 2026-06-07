@@ -12,7 +12,14 @@ export interface Database {
       community_posts: {
         Row: {
           id: string;
-          category: "free" | "maintenance" | "news" | "electric" | "imported" | "domestic" | "partner";
+          category:
+            | "free"
+            | "maintenance"
+            | "news"
+            | "electric"
+            | "imported"
+            | "domestic"
+            | "partner";
           title: string;
           content: string;
           user_id: string;
@@ -29,7 +36,14 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          category: "free" | "maintenance" | "news" | "electric" | "imported" | "domestic" | "partner";
+          category:
+            | "free"
+            | "maintenance"
+            | "news"
+            | "electric"
+            | "imported"
+            | "domestic"
+            | "partner";
           title: string;
           content: string;
           user_id: string;
@@ -46,7 +60,14 @@ export interface Database {
         };
         Update: {
           id?: string;
-          category?: "free" | "maintenance" | "news" | "electric" | "imported" | "domestic" | "partner";
+          category?:
+            | "free"
+            | "maintenance"
+            | "news"
+            | "electric"
+            | "imported"
+            | "domestic"
+            | "partner";
           title?: string;
           content?: string;
           user_id?: string;
@@ -95,7 +116,7 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "community_posts";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       community_likes: {
@@ -124,7 +145,7 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "community_posts";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       community_reports: {
@@ -156,7 +177,7 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "community_posts";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       vehicles: {
@@ -251,7 +272,80 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "vehicles";
             referencedColumns: ["id"];
-          }
+          },
+        ];
+      };
+      page_views: {
+        Row: {
+          id: string;
+          created_at: string;
+          vehicle_id: string | null;
+          review_id: string | null;
+          user_id: string | null;
+          session_id: string;
+          ip_hash: string | null;
+          user_agent: string | null;
+          device_type: "mobile" | "desktop" | "tablet" | "unknown";
+          browser: string;
+          os: string;
+          referrer: string | null;
+          path: string | null;
+          event_type: "page_view" | "vehicle_view" | "review_view";
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          vehicle_id?: string | null;
+          review_id?: string | null;
+          user_id?: string | null;
+          session_id: string;
+          ip_hash?: string | null;
+          user_agent?: string | null;
+          device_type?: "mobile" | "desktop" | "tablet" | "unknown";
+          browser?: string;
+          os?: string;
+          referrer?: string | null;
+          path?: string | null;
+          event_type?: "page_view" | "vehicle_view" | "review_view";
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          vehicle_id?: string | null;
+          review_id?: string | null;
+          user_id?: string | null;
+          session_id?: string;
+          ip_hash?: string | null;
+          user_agent?: string | null;
+          device_type?: "mobile" | "desktop" | "tablet" | "unknown";
+          browser?: string;
+          os?: string;
+          referrer?: string | null;
+          path?: string | null;
+          event_type?: "page_view" | "vehicle_view" | "review_view";
+        };
+        Relationships: [
+          {
+            foreignKeyName: "page_views_vehicle_id_fkey";
+            columns: ["vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "page_views_review_id_fkey";
+            columns: ["review_id"];
+            isOneToOne: false;
+            referencedRelation: "reviews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "page_views_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
         ];
       };
       review_reports: {
@@ -280,7 +374,7 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "reviews";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       user_profiles: {
@@ -324,7 +418,7 @@ export interface Database {
             isOneToOne: true;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       popup_notices: {
@@ -478,13 +572,49 @@ export interface Database {
           reports_count: number;
         }[];
       };
+      admin_get_traffic_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          today_visitors: number;
+          seven_day_visitors: number;
+          thirty_day_visitors: number;
+          total_visitors: number;
+          today_reviews_count: number;
+          total_reviews_count: number;
+          total_users_count: number;
+          top_vehicles: Json;
+          top_models: Json;
+          top_reviews: Json;
+          device_breakdown: Json;
+          browser_breakdown: Json;
+          os_breakdown: Json;
+          referrer_top: Json;
+          path_top: Json;
+          hourly_visitors: Json;
+          daily_visitors: Json;
+        }[];
+      };
+      public_get_home_traffic_rankings: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          top_vehicles: Json;
+          top_models: Json;
+        }[];
+      };
       admin_list_community_posts: {
         Args: {
           search_text?: string;
         };
         Returns: {
           id: string;
-          category: "free" | "maintenance" | "news" | "electric" | "imported" | "domestic" | "partner";
+          category:
+            | "free"
+            | "maintenance"
+            | "news"
+            | "electric"
+            | "imported"
+            | "domestic"
+            | "partner";
           title: string;
           content: string;
           user_id: string;
@@ -624,6 +754,22 @@ export interface Database {
           id: string;
           is_verified_dealer: boolean;
         }[];
+      };
+      record_page_view: {
+        Args: {
+          target_vehicle_id?: string | null;
+          target_review_id?: string | null;
+          view_session_id?: string;
+          view_ip_hash?: string | null;
+          view_user_agent?: string | null;
+          view_device_type?: "mobile" | "desktop" | "tablet" | "unknown";
+          view_browser?: string;
+          view_os?: string;
+          view_referrer?: string | null;
+          view_path?: string | null;
+          view_event_type?: "page_view" | "vehicle_view" | "review_view";
+        };
+        Returns: boolean;
       };
       admin_upsert_community_notice: {
         Args: {

@@ -17,6 +17,7 @@ export interface AccountReceivedActivity {
   count: number;
   href: string;
   label: string;
+  searchText: string;
   title: string;
 }
 
@@ -45,7 +46,7 @@ export const getEmptyAccountActivity = (): AccountActivity => ({
 });
 
 export const fetchAccountActivity = async (
-  userId: string
+  userId: string,
 ): Promise<AccountActivity> => {
   if (!supabase) {
     return getEmptyAccountActivity();
@@ -69,11 +70,11 @@ export const fetchAccountActivity = async (
   const reviews = reviewRows.map((review) => mapReviewRow(review));
   const reviewHelpfulCount = reviews.reduce(
     (total, review) => total + (review.helpfulCount ?? 0),
-    0
+    0,
   );
   const communityLikeCount = communityPosts.reduce(
     (total, post) => total + post.likeCount,
-    0
+    0,
   );
   const receivedActivity: AccountReceivedActivity[] = [
     ...reviews
@@ -82,6 +83,14 @@ export const fetchAccountActivity = async (
         count: review.helpfulCount ?? 0,
         href: getReviewHref(review),
         label: "차량 후기",
+        searchText: [
+          review.vehicleSnapshot?.brand,
+          review.vehicleSnapshot?.model,
+          review.vehicleSnapshot?.plateNumber,
+          review.content,
+        ]
+          .filter(Boolean)
+          .join(" "),
         title: review.vehicleSnapshot
           ? [
               review.vehicleSnapshot.brand,
@@ -98,6 +107,7 @@ export const fetchAccountActivity = async (
         count: post.likeCount,
         href: getCommunityHref(post),
         label: getCommunityCategoryTitle(post.category),
+        searchText: [post.title, post.content].filter(Boolean).join(" "),
         title: post.title,
       })),
   ].sort((left, right) => right.count - left.count);

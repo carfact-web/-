@@ -8,8 +8,8 @@ import {
 } from "@/lib/communityImages";
 import { fetchVerifiedDealerMap } from "@/lib/verifiedDealers";
 import type {
+  CommunityBoardFilter,
   CommunityCategory,
-  CommunityCategoryFilter,
   CommunityComment,
   CommunityImageAttachment,
   CommunityCommentRow,
@@ -75,7 +75,7 @@ const normalizeCommunityCategory = (value: string): CommunityCategory => {
 };
 
 const parseStoredCommunityImage = (
-  value: string
+  value: string,
 ): Record<string, unknown> | null => {
   const trimmedValue = value.trim();
 
@@ -161,11 +161,11 @@ const toCommunityImages = (value: Json): CommunityImageAttachment[] => {
         type: imageType,
         url: publicUrl,
       };
-    }
+    },
   );
 
   return images.filter((image): image is CommunityImageAttachment =>
-    Boolean(image)
+    Boolean(image),
   );
 };
 
@@ -226,7 +226,10 @@ const isMissingRpcFunctionError = (error: unknown) =>
 
 const mapCommunityPost = (
   row: CommunityPostRow,
-  authorProfiles?: Record<string, { isVerifiedDealer: boolean; nickname?: string }>,
+  authorProfiles?: Record<
+    string,
+    { isVerifiedDealer: boolean; nickname?: string }
+  >,
   counts?: {
     comments?: Record<string, number>;
     likes?: Record<string, number>;
@@ -235,7 +238,7 @@ const mapCommunityPost = (
   interactions?: {
     likedByMe?: Set<string>;
     reportedByMe?: Set<string>;
-  }
+  },
 ): CommunityPost => {
   const images = toCommunityImages(row.images);
 
@@ -274,13 +277,17 @@ const mapCommunityPost = (
 
 const mapCommunityComment = (
   row: CommunityCommentRow,
-  authorProfiles: Record<string, { isVerifiedDealer: boolean; nickname?: string }> = {}
+  authorProfiles: Record<
+    string,
+    { isVerifiedDealer: boolean; nickname?: string }
+  > = {},
 ): CommunityComment => ({
   id: row.id,
   postId: row.post_id,
   content: row.content,
   authorNickname: row.author_nickname?.trim() || defaultCommunityNickname,
-  authorIsVerifiedDealer: authorProfiles[row.user_id]?.isVerifiedDealer ?? false,
+  authorIsVerifiedDealer:
+    authorProfiles[row.user_id]?.isVerifiedDealer ?? false,
   createdAt: toLocaleDateTime(row.created_at),
 });
 
@@ -290,20 +297,32 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
   }
 
   const [commentsResult, likesResult, reportsResult] = await Promise.all([
-    supabase.from("community_comments").select("post_id").in("post_id", postIds),
+    supabase
+      .from("community_comments")
+      .select("post_id")
+      .in("post_id", postIds),
     supabase.from("community_likes").select("post_id").in("post_id", postIds),
     supabase.from("community_reports").select("post_id").in("post_id", postIds),
   ]);
 
-  if (commentsResult.error && !isMissingCommunityAuxTableError(commentsResult.error)) {
+  if (
+    commentsResult.error &&
+    !isMissingCommunityAuxTableError(commentsResult.error)
+  ) {
     throw commentsResult.error;
   }
 
-  if (likesResult.error && !isMissingCommunityAuxTableError(likesResult.error)) {
+  if (
+    likesResult.error &&
+    !isMissingCommunityAuxTableError(likesResult.error)
+  ) {
     throw likesResult.error;
   }
 
-  if (reportsResult.error && !isMissingCommunityAuxTableError(reportsResult.error)) {
+  if (
+    reportsResult.error &&
+    !isMissingCommunityAuxTableError(reportsResult.error)
+  ) {
     throw reportsResult.error;
   }
 
@@ -324,10 +343,10 @@ const fetchCommunityPostCounts = async (postIds: string[]) => {
 
 const fetchCommunityAuthorProfiles = async (
   userIds: Array<string | null | undefined>,
-  missingNicknameUserIds: string[] = []
+  missingNicknameUserIds: string[] = [],
 ) => {
   const targetUserIds = Array.from(
-    new Set(userIds.filter((userId): userId is string => Boolean(userId)))
+    new Set(userIds.filter((userId): userId is string => Boolean(userId))),
   );
 
   if (!supabase || targetUserIds.length === 0) {
@@ -352,7 +371,7 @@ const fetchCommunityAuthorProfiles = async (
     Record<string, { isVerifiedDealer: boolean; nickname?: string }>
   >((profiles, userId) => {
     const nickname = (nicknameResult.data ?? []).find(
-      (profile) => profile.id === userId
+      (profile) => profile.id === userId,
     )?.nickname;
 
     profiles[userId] = {
@@ -402,7 +421,10 @@ const fetchCommunityInteractionState = async (postIds: string[]) => {
       .in("post_id", postIds),
   ]);
 
-  if (likesResult.error && !isMissingCommunityAuxTableError(likesResult.error)) {
+  if (
+    likesResult.error &&
+    !isMissingCommunityAuxTableError(likesResult.error)
+  ) {
     throw likesResult.error;
   }
 
@@ -428,7 +450,7 @@ const fetchCommunityInteractionState = async (postIds: string[]) => {
   };
 };
 
-export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => {
+export const fetchCommunityPosts = async (category: CommunityBoardFilter) => {
   if (!supabase) {
     return [] as CommunityPost[];
   }
@@ -440,7 +462,9 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (category !== "all") {
+  if (category === "notice") {
+    query = query.eq("is_notice", true);
+  } else if (category !== "all") {
     query = query.eq("category", category);
   }
 
@@ -460,20 +484,65 @@ export const fetchCommunityPosts = async (category: CommunityCategoryFilter) => 
       posts
         .filter((post) => !post.author_nickname?.trim())
         .map((post) => post.user_id)
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
   const [counts, authorProfiles, interactions] = await Promise.all([
     fetchCommunityPostCounts(postIds),
     fetchCommunityAuthorProfiles(
       posts.map((post) => post.user_id),
-      missingNicknameUserIds
+      missingNicknameUserIds,
     ),
     fetchCommunityInteractionState(postIds),
   ]);
 
   return posts.map((post) =>
-    mapCommunityPost(post, authorProfiles, counts, interactions)
+    mapCommunityPost(post, authorProfiles, counts, interactions),
+  );
+};
+
+export const fetchCommunityNotices = async (limit = 5) => {
+  if (!supabase) {
+    return [] as CommunityPost[];
+  }
+
+  const { data: posts, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("is_hidden", false)
+    .eq("is_notice", true)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  if (posts.length === 0) {
+    return [];
+  }
+
+  const postIds = posts.map((post) => post.id);
+  const missingNicknameUserIds = Array.from(
+    new Set(
+      posts
+        .filter((post) => !post.author_nickname?.trim())
+        .map((post) => post.user_id)
+        .filter(Boolean),
+    ),
+  );
+  const [counts, authorProfiles, interactions] = await Promise.all([
+    fetchCommunityPostCounts(postIds),
+    fetchCommunityAuthorProfiles(
+      posts.map((post) => post.user_id),
+      missingNicknameUserIds,
+    ),
+    fetchCommunityInteractionState(postIds),
+  ]);
+
+  return posts.map((post) =>
+    mapCommunityPost(post, authorProfiles, counts, interactions),
   );
 };
 
@@ -503,20 +572,20 @@ export const fetchCommunityPostsByAuthor = async (authorId: string) => {
       posts
         .filter((post) => !post.author_nickname?.trim())
         .map((post) => post.user_id)
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
   const [counts, authorProfiles, interactions] = await Promise.all([
     fetchCommunityPostCounts(postIds),
     fetchCommunityAuthorProfiles(
       posts.map((post) => post.user_id),
-      missingNicknameUserIds
+      missingNicknameUserIds,
     ),
     fetchCommunityInteractionState(postIds),
   ]);
 
   return posts.map((post) =>
-    mapCommunityPost(post, authorProfiles, counts, interactions)
+    mapCommunityPost(post, authorProfiles, counts, interactions),
   );
 };
 
@@ -544,7 +613,7 @@ export const fetchCommunityComments = async (postId: string) => {
   }
 
   const authorProfiles = await fetchCommunityAuthorProfiles(
-    data.map((comment) => comment.user_id)
+    data.map((comment) => comment.user_id),
   );
 
   return data.map((comment) => mapCommunityComment(comment, authorProfiles));
@@ -632,14 +701,15 @@ export const saveCommunityPost = async (input: {
 
   if (
     error &&
-    (isMissingImagesColumnError(error) || isMissingAuthorNicknameColumnError(error))
+    (isMissingImagesColumnError(error) ||
+      isMissingAuthorNicknameColumnError(error))
   ) {
     const retryResult = await supabase
       .from("community_posts")
       .insert(
         isMissingAuthorNicknameColumnError(error)
           ? (legacyPayloadWithImages as never)
-          : basePayload
+          : basePayload,
       )
       .select("*")
       .single();
@@ -697,7 +767,7 @@ export const updateCommunityPost = async (input: {
 
   const uploadResult = await uploadCommunityImages(
     input.images ?? [],
-    input.postId
+    input.postId,
   );
   const persistableImages = getPersistableCommunityImages(uploadResult.images);
   const { data, error } = await supabase.rpc("update_community_post", {
@@ -717,7 +787,7 @@ export const updateCommunityPost = async (input: {
   if (uploadResult.failedCount > 0) {
     throw new Error(
       uploadResult.errorMessage ||
-        "일부 이미지를 업로드하지 못해 글 수정이 완료되지 않았습니다."
+        "일부 이미지를 업로드하지 못해 글 수정이 완료되지 않았습니다.",
     );
   }
 
@@ -803,7 +873,7 @@ export const deleteCommunityPost = async (postId: string) => {
 
   const { data: didHidePost, error: rpcError } = await supabase.rpc(
     "hide_own_community_post",
-    { target_post_id: postId }
+    { target_post_id: postId },
   );
 
   if (!rpcError) {
@@ -820,10 +890,13 @@ export const deleteCommunityPost = async (postId: string) => {
 
   const { count, error } = await supabase
     .from("community_posts")
-    .update({
-      is_hidden: true,
-      updated_at: new Date().toISOString(),
-    }, { count: "exact" })
+    .update(
+      {
+        is_hidden: true,
+        updated_at: new Date().toISOString(),
+      },
+      { count: "exact" },
+    )
     .eq("id", postId)
     .eq("user_id", userId);
 

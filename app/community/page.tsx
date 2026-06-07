@@ -24,8 +24,8 @@ import {
   updateCommunityPost,
 } from "@/lib/communityData";
 import type {
+  CommunityBoardFilter,
   CommunityCategory,
-  CommunityCategoryFilter,
   CommunityComment,
   CommunityImageAttachment,
   CommunityPost,
@@ -38,62 +38,62 @@ import {
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
-  "min-h-screen overflow-x-hidden bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8"
+  "min-h-screen overflow-x-hidden bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8",
 );
 const shellClassName = cn("mx-auto flex w-full max-w-4xl flex-col gap-5");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-xl shadow-black/20 sm:p-5"
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-xl shadow-black/20 sm:p-5",
 );
 const mutedTextClassName = cn("text-sm leading-relaxed text-zinc-400");
 const inputClassName = cn(
   "w-full rounded-lg border border-zinc-800 bg-black px-4 py-3 text-sm text-white outline-none transition",
-  "placeholder:text-zinc-600 focus:border-red-400"
+  "placeholder:text-zinc-600 focus:border-red-400",
 );
 const buttonClassName = cn(
   "inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition",
-  "disabled:cursor-not-allowed disabled:opacity-60"
+  "disabled:cursor-not-allowed disabled:opacity-60",
 );
 const primaryButtonClassName = cn(
   buttonClassName,
-  "bg-red-500 text-white hover:bg-red-400"
+  "bg-red-500 text-white hover:bg-red-400",
 );
 const secondaryButtonClassName = cn(
   buttonClassName,
-  "border border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-zinc-500"
+  "border border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-zinc-500",
 );
 const sortButtonClassName = cn(
-  "rounded-full px-3 py-2 text-sm font-extrabold text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+  "rounded-full px-3 py-2 text-sm font-extrabold text-zinc-400 transition hover:bg-zinc-900 hover:text-white",
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reportButtonClassName = cn(
   "inline-flex items-center rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-300 transition",
   "hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-200 active:scale-[0.98]",
-  "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500"
+  "disabled:cursor-default disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-gray-500 disabled:hover:text-gray-500",
 );
 const dangerButtonClassName = cn(
   buttonClassName,
-  "border border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20"
+  "border border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20",
 );
 const reportModalOverlayClassName = cn(
-  "fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+  "fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm",
 );
 const reportModalPanelClassName = cn(
-  "w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-black/60"
+  "w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-black/60",
 );
 const reportReasonButtonClassName = cn(
   "w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-zinc-200 transition",
-  "hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.99]"
+  "hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.99]",
 );
 const activeReportReasonButtonClassName = cn(
-  "border-red-500 bg-red-500/15 text-red-100"
+  "border-red-500 bg-red-500/15 text-red-100",
 );
 const reportSubmitButtonClassName = cn(
   "mt-4 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition",
-  "hover:bg-red-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:hover:bg-zinc-700"
+  "hover:bg-red-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 disabled:hover:bg-zinc-700",
 );
 const reportCancelButtonClassName = cn(
   "mt-2 w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-300 transition",
-  "hover:bg-zinc-800 active:scale-[0.99]"
+  "hover:bg-zinc-800 active:scale-[0.99]",
 );
 
 const normalizeField = (value: string, maxLength: number) =>
@@ -139,11 +139,11 @@ const communityReportReasons: CommunityReportReason[] = [
 
 const isAllowedCommunityImageFile = (file: File) =>
   allowedCommunityImageTypes.includes(
-    file.type as (typeof allowedCommunityImageTypes)[number]
+    file.type as (typeof allowedCommunityImageTypes)[number],
   ) || isSupportedImageFile(file);
 
 const readCommunityImageFile = async (
-  file: File
+  file: File,
 ): Promise<CommunityImageAttachment> => {
   if (!isAllowedCommunityImageFile(file)) {
     throw new Error("jpg, png, webp, heic 이미지만 첨부할 수 있습니다.");
@@ -191,9 +191,8 @@ export default function CommunityPage() {
   const { ensureReviewNickname, reviewNickname } = useUserProfile(user);
 
   const [activeCategory, setActiveCategory] =
-    useState<CommunityCategoryFilter>("all");
-  const [writeCategory, setWriteCategory] =
-    useState<CommunityCategory>("free");
+    useState<CommunityBoardFilter>("all");
+  const [writeCategory, setWriteCategory] = useState<CommunityCategory>("free");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
@@ -218,13 +217,13 @@ export default function CommunityPage() {
   const [selectedReportReason, setSelectedReportReason] =
     useState<CommunityReportReason | null>(null);
   const [reportedPostIds, setReportedPostIds] = useState<Set<string>>(
-    () => new Set()
+    () => new Set(),
   );
   const [message, setMessage] = useState("");
 
   const activeCategoryLabel = useMemo(
     () => getCommunityCategoryLabel(activeCategory),
-    [activeCategory]
+    [activeCategory],
   );
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const visiblePosts = useMemo(() => {
@@ -255,14 +254,14 @@ export default function CommunityPage() {
           right.likeCount +
             right.commentCount -
             (left.likeCount + left.commentCount) ||
-          Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
+          Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw),
       );
     }
 
     return sortedPosts.sort(
       (left, right) =>
         Number(right.isPinned) - Number(left.isPinned) ||
-        Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw)
+        Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw),
     );
   }, [currentTime, normalizedSearchQuery, posts, sortOption]);
   const totalPages = Math.max(1, Math.ceil(visiblePosts.length / postsPerPage));
@@ -272,7 +271,7 @@ export default function CommunityPage() {
     return visiblePosts.slice(startIndex, startIndex + postsPerPage);
   }, [currentPage, visiblePosts]);
   const canDeleteSelectedPost = Boolean(
-    user && selectedPost && (selectedPost.userId === user.id || isAdmin)
+    user && selectedPost && (selectedPost.userId === user.id || isAdmin),
   );
   const canEditSelectedPost = canDeleteSelectedPost;
 
@@ -315,7 +314,7 @@ export default function CommunityPage() {
     return nickname.trim() || "카팩트 사용자";
   };
 
-  const loadPosts = useCallback(async (category: CommunityCategoryFilter) => {
+  const loadPosts = useCallback(async (category: CommunityBoardFilter) => {
     setIsLoadingPosts(true);
     setMessage("");
 
@@ -327,7 +326,15 @@ export default function CommunityPage() {
           return null;
         }
 
-        if (category !== "all" && current.category !== category) {
+        if (category === "notice" && !current.isNotice) {
+          return null;
+        }
+
+        if (
+          category !== "all" &&
+          category !== "notice" &&
+          current.category !== category
+        ) {
           return null;
         }
 
@@ -339,7 +346,7 @@ export default function CommunityPage() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "커뮤니티 글을 불러오지 못했습니다."
+          : "커뮤니티 글을 불러오지 못했습니다.",
       );
     } finally {
       setIsLoadingPosts(false);
@@ -355,9 +362,7 @@ export default function CommunityPage() {
     } catch (error) {
       setComments([]);
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "댓글을 불러오지 못했습니다."
+        error instanceof Error ? error.message : "댓글을 불러오지 못했습니다.",
       );
     } finally {
       setIsLoadingComments(false);
@@ -450,7 +455,11 @@ export default function CommunityPage() {
     }
 
     setSelectedPost(null);
-    setWriteCategory(activeCategory === "all" ? "free" : activeCategory);
+    setWriteCategory(
+      activeCategory === "all" || activeCategory === "notice"
+        ? "free"
+        : activeCategory,
+    );
     setEditingPostId(null);
     setWriteTitle("");
     setWriteContent("");
@@ -504,28 +513,28 @@ export default function CommunityPage() {
 
     try {
       const nextImages = await Promise.all(
-        nextFiles.map((file) => readCommunityImageFile(file))
+        nextFiles.map((file) => readCommunityImageFile(file)),
       );
 
       setPostImages((current) =>
-        [...current, ...nextImages].slice(0, maxCommunityImages)
+        [...current, ...nextImages].slice(0, maxCommunityImages),
       );
       setMessage(
         files.length > remainingSlots
           ? "이미지는 최대 3장까지 첨부할 수 있습니다."
-          : ""
+          : "",
       );
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "이미지를 불러오지 못했습니다."
+        error instanceof Error
+          ? error.message
+          : "이미지를 불러오지 못했습니다.",
       );
     }
   };
 
   const removePostImage = (imageId: string) => {
-    setPostImages((current) =>
-      current.filter((image) => image.id !== imageId)
-    );
+    setPostImages((current) => current.filter((image) => image.id !== imageId));
     setMessage("");
   };
 
@@ -562,7 +571,7 @@ export default function CommunityPage() {
     const title = normalizeField(String(formData.get("title") ?? ""), 80);
     const content = normalizeMultilineField(
       String(formData.get("content") ?? ""),
-      2000
+      2000,
     );
     const isNoticePost = isAdmin && formData.get("isNotice") === "on";
     const isPinnedPost = isAdmin && formData.get("isPinned") === "on";
@@ -576,8 +585,9 @@ export default function CommunityPage() {
     setMessage("");
 
     try {
-      const { data: sessionData, error: sessionError } =
-        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const { data: sessionData, error: sessionError } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null }, error: null };
       const sessionUserId = sessionData.session?.user.id ?? null;
 
       if (sessionError) {
@@ -619,8 +629,8 @@ export default function CommunityPage() {
                   isPinned: isPinnedPost,
                   title,
                 }
-              : post
-          )
+              : post,
+          ),
         );
         setSelectedPost((current) =>
           current && current.id === editingPostId
@@ -633,7 +643,7 @@ export default function CommunityPage() {
                 isPinned: isPinnedPost,
                 title,
               }
-            : current
+            : current,
         );
         setIsWriting(false);
         setEditingPostId(null);
@@ -680,7 +690,7 @@ export default function CommunityPage() {
       setMessage(
         error instanceof Error
           ? "커뮤니티 글 저장 실패: " + error.message
-          : "커뮤니티 글 저장에 실패했습니다."
+          : "커뮤니티 글 저장에 실패했습니다.",
       );
     } finally {
       setIsSubmitting(false);
@@ -703,7 +713,7 @@ export default function CommunityPage() {
     const formData = new FormData(form);
     const content = normalizeMultilineField(
       String(formData.get("comment") ?? ""),
-      500
+      500,
     );
 
     if (content.length < 2) {
@@ -715,8 +725,9 @@ export default function CommunityPage() {
     setMessage("");
 
     try {
-      const { data: sessionData, error: sessionError } =
-        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const { data: sessionData, error: sessionError } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null }, error: null };
       const sessionUserId = sessionData.session?.user.id ?? null;
 
       if (sessionError) {
@@ -747,15 +758,19 @@ export default function CommunityPage() {
         current.map((post) =>
           post.id === selectedPost.id
             ? { ...post, commentCount: post.commentCount + 1 }
-            : post
-        )
+            : post,
+        ),
       );
       setSelectedPost((current) =>
-        current ? { ...current, commentCount: current.commentCount + 1 } : current
+        current
+          ? { ...current, commentCount: current.commentCount + 1 }
+          : current,
       );
       form.reset();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "댓글 저장에 실패했습니다.");
+      setMessage(
+        error instanceof Error ? error.message : "댓글 저장에 실패했습니다.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -777,8 +792,9 @@ export default function CommunityPage() {
     }
 
     try {
-      const { data: sessionData, error: sessionError } =
-        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const { data: sessionData, error: sessionError } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null }, error: null };
       const sessionUserId = sessionData.session?.user.id ?? null;
 
       if (sessionError) {
@@ -795,11 +811,11 @@ export default function CommunityPage() {
       if (!didLike) {
         setPosts((current) =>
           current.map((post) =>
-            post.id === selectedPost.id ? { ...post, likedByMe: true } : post
-          )
+            post.id === selectedPost.id ? { ...post, likedByMe: true } : post,
+          ),
         );
         setSelectedPost((current) =>
-          current ? { ...current, likedByMe: true } : current
+          current ? { ...current, likedByMe: true } : current,
         );
         setMessage("이미 좋아요를 눌렀습니다.");
         return;
@@ -809,16 +825,18 @@ export default function CommunityPage() {
         current.map((post) =>
           post.id === selectedPost.id
             ? { ...post, likedByMe: true, likeCount: post.likeCount + 1 }
-            : post
-        )
+            : post,
+        ),
       );
       setSelectedPost((current) =>
         current
           ? { ...current, likedByMe: true, likeCount: current.likeCount + 1 }
-          : current
+          : current,
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "좋아요 처리에 실패했습니다.");
+      setMessage(
+        error instanceof Error ? error.message : "좋아요 처리에 실패했습니다.",
+      );
     }
   };
 
@@ -837,14 +855,14 @@ export default function CommunityPage() {
     try {
       await deleteCommunityPost(selectedPost.id);
       setPosts((current) =>
-        current.filter((post) => post.id !== selectedPost.id)
+        current.filter((post) => post.id !== selectedPost.id),
       );
       setSelectedPost(null);
       setComments([]);
       setMessage("게시글을 삭제했습니다.");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "게시글 삭제에 실패했습니다."
+        error instanceof Error ? error.message : "게시글 삭제에 실패했습니다.",
       );
     } finally {
       setIsDeletingPost(false);
@@ -886,8 +904,9 @@ export default function CommunityPage() {
     }
 
     try {
-      const { data: sessionData, error: sessionError } =
-        supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
+      const { data: sessionData, error: sessionError } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null }, error: null };
       const sessionUserId = sessionData.session?.user.id ?? null;
 
       if (sessionError) {
@@ -909,11 +928,13 @@ export default function CommunityPage() {
         setReportedPostIds((current) => new Set(current).add(selectedPost.id));
         setPosts((current) =>
           current.map((post) =>
-            post.id === selectedPost.id ? { ...post, reportedByMe: true } : post
-          )
+            post.id === selectedPost.id
+              ? { ...post, reportedByMe: true }
+              : post,
+          ),
         );
         setSelectedPost((current) =>
-          current ? { ...current, reportedByMe: true } : current
+          current ? { ...current, reportedByMe: true } : current,
         );
         closeReportModal();
         setMessage("이미 신고한 글입니다.");
@@ -928,8 +949,8 @@ export default function CommunityPage() {
                 reportedByMe: true,
                 reportCount: post.reportCount + 1,
               }
-            : post
-        )
+            : post,
+        ),
       );
       setSelectedPost((current) =>
         current
@@ -938,13 +959,15 @@ export default function CommunityPage() {
               reportedByMe: true,
               reportCount: current.reportCount + 1,
             }
-          : current
+          : current,
       );
       setReportedPostIds((current) => new Set(current).add(selectedPost.id));
       closeReportModal();
       setMessage("신고가 접수되었습니다.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "신고 처리에 실패했습니다.");
+      setMessage(
+        error instanceof Error ? error.message : "신고 처리에 실패했습니다.",
+      );
     }
   };
 
@@ -966,7 +989,7 @@ export default function CommunityPage() {
                   type="button"
                   className={cn(
                     sortButtonClassName,
-                    sortOption === option.value && activeSortButtonClassName
+                    sortOption === option.value && activeSortButtonClassName,
                   )}
                   onClick={() => {
                     setSortOption(option.value);
@@ -1039,7 +1062,7 @@ export default function CommunityPage() {
                     "min-h-12 min-w-0 rounded-lg border px-3 py-2 text-center text-sm font-extrabold transition sm:text-base",
                     isActive
                       ? "border-red-400 bg-red-500 text-white"
-                      : "border-zinc-800 bg-black text-zinc-300 hover:border-zinc-600"
+                      : "border-zinc-800 bg-black text-zinc-300 hover:border-zinc-600",
                   )}
                   onClick={() => {
                     setActiveCategory(category.value);
@@ -1092,7 +1115,9 @@ export default function CommunityPage() {
                   className={inputClassName}
                   value={writeCategory}
                   onChange={(event) =>
-                    setWriteCategory(event.currentTarget.value as CommunityCategory)
+                    setWriteCategory(
+                      event.currentTarget.value as CommunityCategory,
+                    )
                   }
                 >
                   {writableCommunityCategories.map((category) => (
@@ -1128,7 +1153,9 @@ export default function CommunityPage() {
                       jpg, png, webp, heic · 최대 3장 · 자동 압축
                     </p>
                   </div>
-                  <label className={cn(secondaryButtonClassName, "cursor-pointer")}>
+                  <label
+                    className={cn(secondaryButtonClassName, "cursor-pointer")}
+                  >
                     이미지 선택
                     <input
                       className="sr-only"
@@ -1265,7 +1292,7 @@ export default function CommunityPage() {
                           "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
                           isSelected
                             ? "rounded-lg bg-red-500/10 px-4"
-                            : "hover:bg-zinc-900/50"
+                            : "hover:bg-zinc-900/50",
                         )}
                         onClick={() => {
                           setSelectedPost(post);
@@ -1312,13 +1339,16 @@ export default function CommunityPage() {
                                 sizes="360px"
                                 className="object-cover"
                                 onError={() => {
-                                  console.error("community-image-render-error", {
-                                    storedImageValue:
-                                      thumbnailImage.path ??
-                                      thumbnailImage.url ??
-                                      thumbnailImage.dataUrl,
-                                    finalImageUrl: thumbnailImageUrl,
-                                  });
+                                  console.error(
+                                    "community-image-render-error",
+                                    {
+                                      storedImageValue:
+                                        thumbnailImage.path ??
+                                        thumbnailImage.url ??
+                                        thumbnailImage.dataUrl,
+                                      finalImageUrl: thumbnailImageUrl,
+                                    },
+                                  );
                                 }}
                               />
                             </span>
@@ -1435,7 +1465,7 @@ export default function CommunityPage() {
                                           image.url ??
                                           image.dataUrl,
                                         finalImageUrl,
-                                      }
+                                      },
                                     );
                                   }}
                                 />
@@ -1451,7 +1481,10 @@ export default function CommunityPage() {
                   <h3 className="text-lg font-extrabold">
                     댓글 {selectedPost.commentCount}
                   </h3>
-                  <form className="mt-3 flex flex-col gap-3" onSubmit={submitComment}>
+                  <form
+                    className="mt-3 flex flex-col gap-3"
+                    onSubmit={submitComment}
+                  >
                     <textarea
                       className={cn(inputClassName, "min-h-24 resize-y")}
                       name="comment"
@@ -1534,8 +1567,11 @@ export default function CommunityPage() {
               <div className="flex min-h-64 items-center justify-center text-center">
                 <div>
                   <h2 className="text-xl font-extrabold">글 상세</h2>
-                  <p className={cn(mutedTextClassName, "mx-auto mt-2 max-w-xs")}>
-                    목록에서 글을 선택하면 상세 내용과 댓글을 확인할 수 있습니다.
+                  <p
+                    className={cn(mutedTextClassName, "mx-auto mt-2 max-w-xs")}
+                  >
+                    목록에서 글을 선택하면 상세 내용과 댓글을 확인할 수
+                    있습니다.
                   </p>
                 </div>
               </div>
@@ -1581,7 +1617,7 @@ export default function CommunityPage() {
                     className={cn(
                       reportReasonButtonClassName,
                       selectedReportReason === reason &&
-                        activeReportReasonButtonClassName
+                        activeReportReasonButtonClassName,
                     )}
                   >
                     {reason}

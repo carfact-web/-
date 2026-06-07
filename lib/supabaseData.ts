@@ -76,10 +76,67 @@ const toVehicleSnapshot = (value: Json): Vehicle | undefined => {
     year: typeof value.year === "string" ? value.year : "",
     mileage: typeof value.mileage === "string" ? value.mileage : "",
     fuelType: typeof value.fuelType === "string" ? value.fuelType : "",
-    createdAt: typeof value.createdAt === "string" ? value.createdAt : undefined,
-    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : undefined,
+    createdAt:
+      typeof value.createdAt === "string" ? value.createdAt : undefined,
+    updatedAt:
+      typeof value.updatedAt === "string" ? value.updatedAt : undefined,
   };
 };
+
+const toNumber = (value: unknown) => {
+  const numberValue =
+    typeof value === "number" && Number.isFinite(value)
+      ? value
+      : Number(value ?? 0);
+
+  return Number.isFinite(numberValue) ? numberValue : 0;
+};
+
+const toNullableString = (value: unknown) =>
+  typeof value === "string" ? value : null;
+
+export interface HomeTopVehicle {
+  vehicleId: string;
+  viewCount: number;
+  carNumber: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  generation: string | null;
+  modelDetail: string | null;
+}
+
+export interface HomeTopModel {
+  modelName: string | null;
+  manufacturer: string | null;
+  viewCount: number;
+}
+
+export interface HomeTrafficRankings {
+  topVehicles: HomeTopVehicle[];
+  topModels: HomeTopModel[];
+}
+
+const toHomeTopVehicles = (value: Json): HomeTopVehicle[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        vehicleId: String(item.vehicle_id ?? ""),
+        viewCount: toNumber(item.view_count),
+        carNumber: toNullableString(item.car_number),
+        manufacturer: toNullableString(item.manufacturer),
+        model: toNullableString(item.model),
+        generation: toNullableString(item.generation),
+        modelDetail: toNullableString(item.model_detail),
+      }))
+    : [];
+
+const toHomeTopModels = (value: Json): HomeTopModel[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        modelName: toNullableString(item.model_name),
+        manufacturer: toNullableString(item.manufacturer),
+        viewCount: toNumber(item.view_count),
+      }))
+    : [];
 
 export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
   id: row.id,
@@ -96,13 +153,13 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
 
 export const mapReviewRow = (
   row: ReviewRow,
-  verifiedDealers: Record<string, boolean> = {}
+  verifiedDealers: Record<string, boolean> = {},
 ): Review => ({
   id: row.id,
   authorId: row.author_id ?? undefined,
   authorNickname: row.author_nickname ?? "익명 사용자",
   authorIsVerifiedDealer: row.author_id
-    ? verifiedDealers[row.author_id] ?? false
+    ? (verifiedDealers[row.author_id] ?? false)
     : false,
   content: row.content,
   tags: row.tags ?? [],
@@ -152,7 +209,7 @@ export const saveSupabaseVehicle = async (vehicle: Vehicle) => {
         fuel_type: vehicle.fuelType || null,
         updated_at: now,
       },
-      { onConflict: "car_number" }
+      { onConflict: "car_number" },
     )
     .select("*")
     .single();
@@ -187,7 +244,7 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
   }
 
   const verifiedDealers = await fetchVerifiedDealerMap(
-    data.map((review) => review.author_id)
+    data.map((review) => review.author_id),
   );
 
   return data.map((review) => mapReviewRow(review, verifiedDealers));
@@ -213,7 +270,7 @@ export const fetchSupabaseReviewById = async (reviewId: string) => {
   }
 
   const verifiedDealers = await fetchVerifiedDealerMap(
-    data.author_id ? [data.author_id] : []
+    data.author_id ? [data.author_id] : [],
   );
 
   return {
@@ -254,20 +311,42 @@ export const fetchRecentSupabaseReviews = async (limit = 20) => {
       created_at: row.created_at,
       vehicle_plate:
         toVehicleSnapshot(row.vehicle_snapshot)?.plateNumber ?? null,
-    }))
+    })),
   );
 
   const verifiedDealers = await fetchVerifiedDealerMap(
-    data.map((review) => review.author_id)
+    data.map((review) => review.author_id),
   );
 
   return data.map((review) => mapReviewRow(review, verifiedDealers));
 };
 
+export const fetchHomeTrafficRankings =
+  async (): Promise<HomeTrafficRankings | null> => {
+    if (!supabase) {
+      return null;
+    }
+
+    const { data, error } = await supabase.rpc(
+      "public_get_home_traffic_rankings",
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    const rankings = data?.[0];
+
+    return {
+      topVehicles: toHomeTopVehicles(rankings?.top_vehicles ?? []),
+      topModels: toHomeTopModels(rankings?.top_models ?? []),
+    };
+  };
+
 export const saveSupabaseReview = async (
   plateNumber: string,
   review: Review,
-  authorId: string
+  authorId: string,
 ) => {
   if (!supabase) {
     return null;
@@ -290,7 +369,10 @@ export const saveSupabaseReview = async (
   }
 
   const reviewId = createReviewId();
-  const uploadedImages = await uploadReviewImages(review.images ?? [], reviewId);
+  const uploadedImages = await uploadReviewImages(
+    review.images ?? [],
+    reviewId,
+  );
   const now = new Date().toISOString();
   const payload = {
     id: reviewId,
@@ -322,11 +404,13 @@ export const saveSupabaseReview = async (
 
   if (error) {
     console.error(
-      isRlsPolicyError(error) ? "review-rls-policy-error" : "review-db-insert-error",
+      isRlsPolicyError(error)
+        ? "review-rls-policy-error"
+        : "review-db-insert-error",
       {
         table: "reviews",
         error,
-      }
+      },
     );
     throw createSupabaseFailureError("db-insert", error);
   }
@@ -338,7 +422,7 @@ export const saveSupabaseReview = async (
 
 export const updateSupabaseReview = async (
   reviewId: string,
-  input: Pick<Review, "content" | "tags" | "images">
+  input: Pick<Review, "content" | "tags" | "images">,
 ) => {
   if (!supabase) {
     return false;
@@ -375,9 +459,7 @@ export const hideSupabaseReview = async (reviewId: string) => {
   return Boolean(data);
 };
 
-export const saveSupabaseReviewReport = async (
-  report: ReviewReportInsert
-) => {
+export const saveSupabaseReviewReport = async (report: ReviewReportInsert) => {
   if (!supabase) {
     return null;
   }
@@ -397,7 +479,7 @@ export const saveSupabaseReviewReport = async (
 
 export const updateSupabaseReviewHelpfulCount = async (
   reviewId: string,
-  helpfulCount: number
+  helpfulCount: number,
 ) => {
   if (!supabase) {
     return;

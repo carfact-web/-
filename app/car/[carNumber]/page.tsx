@@ -12,6 +12,7 @@ import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
+import { recordPageView } from "@/lib/pageViews";
 import { getAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
@@ -29,44 +30,50 @@ const shellClassName = cn("mx-auto w-full max-w-3xl");
 const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
-  "hover:opacity-75"
+  "hover:opacity-75",
 );
 const actionLinkClassName = cn(
   "block w-full rounded-xl bg-red-500 p-4 text-center font-bold transition",
-  "hover:bg-red-600"
+  "hover:bg-red-600",
 );
 const editLinkClassName = cn(
   "mt-3 mb-6 block w-full rounded-xl bg-zinc-700 p-3 text-center text-sm font-bold transition",
-  "hover:bg-zinc-600"
+  "hover:bg-zinc-600",
 );
 const timelineSectionClassName = cn("mb-8");
-const timelineListClassName = cn("relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-3 before:w-px before:bg-zinc-700");
+const timelineListClassName = cn(
+  "relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-3 before:w-px before:bg-zinc-700",
+);
 const timelineItemClassName = cn("relative pl-9");
-const timelineDotClassName = cn("absolute top-2 left-1.5 h-3 w-3 rounded-full border-2 border-zinc-900 bg-red-500");
-const timelineCardClassName = cn("rounded-xl border border-zinc-800 bg-zinc-800/70 p-4");
+const timelineDotClassName = cn(
+  "absolute top-2 left-1.5 h-3 w-3 rounded-full border-2 border-zinc-900 bg-red-500",
+);
+const timelineCardClassName = cn(
+  "rounded-xl border border-zinc-800 bg-zinc-800/70 p-4",
+);
 const timelineTagClassName = cn(
-  "rounded-full bg-zinc-700 px-2.5 py-1 text-xs text-gray-300"
+  "rounded-full bg-zinc-700 px-2.5 py-1 text-xs text-gray-300",
 );
 const reviewPaginationClassName = cn(
-  "mb-8 flex flex-wrap items-center justify-center gap-2"
+  "mb-8 flex flex-wrap items-center justify-center gap-2",
 );
 const reviewPageButtonClassName = cn(
   "rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-gray-300 transition",
   "hover:border-zinc-500 hover:bg-zinc-800 hover:text-white active:scale-[0.98]",
-  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700 disabled:hover:bg-transparent disabled:hover:text-gray-300"
+  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700 disabled:hover:bg-transparent disabled:hover:text-gray-300",
 );
 const activeReviewPageButtonClassName = cn(
-  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500"
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
 );
 const reviewHeaderClassName = cn(
-  "mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+  "mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
 );
 const sortControlClassName = cn(
-  "inline-flex w-full rounded-lg border border-zinc-700 bg-zinc-950 p-1 sm:w-auto"
+  "inline-flex w-full rounded-lg border border-zinc-700 bg-zinc-950 p-1 sm:w-auto",
 );
 const sortButtonClassName = cn(
   "flex-1 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-gray-400 transition sm:flex-none",
-  "hover:bg-zinc-800 hover:text-white active:scale-[0.98]"
+  "hover:bg-zinc-800 hover:text-white active:scale-[0.98]",
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 
@@ -141,7 +148,7 @@ export default function CarReportPage() {
   const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const carNumber = sanitizeVehiclePlateNumber(
-    decodeURIComponent(params.carNumber as string)
+    decodeURIComponent(params.carNumber as string),
   );
   const {
     isAllowed: isGuestReportAllowed,
@@ -173,11 +180,11 @@ export default function CarReportPage() {
   const helpfulCountsSnapshot = useSyncExternalStore(
     subscribeToHelpfulChanges,
     getHelpfulCountsSnapshot,
-    getServerHelpfulCountsSnapshot
+    getServerHelpfulCountsSnapshot,
   );
   const helpfulCounts = useMemo(
     () => parseHelpfulJson<Record<string, number>>(helpfulCountsSnapshot, {}),
-    [helpfulCountsSnapshot]
+    [helpfulCountsSnapshot],
   );
   const sortedReviews = useMemo(
     () =>
@@ -185,9 +192,7 @@ export default function CarReportPage() {
         const leftHelpfulCount =
           helpfulCounts[`${carNumber}-${left.id}`] ?? left.helpfulCount ?? 0;
         const rightHelpfulCount =
-          helpfulCounts[`${carNumber}-${right.id}`] ??
-          right.helpfulCount ??
-          0;
+          helpfulCounts[`${carNumber}-${right.id}`] ?? right.helpfulCount ?? 0;
         const leftCreatedTime = getParsedTime(left.createdAt, left.id);
         const rightCreatedTime = getParsedTime(right.createdAt, right.id);
 
@@ -211,29 +216,30 @@ export default function CarReportPage() {
 
         return rightCreatedTime - leftCreatedTime;
       }),
-    [carNumber, helpfulCounts, reviewSort, reviews]
+    [carNumber, helpfulCounts, reviewSort, reviews],
   );
   const totalReviewPages = Math.max(
     1,
-    Math.ceil(sortedReviews.length / reviewsPerPage)
+    Math.ceil(sortedReviews.length / reviewsPerPage),
   );
   const currentReviewPage = Math.min(reviewPage, totalReviewPages);
   const visibleReviews = sortedReviews.slice(
     (currentReviewPage - 1) * reviewsPerPage,
-    currentReviewPage * reviewsPerPage
+    currentReviewPage * reviewsPerPage,
   );
   const changeReviewSort = (nextSort: ReviewSortOption) => {
     setReviewSort(nextSort);
     setReviewPage(1);
   };
-  const recentTitle = [brand, model, generation].filter(Boolean).join(" ") || carNumber;
+  const recentTitle =
+    [brand, model, generation].filter(Boolean).join(" ") || carNumber;
   const reviewPath = `/car/${encodeURIComponent(carNumber)}/review`;
   const reviewLoginPath = `/login?redirectTo=${encodeURIComponent(reviewPath)}`;
   const getCanManageReview = (review: Review) =>
     Boolean(user && (review.authorId === user.id || isAdmin));
   const handleEditReview = (review: Review) => {
     router.push(
-      reviewPath + "?reviewId=" + encodeURIComponent(String(review.id))
+      reviewPath + "?reviewId=" + encodeURIComponent(String(review.id)),
     );
   };
   const handleDeleteReview = async (review: Review) => {
@@ -257,7 +263,7 @@ export default function CarReportPage() {
       }
     } catch (error) {
       window.alert(
-        error instanceof Error ? error.message : "후기 삭제에 실패했습니다."
+        error instanceof Error ? error.message : "후기 삭제에 실패했습니다.",
       );
     } finally {
       setDeletingReviewId(null);
@@ -271,6 +277,19 @@ export default function CarReportPage() {
 
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
   }, [carNumber, isGuestReportAllowed, recentTitle, vehicle, saveRecentView]);
+
+  useEffect(() => {
+    if (!isGuestReportAllowed || !vehicle?.id) {
+      return;
+    }
+
+    void recordPageView({
+      eventType: "vehicle_view",
+      vehicleId: vehicle.id,
+    }).catch(() => {
+      // Traffic analytics should never block the vehicle report page.
+    });
+  }, [isGuestReportAllowed, vehicle?.id]);
 
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
@@ -295,7 +314,9 @@ export default function CarReportPage() {
           <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
 
           <div className={panelClassName}>
-            <p className="text-sm text-zinc-400">로그인 상태를 확인하고 있습니다.</p>
+            <p className="text-sm text-zinc-400">
+              로그인 상태를 확인하고 있습니다.
+            </p>
           </div>
         </div>
       </main>
@@ -333,217 +354,226 @@ export default function CarReportPage() {
         <CarViewEventToast carNumber={carNumber} />
 
         <div className={panelClassName}>
-        {!hasVehicleInfo ? (
-          <>
-            <p className="text-gray-300 mb-6">
-              차량 정보를 찾지 못했어요. 직접 차량 정보를 등록해주세요.
-            </p>
-
-            <Link
-              href={`/car/${encodeURIComponent(carNumber)}/setup`}
-              className={actionLinkClassName}
-            >
-              차량 정보 등록하기
-            </Link>
-          </>
-        ) : (
-          <>
-            <div className="rounded-xl bg-zinc-800 p-4 mb-6">
-              <p className="text-gray-300">
-                {[brand, model, generation, year && `${year}년`]
-                  .filter(Boolean)
-                  .join(" · ")}
+          {!hasVehicleInfo ? (
+            <>
+              <p className="text-gray-300 mb-6">
+                차량 정보를 찾지 못했어요. 직접 차량 정보를 등록해주세요.
               </p>
-              {(fuelType || mileage) && (
-                <p className="text-sm text-gray-500 mt-2">
-                  {[
-                    fuelType,
-                    mileage &&
-                      `주행거리: ${Number(mileage).toLocaleString()}km`,
-                  ]
+
+              <Link
+                href={`/car/${encodeURIComponent(carNumber)}/setup`}
+                className={actionLinkClassName}
+              >
+                차량 정보 등록하기
+              </Link>
+            </>
+          ) : (
+            <>
+              <div className="rounded-xl bg-zinc-800 p-4 mb-6">
+                <p className="text-gray-300">
+                  {[brand, model, generation, year && `${year}년`]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-              )}
-            </div>
+                {(fuelType || mileage) && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    {[
+                      fuelType,
+                      mileage &&
+                        `주행거리: ${Number(mileage).toLocaleString()}km`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+              </div>
 
-            <Link
-              href={`/car/${encodeURIComponent(carNumber)}/edit`}
-              className={editLinkClassName}
-            >
-              차량정보가 바뀌었나요?
-            </Link>
+              <Link
+                href={`/car/${encodeURIComponent(carNumber)}/edit`}
+                className={editLinkClassName}
+              >
+                차량정보가 바뀌었나요?
+              </Link>
 
-            <AiSummaryCard summaries={aiSummaries} />
+              <AiSummaryCard summaries={aiSummaries} />
 
-            <section className={timelineSectionClassName}>
-              <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>
+              <section className={timelineSectionClassName}>
+                <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>
 
-              {timelineItems.length === 0 ? (
-                <p className="rounded-xl border border-zinc-800 bg-zinc-800/70 p-4 text-sm text-gray-400">
-                  아직 차량 이력이 없습니다.
+                {timelineItems.length === 0 ? (
+                  <p className="rounded-xl border border-zinc-800 bg-zinc-800/70 p-4 text-sm text-gray-400">
+                    아직 차량 이력이 없습니다.
+                  </p>
+                ) : (
+                  <div className={timelineListClassName}>
+                    {visibleTimelineItems.map((item) => {
+                      const tags = item.review.tags ?? [];
+
+                      return (
+                        <article
+                          key={item.review.id}
+                          className={timelineItemClassName}
+                        >
+                          <span className={timelineDotClassName} />
+
+                          <div className={timelineCardClassName}>
+                            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                              <span>{item.dateLabel}</span>
+                              <span aria-hidden>·</span>
+                              <span>{item.mileageLabel}</span>
+                            </div>
+
+                            {tags.length > 0 && (
+                              <div className="mb-3 flex flex-wrap gap-2">
+                                {tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className={timelineTagClassName}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <p className="whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-200">
+                              {item.review.content}
+                            </p>
+
+                            <p className="mt-3 border-t border-zinc-700 pt-3 text-xs leading-5 text-gray-500">
+                              {item.snapshotLabel ||
+                                "작성 당시 차량 스냅샷 정보 없음"}
+                            </p>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <div className={reviewHeaderClassName}>
+                <h2 className="text-3xl font-bold">등록된 팩트</h2>
+                <div className={sortControlClassName} aria-label="후기 정렬">
+                  <button
+                    type="button"
+                    onClick={() => changeReviewSort("latest")}
+                    aria-pressed={reviewSort === "latest"}
+                    className={cn(
+                      sortButtonClassName,
+                      reviewSort === "latest" && activeSortButtonClassName,
+                    )}
+                  >
+                    최신순
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeReviewSort("helpful")}
+                    aria-pressed={reviewSort === "helpful"}
+                    className={cn(
+                      sortButtonClassName,
+                      reviewSort === "helpful" && activeSortButtonClassName,
+                    )}
+                  >
+                    도움순
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeReviewSort("photo")}
+                    aria-pressed={reviewSort === "photo"}
+                    className={cn(
+                      sortButtonClassName,
+                      reviewSort === "photo" && activeSortButtonClassName,
+                    )}
+                  >
+                    사진순
+                  </button>
+                </div>
+              </div>
+
+              {reviews.length === 0 ? (
+                <p className="text-gray-400 mb-8">
+                  아직 등록된 후기가 없습니다.
                 </p>
               ) : (
-                <div className={timelineListClassName}>
-                  {visibleTimelineItems.map((item) => {
-                    const tags = item.review.tags ?? [];
-
-                    return (
-                      <article
-                        key={item.review.id}
-                        className={timelineItemClassName}
-                      >
-                        <span className={timelineDotClassName} />
-
-                        <div className={timelineCardClassName}>
-                          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                            <span>{item.dateLabel}</span>
-                            <span aria-hidden>·</span>
-                            <span>{item.mileageLabel}</span>
-                          </div>
-
-                          {tags.length > 0 && (
-                            <div className="mb-3 flex flex-wrap gap-2">
-                              {tags.map((tag) => (
-                                <span key={tag} className={timelineTagClassName}>
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          <p className="whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-200">
-                            {item.review.content}
-                          </p>
-
-                          <p className="mt-3 border-t border-zinc-700 pt-3 text-xs leading-5 text-gray-500">
-                            {item.snapshotLabel ||
-                              "작성 당시 차량 스냅샷 정보 없음"}
-                          </p>
-                        </div>
-                      </article>
-                    );
-                  })}
+                <div className="space-y-4 mb-8">
+                  {visibleReviews.map((review) => (
+                    <ReviewCard
+                      key={review.id}
+                      canDelete={getCanManageReview(review)}
+                      canEdit={getCanManageReview(review)}
+                      isDeleting={deletingReviewId === String(review.id)}
+                      onDelete={() => void handleDeleteReview(review)}
+                      onEdit={() => handleEditReview(review)}
+                      review={review}
+                      reviewKey={`${carNumber}-${review.id}`}
+                      vehicleId={vehicle?.id}
+                    />
+                  ))}
                 </div>
               )}
-            </section>
 
-            <div className={reviewHeaderClassName}>
-              <h2 className="text-3xl font-bold">등록된 팩트</h2>
-              <div className={sortControlClassName} aria-label="후기 정렬">
-                <button
-                  type="button"
-                  onClick={() => changeReviewSort("latest")}
-                  aria-pressed={reviewSort === "latest"}
-                  className={cn(
-                    sortButtonClassName,
-                    reviewSort === "latest" && activeSortButtonClassName
-                  )}
+              {reviews.length > reviewsPerPage && (
+                <div
+                  className={reviewPaginationClassName}
+                  aria-label="후기 페이지"
                 >
-                  최신순
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeReviewSort("helpful")}
-                  aria-pressed={reviewSort === "helpful"}
-                  className={cn(
-                    sortButtonClassName,
-                    reviewSort === "helpful" && activeSortButtonClassName
-                  )}
-                >
-                  도움순
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeReviewSort("photo")}
-                  aria-pressed={reviewSort === "photo"}
-                  className={cn(
-                    sortButtonClassName,
-                    reviewSort === "photo" && activeSortButtonClassName
-                  )}
-                >
-                  사진순
-                </button>
-              </div>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReviewPage(Math.max(1, currentReviewPage - 1))
+                    }
+                    disabled={currentReviewPage === 1}
+                    className={reviewPageButtonClassName}
+                  >
+                    이전
+                  </button>
 
-            {reviews.length === 0 ? (
-              <p className="text-gray-400 mb-8">아직 등록된 후기가 없습니다.</p>
-            ) : (
-              <div className="space-y-4 mb-8">
-                {visibleReviews.map((review) => (
-                  <ReviewCard
-                    key={review.id}
-                    canDelete={getCanManageReview(review)}
-                    canEdit={getCanManageReview(review)}
-                    isDeleting={deletingReviewId === String(review.id)}
-                    onDelete={() => void handleDeleteReview(review)}
-                    onEdit={() => handleEditReview(review)}
-                    review={review}
-                    reviewKey={`${carNumber}-${review.id}`}
-                  />
-                ))}
-              </div>
-            )}
+                  {Array.from({ length: totalReviewPages }, (_, index) => {
+                    const page = index + 1;
 
-            {reviews.length > reviewsPerPage && (
-              <div className={reviewPaginationClassName} aria-label="후기 페이지">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setReviewPage(Math.max(1, currentReviewPage - 1))
-                  }
-                  disabled={currentReviewPage === 1}
-                  className={reviewPageButtonClassName}
-                >
-                  이전
-                </button>
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setReviewPage(page)}
+                        aria-current={
+                          currentReviewPage === page ? "page" : undefined
+                        }
+                        className={cn(
+                          reviewPageButtonClassName,
+                          currentReviewPage === page &&
+                            activeReviewPageButtonClassName,
+                        )}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
 
-                {Array.from({ length: totalReviewPages }, (_, index) => {
-                  const page = index + 1;
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReviewPage(
+                        Math.min(totalReviewPages, currentReviewPage + 1),
+                      )
+                    }
+                    disabled={currentReviewPage === totalReviewPages}
+                    className={reviewPageButtonClassName}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
 
-                  return (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setReviewPage(page)}
-                      aria-current={
-                        currentReviewPage === page ? "page" : undefined
-                      }
-                      className={cn(
-                        reviewPageButtonClassName,
-                        currentReviewPage === page &&
-                          activeReviewPageButtonClassName
-                      )}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setReviewPage(
-                      Math.min(totalReviewPages, currentReviewPage + 1)
-                    )
-                  }
-                  disabled={currentReviewPage === totalReviewPages}
-                  className={reviewPageButtonClassName}
-                >
-                  다음
-                </button>
-              </div>
-            )}
-
-            <Link
-              href={isAuthenticated ? reviewPath : reviewLoginPath}
-              className={actionLinkClassName}
-            >
-              이 차량 후기 남기기
-            </Link>
-          </>
-        )}
+              <Link
+                href={isAuthenticated ? reviewPath : reviewLoginPath}
+                className={actionLinkClassName}
+              >
+                이 차량 후기 남기기
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </main>

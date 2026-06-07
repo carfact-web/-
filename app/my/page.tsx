@@ -19,41 +19,49 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
-  "min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6"
+  "min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6",
 );
 const shellClassName = cn("mx-auto w-full max-w-3xl");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-sm leading-6 text-zinc-400"
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-sm leading-6 text-zinc-400",
 );
 const secondaryButtonClassName = cn(
   "inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-200 transition",
-  "hover:border-zinc-500 hover:bg-zinc-900 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+  "hover:border-zinc-500 hover:bg-zinc-900 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto",
 );
 const primaryButtonClassName = cn(
   "inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition",
-  "hover:bg-red-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 sm:w-auto"
+  "hover:bg-red-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-700 sm:w-auto",
 );
 const inputClassName = cn(
   "w-full rounded-lg border border-zinc-700 bg-black/40 px-4 py-3 text-sm text-white outline-none transition",
-  "placeholder:text-zinc-600 focus:border-red-500/70"
+  "placeholder:text-zinc-600 focus:border-red-500/70",
 );
 const statusClassName = cn(
-  "rounded-lg border border-zinc-800 bg-black/40 px-4 py-3 text-sm text-zinc-300"
+  "rounded-lg border border-zinc-800 bg-black/40 px-4 py-3 text-sm text-zinc-300",
 );
 const errorClassName = cn(
-  "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+  "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200",
 );
 const summaryGridClassName = cn("mt-6 grid grid-cols-3 gap-3");
 const summaryCardClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+  "rounded-lg border border-zinc-800 bg-zinc-950 p-4",
 );
 const activitySectionClassName = cn(
-  "mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-5"
+  "mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-5",
 );
 const activityLinkClassName = cn(
   "block rounded-lg border border-zinc-800 bg-black px-4 py-3 transition",
-  "hover:border-zinc-600 hover:bg-zinc-900"
+  "hover:border-zinc-600 hover:bg-zinc-900",
 );
+const paginationButtonClassName = cn(
+  "inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300 transition",
+  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700 disabled:hover:bg-transparent disabled:hover:text-zinc-300",
+);
+const activePaginationButtonClassName = cn(
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+);
+const activityPageSize = 5;
 
 export default function MyPage() {
   const router = useRouter();
@@ -82,22 +90,23 @@ export default function MyPage() {
   } = useUserProfile(user);
   const [nicknameMessage, setNicknameMessage] = useState("");
   const [accountActivity, setAccountActivity] = useState<AccountActivity>(
-    getEmptyAccountActivity
+    getEmptyAccountActivity,
   );
   const [activityError, setActivityError] = useState("");
+  const [activitySearch, setActivitySearch] = useState("");
   const [isActivityLoading, setIsActivityLoading] = useState(false);
 
   const freePosts = useMemo(
     () =>
       accountActivity.communityPosts.filter((post) => post.category === "free"),
-    [accountActivity.communityPosts]
+    [accountActivity.communityPosts],
   );
   const maintenancePosts = useMemo(
     () =>
       accountActivity.communityPosts.filter(
-        (post) => post.category === "maintenance"
+        (post) => post.category === "maintenance",
       ),
-    [accountActivity.communityPosts]
+    [accountActivity.communityPosts],
   );
   const receivedLikeCount =
     accountActivity.communityLikeCount + accountActivity.reviewHelpfulCount;
@@ -208,7 +217,7 @@ export default function MyPage() {
           setActivityError(
             error instanceof Error
               ? error.message
-              : "내 활동 정보를 불러오지 못했습니다."
+              : "내 활동 정보를 불러오지 못했습니다.",
           );
         })
         .finally(() => {
@@ -228,7 +237,9 @@ export default function MyPage() {
     setNicknameMessage("");
 
     const formData = new FormData(event.currentTarget);
-    const isUpdated = await updateNickname(String(formData.get("nickname") ?? ""));
+    const isUpdated = await updateNickname(
+      String(formData.get("nickname") ?? ""),
+    );
 
     if (isUpdated) {
       setNicknameMessage("닉네임이 저장되었습니다.");
@@ -309,7 +320,9 @@ export default function MyPage() {
               <p className="mt-3 text-xs text-zinc-500">
                 닉네임은 최초 1회만 변경할 수 있습니다.
                 {nicknameChangeAvailable > 0
-                  ? " 현재 변경권 " + nicknameChangeAvailable + "회 보유 중입니다."
+                  ? " 현재 변경권 " +
+                    nicknameChangeAvailable +
+                    "회 보유 중입니다."
                   : ""}
               </p>
             ) : null}
@@ -364,13 +377,25 @@ export default function MyPage() {
               </span>
             ) : null}
           </div>
-          {activityError ? <p className={errorClassName}>{activityError}</p> : null}
+          {activityError ? (
+            <p className={errorClassName}>{activityError}</p>
+          ) : null}
+          <input
+            type="search"
+            className={inputClassName}
+            placeholder="내 활동 검색"
+            value={activitySearch}
+            onChange={(event) => setActivitySearch(event.target.value)}
+          />
           <ActivityList
+            key={"reviews-" + activitySearch}
+            searchQuery={activitySearch}
             title="내가 쓴 차량 후기"
             emptyText="작성한 차량 후기가 없습니다."
             items={accountActivity.reviews.map((review) => ({
               href: review.vehicleSnapshot?.plateNumber
-                ? "/car/" + encodeURIComponent(review.vehicleSnapshot.plateNumber)
+                ? "/car/" +
+                  encodeURIComponent(review.vehicleSnapshot.plateNumber)
                 : "/",
               meta: review.createdAt,
               title: review.vehicleSnapshot
@@ -382,9 +407,19 @@ export default function MyPage() {
                     .filter(Boolean)
                     .join(" · ")
                 : review.content,
+              searchText: [
+                review.vehicleSnapshot?.brand,
+                review.vehicleSnapshot?.model,
+                review.vehicleSnapshot?.plateNumber,
+                review.content,
+              ]
+                .filter(Boolean)
+                .join(" "),
             }))}
           />
           <ActivityList
+            key={"free-" + activitySearch}
+            searchQuery={activitySearch}
             title="내가 쓴 자유게시판 글"
             emptyText="작성한 자유게시판 글이 없습니다."
             items={freePosts.map((post) => ({
@@ -395,10 +430,13 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
+              searchText: [post.title, post.content].filter(Boolean).join(" "),
               title: post.title,
             }))}
           />
           <ActivityList
+            key={"maintenance-" + activitySearch}
+            searchQuery={activitySearch}
             title="내가 쓴 정비후기 글"
             emptyText="작성한 정비후기 글이 없습니다."
             items={maintenancePosts.map((post) => ({
@@ -409,15 +447,19 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
+              searchText: [post.title, post.content].filter(Boolean).join(" "),
               title: post.title,
             }))}
           />
           <ActivityList
+            key={"received-" + activitySearch}
+            searchQuery={activitySearch}
             title="내가 받은 좋아요/도움돼요"
             emptyText="아직 받은 좋아요/도움돼요가 없습니다."
             items={accountActivity.receivedActivity.map((activity) => ({
               href: activity.href,
               meta: activity.label + " · " + activity.count + "개",
+              searchText: activity.searchText,
               title: activity.title,
             }))}
           />
@@ -430,29 +472,105 @@ export default function MyPage() {
 function ActivityList({
   emptyText,
   items,
+  searchQuery,
   title,
 }: {
   emptyText: string;
-  items: { href: string; meta: string; title: string }[];
+  items: { href: string; meta: string; searchText?: string; title: string }[];
+  searchQuery: string;
   title: string;
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const normalizedSearchQuery = normalizeActivitySearch(searchQuery);
+  const filteredItems = normalizedSearchQuery
+    ? items.filter((item) =>
+        normalizeActivitySearch(
+          [item.title, item.meta, item.searchText].filter(Boolean).join(" "),
+        ).includes(normalizedSearchQuery),
+      )
+    : items;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredItems.length / activityPageSize),
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * activityPageSize;
+  const visibleItems = filteredItems.slice(
+    pageStartIndex,
+    pageStartIndex + activityPageSize,
+  );
+
   return (
     <div className="mt-5">
-      <h3 className="text-sm font-black text-white">{title}</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black text-white">{title}</h3>
+        {filteredItems.length ? (
+          <span className="text-xs font-bold text-zinc-500">
+            {filteredItems.length.toLocaleString()}개
+          </span>
+        ) : null}
+      </div>
       <div className="mt-3 space-y-2">
-        {items.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <p className="rounded-lg border border-zinc-800 bg-black px-4 py-3 text-sm text-zinc-500">
-            {emptyText}
+            {normalizedSearchQuery ? "검색 결과가 없습니다." : emptyText}
           </p>
         ) : (
-          items.map((item) => (
-            <Link key={item.href + item.title} href={item.href} className={activityLinkClassName}>
+          visibleItems.map((item) => (
+            <Link
+              key={item.href + item.title}
+              href={item.href}
+              className={activityLinkClassName}
+            >
               <p className="font-bold text-white">{item.title}</p>
               <p className="mt-1 text-xs text-zinc-500">{item.meta}</p>
             </Link>
           ))
         )}
       </div>
+      {totalPages > 1 ? (
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            className={paginationButtonClassName}
+            disabled={safeCurrentPage === 1}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          >
+            이전
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => {
+            const page = index + 1;
+
+            return (
+              <button
+                key={page}
+                type="button"
+                aria-current={safeCurrentPage === page ? "page" : undefined}
+                className={cn(
+                  paginationButtonClassName,
+                  safeCurrentPage === page && activePaginationButtonClassName,
+                )}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className={paginationButtonClassName}
+            disabled={safeCurrentPage === totalPages}
+            onClick={() =>
+              setCurrentPage((page) => Math.min(totalPages, page + 1))
+            }
+          >
+            다음
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
+
+const normalizeActivitySearch = (value: string) =>
+  value.toLowerCase().replace(/\s+/g, " ").trim();
