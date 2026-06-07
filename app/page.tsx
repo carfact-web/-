@@ -490,28 +490,30 @@ export default function Home() {
           </p>
         </section>
 
-        <section className="rounded-lg border border-zinc-800 bg-[#111111] p-4 shadow-2xl shadow-black/30 sm:p-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
-            차량번호 조회
-          </p>
-          <p className="text-sm leading-6 text-zinc-400">
-            이 차량을 본 사람들의 실제 후기를 확인하세요.
-          </p>
-        </section>
-
         <form className={panelClassName} onSubmit={goToReport}>
-          <input
-            value={carNumber}
-            onChange={(e) => {
-              setCarNumber(sanitizeVehiclePlateNumber(e.target.value));
-              setFormMessage("");
-            }}
-            type="text"
-            placeholder="차량번호 입력 예) 123가4567"
-            className={inputClassName}
-            aria-invalid={Boolean(formMessage)}
-            aria-describedby={formMessage ? "plate-validation" : undefined}
-          />
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
+              차량번호 조회
+            </p>
+            <p className="text-sm leading-6 text-zinc-400">
+              이 차량을 본 사람들의 실제 후기를 확인하세요.
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <input
+              value={carNumber}
+              onChange={(e) => {
+                setCarNumber(sanitizeVehiclePlateNumber(e.target.value));
+                setFormMessage("");
+              }}
+              type="text"
+              placeholder="차량번호 입력 예) 123가4567"
+              className={inputClassName}
+              aria-invalid={Boolean(formMessage)}
+              aria-describedby={formMessage ? "plate-validation" : undefined}
+            />
+          </div>
 
           {formMessage && (
             <p
