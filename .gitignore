@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results
+/carfact-captures
 
 # next.js
 /.next/

@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import {
+  formatVehiclePlateNumberForDisplay,
+  isValidVehiclePlateNumber,
+  normalizeVehiclePlateNumber,
+} from "@/utils/vehiclePlateValidation";
 import type { FormEvent } from "react";
 
 const pageClassName = cn("min-h-screen bg-black px-4 py-8 text-white sm:px-6");
@@ -16,29 +21,31 @@ const inputClassName = cn(
   "placeholder:text-zinc-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
 );
 const primaryButtonClassName = cn(
-  "mt-3 w-full rounded-lg bg-red-600 px-4 py-4 text-base font-bold text-white transition",
-  "hover:bg-red-500 active:scale-[0.99]"
+  "mt-3 w-full rounded-lg px-4 py-4 text-base font-bold text-white transition",
+  "bg-[#FF3B30] hover:bg-[#f52f25] active:scale-[0.99]",
+  "disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:hover:bg-[#3A3A3A] disabled:active:scale-100",
 );
 const formMessageClassName = cn(
-  "mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+  "mt-2 px-1 text-xs font-semibold text-[#FF3B30]"
 );
 
 export default function LookupPage() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
-  const [formMessage, setFormMessage] = useState("");
+  const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
+  const hasCarNumberInput = normalizedCarNumber.length > 0;
+  const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
+  const showPlateValidationError = hasCarNumberInput && !isCarNumberValid;
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const value = sanitizeVehiclePlateNumber(carNumber);
+    const value = normalizeVehiclePlateNumber(carNumber);
 
-    if (!value) {
-      setFormMessage("차량번호를 입력해주세요.");
+    if (!isValidVehiclePlateNumber(value)) {
       return;
     }
 
-    setFormMessage("");
     router.push(`/car/${encodeURIComponent(value)}`);
   };
 
@@ -54,29 +61,34 @@ export default function LookupPage() {
 
         <form className={panelClassName} onSubmit={goToReport}>
           <input
-            value={carNumber}
+            value={formatVehiclePlateNumberForDisplay(carNumber)}
             onChange={(event) => {
               setCarNumber(sanitizeVehiclePlateNumber(event.target.value));
-              setFormMessage("");
             }}
             type="text"
             placeholder="예) 123가4567"
             className={inputClassName}
-            aria-invalid={Boolean(formMessage)}
-            aria-describedby={formMessage ? "lookup-validation" : undefined}
+            aria-invalid={showPlateValidationError}
+            aria-describedby={
+              showPlateValidationError ? "lookup-validation" : undefined
+            }
           />
 
-          {formMessage && (
+          {showPlateValidationError && (
             <p
               id="lookup-validation"
               className={formMessageClassName}
               aria-live="polite"
             >
-              {formMessage}
+              잘못된 입력형태입니다.
             </p>
           )}
 
-          <button type="submit" className={primaryButtonClassName}>
+          <button
+            type="submit"
+            className={primaryButtonClassName}
+            disabled={!isCarNumberValid}
+          >
             차량 이야기 보기
           </button>
         </form>

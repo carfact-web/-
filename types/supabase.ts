@@ -148,6 +148,35 @@ export interface Database {
           },
         ];
       };
+      review_helpful: {
+        Row: {
+          id: string;
+          review_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          review_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          review_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "review_helpful_review_id_fkey";
+            columns: ["review_id"];
+            isOneToOne: false;
+            referencedRelation: "reviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       community_reports: {
         Row: {
           id: string;
@@ -601,6 +630,28 @@ export interface Database {
           top_models: Json;
         }[];
       };
+      public_get_recent_home_reviews: {
+        Args: {
+          review_limit?: number;
+        };
+        Returns: {
+          id: string;
+          vehicle_id: string;
+          author_id: string | null;
+          author_nickname: string | null;
+          content: string;
+          tags: string[];
+          images: Json;
+          vehicle_snapshot: Json;
+          helpful_count: number;
+          report_count: number;
+          is_hidden: boolean;
+          created_at: string;
+          updated_at: string;
+          view_count: number;
+          recent_view_count: number;
+        }[];
+      };
       admin_list_community_posts: {
         Args: {
           search_text?: string;
@@ -819,6 +870,15 @@ export interface Database {
           p_review_id: string;
         };
         Returns: void;
+      };
+      toggle_review_helpful: {
+        Args: {
+          target_review_id: string;
+        };
+        Returns: {
+          is_voted: boolean;
+          helpful_count: number;
+        }[];
       };
       update_community_post: {
         Args: {

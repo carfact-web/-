@@ -11,7 +11,11 @@ import {
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import type { Review } from "@/types/review";
 import { recordPageView } from "@/lib/pageViews";
-import { updateSupabaseReviewHelpfulCount } from "@/lib/supabaseData";
+import {
+  fetchSupabaseReviewHelpfulSnapshot,
+  toggleSupabaseReviewHelpful,
+} from "@/lib/supabaseData";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
 import {
   addHelpfulVote,
@@ -53,7 +57,7 @@ const tagClassName = cn(
   "ring-1 ring-red-500/25",
 );
 const contentClassName = cn(
-  "mb-4 whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-100",
+  "mb-4 whitespace-pre-line break-words text-sm leading-[1.7] text-gray-100",
 );
 const imageGridClassName = cn("mb-4 grid grid-cols-3 gap-2 sm:max-w-sm");
 const imageThumbnailClassName = cn(
@@ -156,6 +160,12 @@ export function ReviewCard({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isReportToastMounted, setIsReportToastMounted] = useState(false);
   const [showReportToast, setShowReportToast] = useState(false);
+  const [remoteHelpfulSnapshot, setRemoteHelpfulSnapshot] =
+    useState<(HelpfulSnapshot & { reviewId: string; userId: string }) | null>(
+      null,
+    );
+  const [isHelpfulSaving, setIsHelpfulSaving] = useState(false);
+  const { isAuthenticated, isAuthReady, user } = useAuth();
   const authorNickname = review.authorNickname || "익명 사용자";
   const storageKey = reviewKey ?? String(review.id);
   const initialHelpfulCount = review.helpfulCount ?? 0;
@@ -173,6 +183,14 @@ export function ReviewCard({
       }),
     [helpfulSnapshotJson, initialHelpfulCount],
   );
+  const displayedHelpfulSnapshot =
+    isAuthReady &&
+    isAuthenticated &&
+    user?.id &&
+    remoteHelpfulSnapshot?.userId === user.id &&
+    remoteHelpfulSnapshot.reviewId === String(review.id)
+      ? remoteHelpfulSnapshot
+      : helpfulSnapshot;
   const reportSnapshotJson = useSyncExternalStore(
     subscribeToReviewReports,
     () =>
@@ -208,18 +226,59 @@ export function ReviewCard({
         .filter(Boolean)
         .join(" · ")
     : "";
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isAuthReady || !isAuthenticated || !user?.id) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchSupabaseReviewHelpfulSnapshot(String(review.id), user.id)
+      .then((snapshot) => {
+        if (isActive && snapshot) {
+          setRemoteHelpfulSnapshot({
+            ...snapshot,
+            reviewId: String(review.id),
+            userId: user.id,
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthReady, isAuthenticated, review.id, user?.id]);
+
   const addHelpful = () => {
-    if (helpfulSnapshot.isVoted) {
+    if (isHelpfulSaving) {
       return;
     }
 
-    const nextSnapshot = addHelpfulVote(storageKey, initialHelpfulCount);
-    void updateSupabaseReviewHelpfulCount(
-      String(review.id),
-      nextSnapshot.count,
-    ).catch(() => {
-      // Keep local helpful state when remote persistence is unavailable.
-    });
+    if (isAuthReady && isAuthenticated && user?.id) {
+      setIsHelpfulSaving(true);
+      void toggleSupabaseReviewHelpful(String(review.id))
+        .then((snapshot) => {
+          if (snapshot) {
+            setRemoteHelpfulSnapshot({
+              ...snapshot,
+              reviewId: String(review.id),
+              userId: user.id,
+            });
+          }
+        })
+        .finally(() => {
+          setIsHelpfulSaving(false);
+        });
+
+      return;
+    }
+
+    if (!helpfulSnapshot.isVoted) {
+      addHelpfulVote(storageKey, initialHelpfulCount);
+    }
   };
   const recordReviewView = () => {
     void recordPageView({
@@ -447,13 +506,13 @@ export function ReviewCard({
         <button
           type="button"
           onClick={addHelpful}
-          disabled={helpfulSnapshot.isVoted}
+          disabled={isHelpfulSaving}
           className={helpfulButtonClassName}
-          aria-pressed={helpfulSnapshot.isVoted}
+          aria-pressed={displayedHelpfulSnapshot.isVoted}
         >
-          {helpfulSnapshot.isVoted
-            ? `도움됨 ✓ ${helpfulSnapshot.count}`
-            : `👍 도움돼요 ${helpfulSnapshot.count}`}
+          {displayedHelpfulSnapshot.isVoted
+            ? `도움됨 ✓ ${displayedHelpfulSnapshot.count}`
+            : `👍 도움돼요 ${displayedHelpfulSnapshot.count}`}
         </button>
         <button
           type="button"
@@ -599,7 +658,7 @@ export function ReviewCard({
               </div>
             ) : null}
 
-            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-[1.8] text-zinc-100">
+            <p className="mt-4 whitespace-pre-line break-words text-sm leading-[1.8] text-zinc-100">
               {review.content}
             </p>
 

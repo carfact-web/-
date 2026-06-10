@@ -13,7 +13,7 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { recordPageView } from "@/lib/pageViews";
-import { getAiSummary } from "@/utils/aiSummary";
+import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
@@ -171,7 +171,7 @@ export default function CarReportPage() {
   const fuelType = vehicle?.fuelType ?? "";
   const hasVehicleInfo = Boolean(brand && model && generation && year);
 
-  const aiSummaries = getAiSummary(brand, model, year, mileage, {
+  const aiAnalysis = getStructuredAiSummary(brand, model, year, mileage, {
     generation,
     fuelType,
   });
@@ -395,7 +395,7 @@ export default function CarReportPage() {
                 차량정보가 바뀌었나요?
               </Link>
 
-              <AiSummaryCard summaries={aiSummaries} />
+              <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
 
               <section className={timelineSectionClassName}>
                 <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>

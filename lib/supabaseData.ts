@@ -18,6 +18,11 @@ import type {
 } from "@/types/review";
 import type { Vehicle, VehicleRow } from "@/types/vehicle";
 
+type ReviewRowWithTraffic = ReviewRow & {
+  view_count?: number | string | null;
+  recent_view_count?: number | string | null;
+};
+
 const toLocaleDateTime = (value: string) => {
   const date = new Date(value);
 
@@ -152,7 +157,7 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
 });
 
 export const mapReviewRow = (
-  row: ReviewRow,
+  row: ReviewRowWithTraffic,
   verifiedDealers: Record<string, boolean> = {},
 ): Review => ({
   id: row.id,
@@ -167,6 +172,8 @@ export const mapReviewRow = (
   hasImages: toReviewImages(row.images).length > 0,
   helpfulCount: row.helpful_count,
   reportCount: row.report_count,
+  viewCount: toNumber(row.view_count),
+  recentViewCount: toNumber(row.recent_view_count),
   isHidden: row.is_hidden,
   createdAt: toLocaleDateTime(row.created_at),
   vehicleSnapshot: toVehicleSnapshot(row.vehicle_snapshot),
@@ -284,35 +291,13 @@ export const fetchRecentSupabaseReviews = async (limit = 20) => {
     return null;
   }
 
-  console.info("recent-reviews-query", {
-    table: "reviews",
-    select: "*",
-    filters: { is_hidden: false },
-    order: { created_at: "desc" },
-    limit,
+  const { data, error } = await supabase.rpc("public_get_recent_home_reviews", {
+    review_limit: limit,
   });
-
-  const { data, error } = await supabase
-    .from("reviews")
-    .select("*")
-    .eq("is_hidden", false)
-    .order("created_at", { ascending: false })
-    .limit(limit);
 
   if (error) {
     throw error;
   }
-
-  console.info(
-    "recent-reviews-query-result",
-    data.map((row) => ({
-      id: row.id,
-      is_hidden: row.is_hidden,
-      created_at: row.created_at,
-      vehicle_plate:
-        toVehicleSnapshot(row.vehicle_snapshot)?.plateNumber ?? null,
-    })),
-  );
 
   const verifiedDealers = await fetchVerifiedDealerMap(
     data.map((review) => review.author_id),
@@ -493,4 +478,65 @@ export const updateSupabaseReviewHelpfulCount = async (
   if (error) {
     throw error;
   }
+};
+
+export const fetchSupabaseReviewHelpfulSnapshot = async (
+  reviewId: string,
+  userId: string,
+) => {
+  if (!supabase) {
+    return null;
+  }
+
+  const [reviewResult, helpfulResult] = await Promise.all([
+    supabase
+      .from("reviews")
+      .select("helpful_count")
+      .eq("id", reviewId)
+      .maybeSingle(),
+    supabase
+      .from("review_helpful")
+      .select("id")
+      .eq("review_id", reviewId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+
+  if (reviewResult.error) {
+    throw reviewResult.error;
+  }
+
+  if (helpfulResult.error) {
+    throw helpfulResult.error;
+  }
+
+  return {
+    count: toNumber(reviewResult.data?.helpful_count),
+    isVoted: Boolean(helpfulResult.data),
+  };
+};
+
+export const toggleSupabaseReviewHelpful = async (reviewId: string) => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.rpc("toggle_review_helpful", {
+    target_review_id: reviewId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const snapshot = data?.[0];
+
+  if (!snapshot) {
+    return null;
+  }
+
+  return {
+    count: toNumber(snapshot.helpful_count),
+    isVoted: Boolean(snapshot.is_voted),
+  };
 };

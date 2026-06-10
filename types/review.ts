@@ -20,6 +20,8 @@ export interface Review {
   tags?: string[];
   helpfulCount?: number;
   reportCount?: number;
+  viewCount?: number;
+  recentViewCount?: number;
   isHidden?: boolean;
   images?: ReviewImageAttachment[];
   hasImages?: boolean;

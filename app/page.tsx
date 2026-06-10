@@ -1,10 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -21,8 +21,13 @@ import {
 } from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import {
+  formatVehiclePlateNumberForDisplay,
+  isValidVehiclePlateNumber,
+  normalizeVehiclePlateNumber,
+} from "@/utils/vehiclePlateValidation";
 import { filterValidReviews } from "@/utils/reviewValidation";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode, TouchEvent } from "react";
 import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
@@ -32,54 +37,69 @@ const pageClassName = cn(
 );
 const shellClassName = cn("mx-auto flex w-full max-w-3xl flex-col gap-6 sm:gap-8");
 const headerClassName = cn(
-  "border-b border-zinc-800/80 pb-3",
+  "border-b border-zinc-800/80 pb-1.5",
 );
-const headerTopClassName = cn("flex items-center justify-between gap-3");
-const homeLogoClassName = cn("h-10 w-auto object-contain sm:h-12");
+const headerTopClassName = cn("flex min-h-11 items-center justify-between gap-3");
+const homeLogoClassName = cn(
+  "inline-flex h-10 items-center sm:h-11",
+);
 const panelClassName = cn(
   "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
 );
 const plateInputFrameClassName = cn(
-  "relative",
-  "before:pointer-events-none before:absolute before:left-4 before:top-1/2 before:z-10 before:h-2 before:w-2 before:-translate-y-1/2 before:rounded-full before:bg-zinc-400 before:shadow-[inset_0_1px_1px_rgba(0,0,0,0.45)] before:content-['']",
-  "after:pointer-events-none after:absolute after:right-4 after:top-1/2 after:z-10 after:h-2 after:w-2 after:-translate-y-1/2 after:rounded-full after:bg-zinc-400 after:shadow-[inset_0_1px_1px_rgba(0,0,0,0.45)] after:content-['']",
+  "plate-input-frame",
 );
 const inputClassName = cn(
-  "w-full rounded-lg border-2 border-[#222] bg-[linear-gradient(#ffffff,#f2f2f2)] px-12 py-4 text-center text-[26px] font-extrabold tracking-[1.5px] text-zinc-950 shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] outline-none transition sm:text-[32px] sm:tracking-[2px]",
-  "placeholder:text-zinc-500 focus:border-[#FF3B30] focus:ring-2 focus:ring-[#FF3B30]/30",
+  "plate-number-input",
 );
 const primaryButtonClassName = cn(
-  "mt-3 w-full rounded-lg bg-[#FF3B30] px-4 py-4 text-base font-bold text-white transition",
-  "hover:bg-[#f52f25] active:scale-[0.99]",
+  "mt-3 w-full rounded-lg px-4 py-4 text-base font-bold text-white transition",
+  "bg-[#FF3B30] hover:bg-[#f52f25] active:scale-[0.99]",
+  "disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:hover:bg-[#3A3A3A] disabled:active:scale-100",
 );
 const formMessageClassName = cn(
-  "mt-3 rounded-lg border border-[#FF3B30]/30 bg-[#FF3B30]/10 px-3 py-2 text-sm text-red-200",
+  "mt-2 px-1 text-xs font-semibold text-[#FF3B30]",
 );
-const recentSectionClassName = cn("max-w-3xl");
-const recentListClassName = cn("space-y-3");
+const recentSectionClassName = cn("w-full max-w-3xl min-w-0");
 const recentCardClassName = cn(
-  "block rounded-lg border border-zinc-800 bg-zinc-950 p-4 transition",
+  "block w-full max-w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-3 transition sm:p-4",
   "hover:border-zinc-700 hover:bg-zinc-900",
 );
 const recentMetaClassName = cn(
-  "mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500",
+  "mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-zinc-500 sm:mt-2 sm:gap-x-2 sm:gap-y-1 sm:text-xs",
 );
-const recentToggleButtonClassName = cn(
-  "mt-4 inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-zinc-300 transition",
-  "hover:bg-zinc-900 hover:text-white active:scale-[0.98]",
+const recentCarouselButtonClassName = cn(
+  "hidden h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-lg font-black text-zinc-200 transition sm:inline-flex",
+  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-95",
+);
+const recentCarouselDotClassName = cn(
+  "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
+);
+const recentBadgeStackClassName = cn(
+  "flex max-w-[45%] shrink-0 flex-col items-end gap-1 sm:max-w-none sm:gap-1.5",
+);
+const recentViewBadgeClassName = cn(
+  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-bold leading-tight text-zinc-200 sm:px-2.5 sm:py-1 sm:text-xs",
+);
+const recentStatusBadgeClassName = cn(
+  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full bg-[#FF3B30]/15 px-2 py-0.5 text-[11px] font-bold leading-tight text-[#FF7A73] sm:px-2.5 sm:py-1 sm:text-xs",
 );
 const topRankingCardClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
+  "flex h-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 shadow-2xl shadow-black/20 sm:p-4 md:p-5",
 );
 const topRankingItemClassName = cn(
-  "grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-lg border border-zinc-800 bg-black p-3",
+  "grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-1.5 rounded-lg border border-zinc-800 bg-black p-2 md:grid-cols-[2rem_1fr_auto] md:gap-3 md:p-3",
+);
+const topRankingButtonClassName = cn(
+  "shrink-0 whitespace-nowrap rounded-full border border-[#FF4D4F]/70 px-2 py-1 text-[10px] font-black leading-none text-[#FF4D4F] transition md:px-3 md:text-xs",
+  "hover:border-[#FF4D4F] hover:bg-[#FF4D4F]/[0.08] hover:text-[#FF6B6D] active:scale-[0.98]",
 );
 const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
   "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]",
 );
 const noticeTickerClassName = cn(
-  "mt-2 block min-w-0 truncate text-sm font-bold text-white transition",
+  "mt-1 block min-w-0 truncate text-sm font-bold text-white transition",
   "hover:text-white",
 );
 const heroCopyFrameClassName = cn("relative h-20 overflow-hidden sm:h-32");
@@ -96,13 +116,20 @@ interface RecentFact {
   vehicle: Vehicle | null;
   content: string;
   createdAt: string;
+  viewCount: number;
+  recentViewCount: number;
 }
 
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
-const recentPreviewCount = 3;
+const recentReviewsPerSlide = 3;
+const recentReviewSlideIntervalMs = 5000;
+const recentReviewSwipeThresholdPx = 48;
 const heroCopyIntervalMs = 3500;
 const noticeRollIntervalMs = 3000;
+const topVehiclesPreviewCount = 3;
+const topModelsPreviewCount = 4;
+const topRankingModalLimit = 10;
 const heroCopies = [
   [
     [{ text: "좋은 차", highlight: true }, { text: "는 이유가 있고," }],
@@ -191,6 +218,8 @@ const getRecentFacts = (snapshot: string): RecentFact[] => {
         vehicle: review.vehicleSnapshot ?? savedVehicle,
         content: review.content,
         createdAt: review.createdAt,
+        viewCount: review.viewCount ?? 0,
+        recentViewCount: review.recentViewCount ?? 0,
       }));
     })
     .sort((left, right) => getRecentFactTime(right) - getRecentFactTime(left));
@@ -218,17 +247,6 @@ const maskPlateNumber = (plateNumber: string) => {
   return normalizedPlateNumber.slice(0, -3) + "XXX";
 };
 
-const formatPlateNumberForDisplay = (plateNumber: string) => {
-  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
-  const match = normalizedPlateNumber.match(/^(\d{2,3}[가-힣])(\d{4})$/);
-
-  if (!match) {
-    return normalizedPlateNumber;
-  }
-
-  return match[1] + " " + match[2];
-};
-
 const formatTopVehicleModel = (
   vehicle: HomeTrafficRankings["topVehicles"][number],
 ) =>
@@ -236,6 +254,14 @@ const formatTopVehicleModel = (
   vehicle.generation ??
   vehicle.model ??
   "차종 정보 없음";
+
+const getTopVehicleHref = (
+  vehicle: HomeTrafficRankings["topVehicles"][number],
+) => {
+  const carNumber = sanitizeVehiclePlateNumber(vehicle.carNumber ?? "");
+
+  return carNumber ? `/car/${encodeURIComponent(carNumber)}` : null;
+};
 
 const formatTopModelName = (
   model: HomeTrafficRankings["topModels"][number],
@@ -258,14 +284,78 @@ const formatTopModelName = (
   return manufacturer + " " + modelName;
 };
 
+const chunkRecentFacts = (facts: RecentFact[]) => {
+  const chunks: RecentFact[][] = [];
+
+  for (let index = 0; index < facts.length; index += recentReviewsPerSlide) {
+    chunks.push(facts.slice(index, index + recentReviewsPerSlide));
+  }
+
+  return chunks;
+};
+
+const formatVehicleYearRange = (year: string | undefined) => {
+  const normalizedYear = year?.trim();
+
+  if (!normalizedYear) {
+    return "연식 정보 없음";
+  }
+
+  if (normalizedYear.includes("년")) {
+    return normalizedYear.startsWith("(")
+      ? normalizedYear
+      : `(${normalizedYear})`;
+  }
+
+  const yearMatch = normalizedYear.match(/\d{2,4}/);
+
+  if (!yearMatch) {
+    return normalizedYear;
+  }
+
+  const yearNumber = yearMatch[0].slice(-2);
+
+  return `(${yearNumber}년~)`;
+};
+
+const formatReviewDate = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("ko-KR", {
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  });
+};
+
+const getRecentViewBadge = (recentViewCount: number) => {
+  if (recentViewCount >= 30) {
+    return "🚀 관심집중";
+  }
+
+  if (recentViewCount >= 10) {
+    return "📈 급상승";
+  }
+
+  return null;
+};
+
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, signOut } = useAuth();
   const [carNumber, setCarNumber] = useState("");
-  const [formMessage, setFormMessage] = useState("");
-  const [showAllRecentFacts, setShowAllRecentFacts] = useState(false);
   const [heroCopyIndex, setHeroCopyIndex] = useState(0);
+  const [recentSlideIndex, setRecentSlideIndex] = useState(0);
+  const [recentCarouselHeight, setRecentCarouselHeight] = useState<
+    number | null
+  >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
+  const recentTouchStartX = useRef<number | null>(null);
+  const recentSlideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
   const [trafficRankings, setTrafficRankings] =
     useState<HomeTrafficRankings | null>(null);
@@ -277,17 +367,66 @@ export default function Home() {
   const [remoteRecentFacts, setRemoteRecentFacts] = useState<
     RecentFact[] | null
   >(null);
-  const localRecentFacts = getRecentFacts(recentReviewsSnapshot);
-  const recentFacts = isSupabaseConfigured
-    ? (remoteRecentFacts ?? [])
-    : localRecentFacts;
-  const displayedRecentFacts = showAllRecentFacts
-    ? recentFacts
-    : recentFacts.slice(0, recentPreviewCount);
-  const hasHiddenRecentFacts = recentFacts.length > recentPreviewCount;
+  const localRecentFacts = useMemo(
+    () => getRecentFacts(recentReviewsSnapshot),
+    [recentReviewsSnapshot],
+  );
+  const recentFacts = useMemo(
+    () => (isSupabaseConfigured ? (remoteRecentFacts ?? []) : localRecentFacts),
+    [localRecentFacts, remoteRecentFacts],
+  );
+  const recentFactPages = useMemo(
+    () => chunkRecentFacts(recentFacts),
+    [recentFacts],
+  );
+  const recentPageCount = recentFactPages.length;
+  const activeRecentSlideIndex =
+    recentPageCount > 0
+      ? Math.min(recentSlideIndex, recentPageCount - 1)
+      : 0;
   const heroCopy = heroCopies[heroCopyIndex];
   const activeNotice =
     homeNotices[noticeIndex % Math.max(homeNotices.length, 1)];
+  const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
+  const hasCarNumberInput = normalizedCarNumber.length > 0;
+  const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
+  const showPlateValidationError = hasCarNumberInput && !isCarNumberValid;
+  const goToPreviousRecentSlide = () => {
+    setRecentSlideIndex((currentIndex) =>
+      recentPageCount > 0
+        ? (currentIndex - 1 + recentPageCount) % recentPageCount
+        : 0,
+    );
+  };
+  const goToNextRecentSlide = () => {
+    setRecentSlideIndex((currentIndex) =>
+      recentPageCount > 0 ? (currentIndex + 1) % recentPageCount : 0,
+    );
+  };
+  const handleRecentTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    recentTouchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleRecentTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startX = recentTouchStartX.current;
+    recentTouchStartX.current = null;
+
+    if (startX === null || recentPageCount < 2) {
+      return;
+    }
+
+    const endX = event.changedTouches[0]?.clientX ?? startX;
+    const deltaX = endX - startX;
+
+    if (Math.abs(deltaX) < recentReviewSwipeThresholdPx) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      goToNextRecentSlide();
+    } else {
+      goToPreviousRecentSlide();
+    }
+  };
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -298,6 +437,53 @@ export default function Home() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (recentPageCount < 2) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setRecentSlideIndex(
+        (currentIndex) => (currentIndex + 1) % recentPageCount,
+      );
+    }, recentReviewSlideIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [recentPageCount]);
+
+  useEffect(() => {
+    recentSlideRefs.current.length = recentFactPages.length;
+    const activeSlide = recentSlideRefs.current[activeRecentSlideIndex];
+
+    if (!activeSlide) {
+      setRecentCarouselHeight(null);
+      return;
+    }
+
+    const updateHeight = () => {
+      setRecentCarouselHeight(activeSlide.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeight);
+
+      return () => {
+        window.removeEventListener("resize", updateHeight);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(activeSlide);
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, [activeRecentSlideIndex, recentFactPages]);
 
   useEffect(() => {
     let isActive = true;
@@ -323,6 +509,8 @@ export default function Home() {
             vehicle: review.vehicleSnapshot ?? null,
             content: review.content,
             createdAt: review.createdAt,
+            viewCount: review.viewCount ?? 0,
+            recentViewCount: review.recentViewCount ?? 0,
           })),
         );
       })
@@ -410,14 +598,12 @@ export default function Home() {
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const value = sanitizeVehiclePlateNumber(carNumber);
+    const value = normalizeVehiclePlateNumber(carNumber);
 
-    if (!value) {
-      setFormMessage("차량번호를 입력해주세요.");
+    if (!isValidVehiclePlateNumber(value)) {
       return;
     }
 
-    setFormMessage("");
     router.push(`/car/${encodeURIComponent(value)}/setup`);
   };
 
@@ -426,15 +612,8 @@ export default function Home() {
       <div className={shellClassName}>
         <header className={headerClassName}>
           <div className={headerTopClassName}>
-            <Link href="/" aria-label="카팩트 홈">
-              <Image
-                src="/brand/carfact-home-logo.png"
-                alt="카팩트"
-                width={48}
-                height={51}
-                priority
-                className={homeLogoClassName}
-              />
+            <Link href="/" aria-label="카팩트 홈" className="shrink-0">
+              <BrandLogo className={homeLogoClassName} />
             </Link>
             {isAuthReady && isAuthenticated ? (
               <button
@@ -518,33 +697,38 @@ export default function Home() {
 
           <div className={cn("mt-5", plateInputFrameClassName)}>
             <input
-              value={formatPlateNumberForDisplay(carNumber)}
+              value={formatVehiclePlateNumberForDisplay(carNumber)}
               onChange={(e) => {
                 setCarNumber(sanitizeVehiclePlateNumber(e.target.value));
-                setFormMessage("");
               }}
               type="text"
               inputMode="text"
               autoComplete="off"
-              placeholder="123마4567"
+              placeholder="123마 4567"
               className={inputClassName}
-              aria-invalid={Boolean(formMessage)}
-              aria-describedby={formMessage ? "plate-validation" : undefined}
+              aria-invalid={showPlateValidationError}
+              aria-describedby={
+                showPlateValidationError ? "plate-validation" : undefined
+              }
               aria-label="차량번호"
             />
           </div>
 
-          {formMessage && (
+          {showPlateValidationError && (
             <p
               id="plate-validation"
               className={formMessageClassName}
               aria-live="polite"
             >
-              {formMessage}
+              잘못된 입력형태입니다.
             </p>
           )}
 
-          <button type="submit" className={primaryButtonClassName}>
+          <button
+            type="submit"
+            className={primaryButtonClassName}
+            disabled={!isCarNumberValid}
+          >
             차량 이야기 보기
           </button>
         </form>
@@ -552,17 +736,37 @@ export default function Home() {
         {trafficRankings &&
         (trafficRankings.topVehicles.length ||
           trafficRankings.topModels.length) ? (
-          <section className="grid gap-4 md:grid-cols-2">
+          <section className="mb-2 grid grid-cols-2 items-stretch gap-2 sm:mb-0 sm:gap-3 md:gap-4">
             <HomeTopVehiclesPanel rankings={trafficRankings} />
             <HomeTopModelsPanel rankings={trafficRankings} />
           </section>
         ) : null}
 
         <section className={recentSectionClassName}>
-          <div className="mb-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-xl font-black text-white">
               📌 최근 작성된 후기
             </h2>
+            {recentPageCount > 1 ? (
+              <div className="hidden items-center gap-2 sm:flex">
+                <button
+                  type="button"
+                  className={recentCarouselButtonClassName}
+                  onClick={goToPreviousRecentSlide}
+                  aria-label="이전 후기"
+                >
+                  &lt;
+                </button>
+                <button
+                  type="button"
+                  className={recentCarouselButtonClassName}
+                  onClick={goToNextRecentSlide}
+                  aria-label="다음 후기"
+                >
+                  &gt;
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {recentFacts.length === 0 ? (
@@ -570,70 +774,127 @@ export default function Home() {
               아직 등록된 차량 이야기가 없습니다.
             </div>
           ) : (
-            <div className={recentListClassName}>
-              {displayedRecentFacts.map((fact) => {
-                const vehicleTitle = fact.vehicle
-                  ? [fact.vehicle.brand, fact.vehicle.model]
-                      .filter(Boolean)
-                      .join(" ")
-                  : fact.carNumber;
-                const generation = fact.vehicle?.generation || "세대 정보 없음";
-                const mileage = fact.vehicle?.mileage
-                  ? `${Number(fact.vehicle.mileage).toLocaleString()}km`
-                  : "주행거리 정보 없음";
-
-                return (
-                  <Link
-                    key={`${fact.carNumber}-${fact.id}`}
-                    href={`/car/${encodeURIComponent(fact.carNumber)}`}
-                    className={recentCardClassName}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-black text-white">
-                          {maskPlateNumber(fact.carNumber)}
-                        </p>
-                        <p className="truncate text-base font-bold text-zinc-100">
-                          {vehicleTitle}
-                        </p>
-                        <p className="mt-1 text-sm text-zinc-400">
-                          {generation}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300">
-                        이야기
-                      </span>
-                    </div>
-
-                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-[1.7] text-zinc-300">
-                      {fact.content}
-                    </p>
-
-                    <div className={recentMetaClassName}>
-                      <VerifiedNickname
-                        isVerifiedDealer={fact.authorIsVerifiedDealer}
-                      >
-                        {fact.authorNickname}
-                      </VerifiedNickname>
-                      <span aria-hidden>·</span>
-                      <span>{mileage}</span>
-                      {fact.createdAt && <span aria-hidden>·</span>}
-                      {fact.createdAt && <span>{fact.createdAt}</span>}
-                    </div>
-                  </Link>
-                );
-              })}
-              {hasHiddenRecentFacts && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllRecentFacts((value) => !value)}
-                  className={recentToggleButtonClassName}
+            <div className="w-full max-w-full min-w-0 overflow-hidden">
+              <div
+                className="w-full max-w-full overflow-hidden transition-[height] duration-300 ease-out"
+                data-testid="recent-reviews-carousel"
+                onTouchStart={handleRecentTouchStart}
+                onTouchEnd={handleRecentTouchEnd}
+                style={
+                  recentCarouselHeight === null
+                    ? undefined
+                    : { height: recentCarouselHeight }
+                }
+              >
+                <div
+                  className="flex w-full min-w-0 items-start transition-transform duration-500 ease-out"
+                  style={{
+                    transform: `translateX(-${activeRecentSlideIndex * 100}%)`,
+                  }}
                 >
-                  {showAllRecentFacts
-                    ? "최근 3개만 보기"
-                    : "전체 이야기 보기 →"}
-                </button>
-              )}
+                  {recentFactPages.map((page, pageIndex) => (
+                    <div
+                      key={pageIndex}
+                      ref={(element) => {
+                        recentSlideRefs.current[pageIndex] = element;
+                      }}
+                      className="w-full min-w-full max-w-full flex-none self-start space-y-2.5 sm:space-y-3"
+                      aria-hidden={pageIndex !== activeRecentSlideIndex}
+                    >
+                      {page.map((fact) => {
+                        const vehicleTitle = fact.vehicle
+                          ? [
+                              fact.vehicle.brand,
+                              fact.vehicle.generation || fact.vehicle.model,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")
+                          : fact.carNumber;
+                        const yearRange = formatVehicleYearRange(
+                          fact.vehicle?.year,
+                        );
+                        const mileage = fact.vehicle?.mileage
+                          ? `${Number(fact.vehicle.mileage).toLocaleString()}km`
+                          : "주행거리 정보 없음";
+                        const viewBadge = getRecentViewBadge(
+                          fact.recentViewCount,
+                        );
+
+                        return (
+                          <Link
+                            key={`${fact.carNumber}-${fact.id}`}
+                            href={`/car/${encodeURIComponent(fact.carNumber)}`}
+                            className={recentCardClassName}
+                          >
+                            <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+                              <div className="min-w-0 flex-1 pr-1 sm:pr-2">
+                                <p className="truncate text-sm font-black text-white sm:text-base">
+                                  {maskPlateNumber(fact.carNumber)}
+                                </p>
+                                <p className="truncate text-sm font-bold text-zinc-100 sm:text-base">
+                                  {vehicleTitle || "차종 정보 없음"}
+                                </p>
+                                <p className="mt-0.5 truncate text-xs text-zinc-400 sm:mt-1 sm:text-sm">
+                                  {yearRange}
+                                </p>
+                              </div>
+                              <div className={recentBadgeStackClassName}>
+                                <p className={recentViewBadgeClassName}>
+                                  👀 {fact.viewCount.toLocaleString()}
+                                </p>
+                                {viewBadge ? (
+                                  <p className={recentStatusBadgeClassName}>
+                                    {viewBadge}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <p className="mt-1.5 overflow-hidden whitespace-pre-line break-words text-xs leading-[1.55] text-zinc-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:mt-2 sm:text-sm sm:leading-[1.7] sm:[-webkit-line-clamp:3]">
+                              {fact.content}
+                            </p>
+
+                            <div className={recentMetaClassName}>
+                              <VerifiedNickname
+                                isVerifiedDealer={fact.authorIsVerifiedDealer}
+                              >
+                                {fact.authorNickname}
+                              </VerifiedNickname>
+                              <span aria-hidden>·</span>
+                              <span>{mileage}</span>
+                              {fact.createdAt && <span aria-hidden>·</span>}
+                              {fact.createdAt && (
+                                <span>{formatReviewDate(fact.createdAt)}</span>
+                              )}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {recentPageCount > 1 ? (
+                <div
+                  className="mt-4 flex items-center justify-center gap-2"
+                  aria-label="최근 후기 슬라이드 위치"
+                >
+                  {recentFactPages.map((_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className={cn(
+                        recentCarouselDotClassName,
+                        index === activeRecentSlideIndex && "w-6 bg-[#FF3B30]",
+                      )}
+                      onClick={() => setRecentSlideIndex(index)}
+                      aria-label={`${index + 1}번째 후기 묶음 보기`}
+                      aria-current={index === activeRecentSlideIndex}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </section>
@@ -643,65 +904,166 @@ export default function Home() {
 }
 
 function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const previewVehicles = rankings.topVehicles.slice(0, topVehiclesPreviewCount);
+  const topVehicles = rankings.topVehicles.slice(0, topRankingModalLimit);
+
   return (
     <div className={topRankingCardClassName}>
-      <h2 className="text-lg font-black text-white">🔥 실시간 인기 차량</h2>
+      <div className="flex items-center justify-between gap-1.5 md:gap-2">
+        <h2 className="min-w-0 truncate text-[11px] font-black text-white sm:text-base md:text-lg">
+          <span>🔥 실시간 인기 차량</span>
+        </h2>
+        {topVehicles.length ? (
+          <button
+            type="button"
+            className={topRankingButtonClassName}
+            onClick={() => setIsModalOpen(true)}
+          >
+            🏆 TOP10 전체보기
+          </button>
+        ) : null}
+      </div>
       {rankings.topVehicles.length ? (
-        <ol className="mt-4 space-y-2">
-          {rankings.topVehicles.map((vehicle, index) => (
-            <li
-              key={vehicle.vehicleId || index}
-              className={topRankingItemClassName}
-            >
-              <span className="pt-0.5 text-sm font-black text-red-400">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-black text-white">
-                  {maskPlateNumber(vehicle.carNumber ?? "")}
+        <ol className="mt-2 space-y-1.5 md:mt-4 md:space-y-2">
+          {previewVehicles.map((vehicle, index) => {
+            const href = getTopVehicleHref(vehicle);
+            const content = (
+              <>
+                <span className="pt-0.5 text-xs font-black text-red-400 md:text-sm">
+                  {index + 1}
                 </span>
-                <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
-                  {[vehicle.manufacturer, vehicle.model]
-                    .filter(Boolean)
-                    .join(" ") || "차량 정보 없음"}
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-black text-white md:text-sm">
+                    {maskPlateNumber(vehicle.carNumber ?? "")}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] font-bold text-zinc-100 md:text-sm">
+                    {[vehicle.manufacturer, vehicle.model]
+                      .filter(Boolean)
+                      .join(" ") || "차량 정보 없음"}
+                  </span>
                 </span>
-                <span className="mt-1 block truncate text-xs text-zinc-500">
-                  {formatTopVehicleModel(vehicle)}
+                <span className="col-start-2 mt-0.5 text-[10px] font-black text-zinc-100 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm">
+                  조회 {vehicle.viewCount.toLocaleString()}
                 </span>
-              </span>
-              <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
-                조회 {vehicle.viewCount.toLocaleString()}
-              </span>
-            </li>
-          ))}
+              </>
+            );
+
+            return (
+              <li key={vehicle.vehicleId || index}>
+                {href ? (
+                  <Link
+                    href={href}
+                    className={cn(
+                      topRankingItemClassName,
+                      "cursor-pointer transition hover:border-[#FF4D4F]/60 hover:bg-zinc-950 active:scale-[0.99]",
+                    )}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <div className={topRankingItemClassName}>{content}</div>
+                )}
+              </li>
+            );
+          })}
         </ol>
       ) : (
         <p className="mt-4 text-sm text-zinc-500">인기 차량 기록이 없습니다.</p>
       )}
+      {isModalOpen ? (
+        <TopRankingModal
+          title="인기 차량 TOP10"
+          onClose={() => setIsModalOpen(false)}
+        >
+          <ol className="space-y-2">
+            {topVehicles.map((vehicle, index) => {
+              const href = getTopVehicleHref(vehicle);
+              const content = (
+                <>
+                  <span className="pt-0.5 text-sm font-black text-red-400">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white">
+                      {maskPlateNumber(vehicle.carNumber ?? "")}
+                    </span>
+                    <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
+                      {[vehicle.manufacturer, vehicle.model]
+                        .filter(Boolean)
+                        .join(" ") || "차종 정보 없음"}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-zinc-500">
+                      {formatTopVehicleModel(vehicle)}
+                    </span>
+                  </span>
+                  <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
+                    조회 {vehicle.viewCount.toLocaleString()}
+                  </span>
+                </>
+              );
+
+              return (
+                <li key={vehicle.vehicleId || index}>
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="grid cursor-pointer grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3 transition hover:border-[#FF4D4F]/60 hover:bg-zinc-950 active:scale-[0.99]"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3">
+                      {content}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </TopRankingModal>
+      ) : null}
     </div>
   );
 }
 
 function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const previewModels = rankings.topModels.slice(0, topModelsPreviewCount);
+  const topModels = rankings.topModels.slice(0, topRankingModalLimit);
+
   return (
     <div className={topRankingCardClassName}>
-      <h2 className="text-lg font-black text-white">🔥 실시간 인기 모델</h2>
+      <div className="flex items-center justify-between gap-1.5 md:gap-2">
+        <h2 className="min-w-0 truncate text-[11px] font-black text-white sm:text-base md:text-lg">
+          <span>🔥 실시간 인기 모델</span>
+        </h2>
+        {topModels.length ? (
+          <button
+            type="button"
+            className={topRankingButtonClassName}
+            onClick={() => setIsModalOpen(true)}
+          >
+            🏆 TOP10 전체보기
+          </button>
+        ) : null}
+      </div>
       {rankings.topModels.length ? (
-        <ol className="mt-4 space-y-2">
-          {rankings.topModels.map((model, index) => (
+        <ol className="mt-2 space-y-1.5 md:mt-4 md:space-y-2">
+          {previewModels.map((model, index) => (
             <li
               key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
               className={topRankingItemClassName}
             >
-              <span className="text-sm font-black text-red-400">
+              <span className="text-xs font-black text-red-400 md:text-sm">
                 {index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-white">
+                <span className="block truncate text-xs font-bold text-white md:text-sm">
                   {formatTopModelName(model)}
                 </span>
               </span>
-              <span className="text-right text-sm font-black text-zinc-100">
+              <span className="col-start-2 mt-0.5 text-[10px] font-black text-zinc-100 md:col-start-auto md:mt-0 md:text-right md:text-sm">
                 조회 {model.viewCount.toLocaleString()}
               </span>
             </li>
@@ -710,6 +1072,89 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
       ) : (
         <p className="mt-4 text-sm text-zinc-500">인기 모델 기록이 없습니다.</p>
       )}
+      {isModalOpen ? (
+        <TopRankingModal
+          title="인기 모델 TOP10"
+          onClose={() => setIsModalOpen(false)}
+        >
+          <ol className="space-y-2">
+            {topModels.map((model, index) => (
+              <li
+                key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
+                className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3"
+              >
+                <span className="text-sm font-black text-red-400">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 truncate text-sm font-bold text-white">
+                  {formatTopModelName(model)}
+                </span>
+                <span className="text-right text-sm font-black text-zinc-100">
+                  조회 {model.viewCount.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </TopRankingModal>
+      ) : null}
+    </div>
+  );
+}
+
+function TopRankingModal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 sm:items-center sm:justify-center"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3">
+          <h2 className="text-lg font-black text-white">{title}</h2>
+          <button
+            type="button"
+            className="rounded-full border border-zinc-700 px-3 py-1 text-xs font-black text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-900 hover:text-white"
+            onClick={onClose}
+          >
+            닫기
+          </button>
+        </div>
+        <div className="max-h-[calc(80vh-3.5rem)] overflow-y-auto p-4">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
