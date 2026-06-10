@@ -7,19 +7,28 @@ const size = {
   height: 630,
 };
 
+const notoSansKrBold =
+  "https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzmo1eLQ.ttf";
+
 export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
   const iconUrl = new URL("/brand/carfact-header-icon.png", origin).toString();
+  const fontData = await fetch(notoSansKrBold).then((response) =>
+    response.arrayBuffer(),
+  );
 
   return new ImageResponse(
     (
       <div
         style={{
           alignItems: "center",
-          background: "#ffffff",
+          background:
+            "linear-gradient(135deg, #050505 0%, #111113 48%, #1a0505 100%)",
           display: "flex",
+          flexDirection: "column",
           height: "100%",
-          justifyContent: "center",
+          justifyContent: "flex-start",
+          padding: "72px 88px 64px",
           width: "100%",
         }}
       >
@@ -27,57 +36,87 @@ export async function GET(request: Request) {
           style={{
             alignItems: "center",
             display: "flex",
-            gap: 52,
+            gap: 18,
             justifyContent: "center",
+            marginBottom: 92,
           }}
         >
           <img
             alt="카팩트"
             src={iconUrl}
             style={{
-              height: 250,
+              height: 82,
               objectFit: "contain",
-              width: 250,
+              width: 82,
             }}
           />
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              gap: 22,
+              fontFamily: "Arial, sans-serif",
+              fontSize: 72,
+              fontWeight: 900,
+              letterSpacing: 2,
+              lineHeight: 1,
             }}
           >
             <div
               style={{
-                color: "#111827",
-                fontFamily: "Arial, sans-serif",
-                fontSize: 104,
-                fontWeight: 900,
-                letterSpacing: 0,
-                lineHeight: 1,
+                color: "#ffffff",
               }}
             >
-              CARFACT
+              CAR
             </div>
             <div
               style={{
-                background: "#ef4444",
-                borderRadius: 999,
-                color: "#ffffff",
-                display: "flex",
-                fontFamily: "Arial, sans-serif",
-                fontSize: 38,
-                fontWeight: 800,
-                lineHeight: 1,
-                padding: "20px 30px",
+                color: "#FF3B30",
               }}
             >
-              OWNER REVIEW · INSPECTION · TROUBLE DATA
+              FACT
             </div>
           </div>
         </div>
+        <div
+          style={{
+            alignItems: "center",
+            display: "flex",
+            flexDirection: "column",
+            fontFamily: '"Noto Sans KR", sans-serif',
+            fontSize: 70,
+            fontWeight: 800,
+            letterSpacing: 0,
+            lineHeight: 1.22,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ color: "#ffffff" }}>판매글에는 없는 이야기,</div>
+          <div style={{ color: "#FF3B30" }}>후기에서 확인하세요.</div>
+        </div>
+        <div
+          style={{
+            color: "#d4d4d8",
+            fontFamily: '"Noto Sans KR", sans-serif',
+            fontSize: 32,
+            fontWeight: 800,
+            lineHeight: 1,
+            marginTop: 52,
+            textAlign: "center",
+          }}
+        >
+          중고차 실매물 후기 공유 플랫폼
+        </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      fonts: [
+        {
+          data: fontData,
+          name: "Noto Sans KR",
+          style: "normal",
+          weight: 800,
+        },
+      ],
+    },
   );
 }

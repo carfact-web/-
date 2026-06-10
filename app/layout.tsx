@@ -5,8 +5,7 @@ import "./globals.css";
 
 const siteUrl = "https://carfact.kr";
 const siteTitle = "카팩트 - 차주가 알려주지 않는 이야기";
-const siteDescription =
-  "실제 차주 후기, 검수 후기, 차량 고질병 정보를 확인하고 중고차 구매에 참고하세요.";
+const siteDescription = "중고차 실매물 후기 공유 플랫폼";
 const ogImageUrl = "/og-image.png";
 
 const geistSans = Geist({
