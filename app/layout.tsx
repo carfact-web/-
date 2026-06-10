@@ -19,27 +19,27 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/favicon.ico?v=20260609-red-logo", sizes: "any" },
+      { url: "/favicon.ico?v=20260610-favicon-fill", sizes: "any" },
       {
-        url: "/icons/icon-32x32.png?v=20260609-red-logo",
+        url: "/icons/icon-32x32.png?v=20260610-favicon-fill",
         sizes: "32x32",
         type: "image/png",
       },
       {
-        url: "/icons/icon-48x48.png?v=20260609-red-logo",
+        url: "/icons/icon-48x48.png?v=20260610-favicon-fill",
         sizes: "48x48",
         type: "image/png",
       },
       {
-        url: "/icon.png?v=20260609-red-logo",
+        url: "/icon.png?v=20260610-favicon-fill",
         sizes: "512x512",
         type: "image/png",
       },
     ],
-    shortcut: ["/favicon.ico?v=20260609-red-logo"],
+    shortcut: ["/favicon.ico?v=20260610-favicon-fill"],
     apple: [
       {
-        url: "/apple-icon.png?v=20260609-red-logo",
+        url: "/apple-touch-icon.png?v=20260610-favicon-fill",
         sizes: "180x180",
         type: "image/png",
       },
