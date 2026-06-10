@@ -4,8 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "카팩트",
     short_name: "카팩트",
-    description:
-      "실제 차주 후기, 검수 후기, 차량 고질병 정보를 확인하고 중고차 구매에 참고하세요.",
+    description: "판매글에는 없는 이야기",
     start_url: "/",
     display: "standalone",
     background_color: "#09090b",

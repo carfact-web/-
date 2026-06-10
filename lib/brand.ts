@@ -3,9 +3,8 @@ export const brand = {
   nameEn: "CARFACT",
   primary: "#FF3B30",
   black: "#111111",
-  slogan: "실매물을 본 사람들의 경험이 쌓이는 곳",
-  description:
-    "수많은 실제 방문 후기와 정보를 모아, 더 현명한 중고차 구매를 돕습니다.",
+  slogan: "판매글에는 없는 이야기",
+  description: "판매글에는 없는 이야기",
   storeDescription:
-    "실매물을 본 사람들의 경험이 쌓이는 곳. 수많은 실제 방문 후기와 정보를 모아, 더 현명한 자동차 선택을 돕습니다.",
+    "판매글에는 없는 이야기. 수많은 실제 방문 후기와 정보를 모아, 더 현명한 자동차 선택을 돕습니다.",
 } as const;

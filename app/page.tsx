@@ -130,30 +130,14 @@ const noticeRollIntervalMs = 3000;
 const topVehiclesPreviewCount = 3;
 const topModelsPreviewCount = 4;
 const topRankingModalLimit = 10;
-const heroCopies = [
+type HeroCopySegment = {
+  text: string;
+  highlight?: boolean;
+};
+const heroCopies: HeroCopySegment[][][] = [
   [
-    [{ text: "좋은 차", highlight: true }, { text: "는 이유가 있고," }],
-    [{ text: "안 좋은 차", highlight: true }, { text: "도 이유가 있습니다." }],
-  ],
-  [
-    [{ text: "판매글에는 없는 이야기," }],
-    [{ text: "후기", highlight: true }, { text: "에서 확인하세요." }],
-  ],
-  [
-    [{ text: "실매물", highlight: true }, { text: "을 본 사람들의" }],
-    [{ text: "경험", highlight: true }, { text: "이 쌓이는 곳" }],
-  ],
-  [
-    [{ text: "차량번호", highlight: true }, { text: " 하나로," }],
-    [
-      { text: "사람들의 " },
-      { text: "실제 후기", highlight: true },
-      { text: "를 확인하세요." },
-    ],
-  ],
-  [
-    [{ text: "광고", highlight: true }, { text: "보다 가까운 건," }],
-    [{ text: "실제로 본 사람의 이야기", highlight: true }, { text: "입니다." }],
+    [{ text: "카팩트", highlight: true }],
+    [{ text: "판매글에는 없는 이야기" }],
   ],
 ];
 
