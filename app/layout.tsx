@@ -3,10 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import "./globals.css";
 
-const siteUrl = "https://www.carfact.kr";
+const siteUrl = "https://carfact.kr";
 const siteTitle = "카팩트 - 판매글에는 없는 이야기";
 const siteDescription = "판매글에는 없는 이야기";
-const ogImageUrl = "/og-image-v2.png";
+const ogImageUrl = `${siteUrl}/og-image-v2.png`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -75,6 +75,9 @@ export const metadata: Metadata = {
     title: siteTitle,
     description: siteDescription,
     images: [ogImageUrl],
+  },
+  other: {
+    "twitter:url": siteUrl,
   },
 };
 
