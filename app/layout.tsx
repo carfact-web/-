@@ -6,7 +6,7 @@ import "./globals.css";
 const siteUrl = "https://carfact.kr";
 const siteTitle = "카팩트 - 차주가 알려주지 않는 이야기";
 const siteDescription = "중고차 실매물 후기 공유 플랫폼";
-const ogImageUrl = "/og-image.png";
+const ogImageUrl = "/og-image-v2.png";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
