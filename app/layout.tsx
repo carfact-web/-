@@ -3,6 +3,12 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import "./globals.css";
 
+const siteUrl = "https://carfact.kr";
+const siteTitle = "카팩트 - 차주가 알려주지 않는 이야기";
+const siteDescription =
+  "실제 차주 후기, 검수 후기, 차량 고질병 정보를 확인하고 중고차 구매에 참고하세요.";
+const ogImageUrl = "/og-image.png";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -14,9 +20,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "카팩트",
-  description: "카팩트 - 이 차량을 본 사람들이 남긴 이야기",
+  metadataBase: new URL(siteUrl),
+  title: siteTitle,
+  description: siteDescription,
   manifest: "/manifest.webmanifest",
+  alternates: {
+    canonical: siteUrl,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico?v=20260610-favicon-fill", sizes: "any" },
@@ -46,15 +56,26 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: "카팩트",
-    description: "이 차량을 본 사람들이 남긴 이야기",
+    title: siteTitle,
+    description: siteDescription,
+    url: siteUrl,
     siteName: "카팩트",
+    images: [
+      {
+        url: ogImageUrl,
+        width: 1200,
+        height: 630,
+        alt: siteTitle,
+      },
+    ],
+    locale: "ko_KR",
     type: "website",
   },
   twitter: {
-    card: "summary",
-    title: "카팩트",
-    description: "이 차량을 본 사람들이 남긴 이야기",
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: [ogImageUrl],
   },
 };
 
