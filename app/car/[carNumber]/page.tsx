@@ -414,10 +414,6 @@ export default function CarReportPage() {
                 차량정보가 바뀌었나요?
               </Link>
 
-              {reviews.length === 0 && (
-                <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
-              )}
-
               <section className={timelineSectionClassName}>
                 <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>
 
@@ -472,6 +468,8 @@ export default function CarReportPage() {
                   </div>
                 )}
               </section>
+
+              <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
 
               <div className={reviewHeaderClassName}>
                 <h2 className="text-3xl font-bold">등록된 팩트</h2>
@@ -608,10 +606,6 @@ export default function CarReportPage() {
                     다음
                   </button>
                 </div>
-              )}
-
-              {reviews.length > 0 && (
-                <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
               )}
 
               <Link
