@@ -17,6 +17,10 @@ import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
+  getReviewKeywordStats,
+  getReviewKeywordStatsSummary,
+} from "@/utils/reviewKeywordStats";
+import {
   getHelpfulCountsSnapshot,
   getServerHelpfulCountsSnapshot,
   parseHelpfulJson,
@@ -76,6 +80,13 @@ const sortButtonClassName = cn(
   "hover:bg-zinc-800 hover:text-white active:scale-[0.98]",
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
+const keywordStatsSectionClassName = cn(
+  "mb-8 rounded-xl border border-red-500/20 bg-red-500/10 p-4",
+);
+const keywordStatsListClassName = cn("flex flex-wrap gap-2");
+const keywordStatsPillClassName = cn(
+  "rounded-full border border-red-500/30 bg-black/25 px-3 py-2 text-sm font-bold text-red-100",
+);
 
 type VehicleSnapshotWithCreatedAt = Vehicle & {
   createdAt?: string;
@@ -217,6 +228,14 @@ export default function CarReportPage() {
         return rightCreatedTime - leftCreatedTime;
       }),
     [carNumber, helpfulCounts, reviewSort, reviews],
+  );
+  const reviewKeywordStats = useMemo(
+    () => getReviewKeywordStats(reviews),
+    [reviews],
+  );
+  const reviewKeywordStatsSummary = useMemo(
+    () => getReviewKeywordStatsSummary(model, reviewKeywordStats),
+    [model, reviewKeywordStats],
   );
   const totalReviewPages = Math.max(
     1,
@@ -395,7 +414,9 @@ export default function CarReportPage() {
                 차량정보가 바뀌었나요?
               </Link>
 
-              <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
+              {reviews.length === 0 && (
+                <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
+              )}
 
               <section className={timelineSectionClassName}>
                 <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>
@@ -491,6 +512,29 @@ export default function CarReportPage() {
                 </div>
               </div>
 
+              {reviewKeywordStats.length > 0 && (
+                <section className={keywordStatsSectionClassName}>
+                  <h2 className="mb-3 text-lg font-black text-white">
+                    실제 후기에서 많이 언급되는 내용
+                  </h2>
+                  {reviewKeywordStatsSummary && (
+                    <p className="mb-4 text-sm leading-[1.7] text-red-100/90">
+                      {reviewKeywordStatsSummary}
+                    </p>
+                  )}
+                  <div className={keywordStatsListClassName}>
+                    {reviewKeywordStats.map((stat) => (
+                      <span
+                        key={stat.label}
+                        className={keywordStatsPillClassName}
+                      >
+                        {stat.label} ({stat.count}건 · {stat.percentage}%)
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {reviews.length === 0 ? (
                 <p className="text-gray-400 mb-8">
                   아직 등록된 후기가 없습니다.
@@ -564,6 +608,10 @@ export default function CarReportPage() {
                     다음
                   </button>
                 </div>
+              )}
+
+              {reviews.length > 0 && (
+                <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
               )}
 
               <Link

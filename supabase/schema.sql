@@ -19,6 +19,7 @@ create table if not exists public.reviews (
   vehicle_id uuid not null references public.vehicles(id) on delete cascade,
   author_id uuid references auth.users(id) on delete set null,
   author_nickname text default '익명 사용자',
+  title text default '차량 후기',
   content text not null,
   tags text[] not null default '{}',
   images jsonb not null default '[]'::jsonb,
@@ -121,6 +122,9 @@ alter table public.reviews
 
 alter table public.reviews
   add column if not exists helpful_count integer not null default 0;
+
+alter table public.reviews
+  add column if not exists title text default '차량 후기';
 
 alter table public.community_posts
   add column if not exists images jsonb not null default '[]'::jsonb;

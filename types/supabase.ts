@@ -254,6 +254,7 @@ export interface Database {
           vehicle_id: string;
           author_id: string | null;
           author_nickname: string | null;
+          title: string | null;
           content: string;
           tags: string[];
           images: Json;
@@ -269,6 +270,7 @@ export interface Database {
           vehicle_id: string;
           author_id?: string | null;
           author_nickname?: string | null;
+          title?: string | null;
           content: string;
           tags?: string[];
           images?: Json;
@@ -284,6 +286,7 @@ export interface Database {
           vehicle_id?: string;
           author_id?: string | null;
           author_nickname?: string | null;
+          title?: string | null;
           content?: string;
           tags?: string[];
           images?: Json;
@@ -630,6 +633,17 @@ export interface Database {
           top_models: Json;
         }[];
       };
+      get_vehicle_review_keyword_stats: {
+        Args: {
+          target_vehicle_id: string;
+          minimum_review_count?: number;
+        };
+        Returns: {
+          keyword: string;
+          mention_count: number;
+          mention_rate: number;
+        }[];
+      };
       public_get_recent_home_reviews: {
         Args: {
           review_limit?: number;
@@ -639,6 +653,7 @@ export interface Database {
           vehicle_id: string;
           author_id: string | null;
           author_nickname: string | null;
+          title: string | null;
           content: string;
           tags: string[];
           images: Json;
@@ -709,6 +724,7 @@ export interface Database {
           vehicle_id: string;
           author_id: string | null;
           author_nickname: string | null;
+          title: string | null;
           content: string;
           tags: string[];
           images: Json;
@@ -895,6 +911,7 @@ export interface Database {
       update_review: {
         Args: {
           target_review_id: string;
+          next_title: string;
           next_content: string;
           next_tags: string[];
           next_images: Json;

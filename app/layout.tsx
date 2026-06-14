@@ -4,7 +4,7 @@ import { BottomTabNav } from "@/components/BottomTabNav";
 import "./globals.css";
 
 const siteUrl = "https://carfact.kr";
-const siteTitle = "카팩트 - 판매글에는 없는 이야기";
+const siteTitle = "카팩트 - 중고차 실매물 후기 공유 플랫폼";
 const siteDescription = "판매글에는 없는 이야기";
 const ogImageUrl = `${siteUrl}/og-image-v2.png`;
 

@@ -12,7 +12,10 @@ import { fetchSupabaseReviewById } from "@/lib/supabaseData";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
-import { validateReviewContent } from "@/utils/reviewValidation";
+import {
+  validateReviewContent,
+  validateReviewTitle,
+} from "@/utils/reviewValidation";
 import { compressImage } from "@/utils/imageCompression";
 import type { Review } from "@/types/review";
 import type { ReviewImageAttachment } from "@/types/review";
@@ -25,6 +28,9 @@ const homeButtonClassName = cn(
   "hover:opacity-75"
 );
 const tagButtonClassName = cn("rounded-full px-4 py-2 text-sm transition");
+const inputClassName = cn(
+  "w-full rounded-xl bg-zinc-800 px-4 py-3 text-white"
+);
 const textareaClassName = cn(
   "h-40 w-full rounded-xl bg-zinc-800 p-4 text-white"
 );
@@ -118,6 +124,7 @@ export default function ReviewPage() {
   );
   const editingReviewId = searchParams.get("reviewId");
   const reviewInputRef = useRef<HTMLTextAreaElement>(null);
+  const [reviewTitle, setReviewTitle] = useState("");
   const [review, setReview] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -235,6 +242,7 @@ export default function ReviewPage() {
           return;
         }
 
+        setReviewTitle(editingReview.title ?? editingReview.content.slice(0, 50));
         setReview(editingReview.content);
         setSelectedTags(editingReview.tags ?? []);
         setReviewImages(editingReview.images ?? []);
@@ -342,7 +350,15 @@ export default function ReviewPage() {
     }
 
     const reviewContent = reviewInputRef.current?.value ?? review;
+    const titleValidation = validateReviewTitle(reviewTitle);
     const validation = validateReviewContent(reviewContent);
+
+    if (!titleValidation.isValid) {
+      setValidationMessage(
+        titleValidation.message ?? "후기 제목을 다시 확인해주세요."
+      );
+      return;
+    }
 
     if (!validation.isValid) {
       setValidationMessage(validation.message ?? "후기를 다시 확인해주세요.");
@@ -391,6 +407,7 @@ export default function ReviewPage() {
     try {
       if (editingReviewId) {
         saveResult = await updateReview(editingReviewId, {
+          title: titleValidation.title,
           content: validation.content,
           tags: selectedTags,
           images: reviewImages,
@@ -400,6 +417,7 @@ export default function ReviewPage() {
           id: Date.now(),
           authorId: sessionUserId,
           authorNickname,
+          title: titleValidation.title,
           content: validation.content,
           tags: selectedTags,
           images: reviewImages,
@@ -530,6 +548,23 @@ export default function ReviewPage() {
         </div>
 
         <label className="block text-gray-300 mb-3">
+          후기 제목
+        </label>
+        <input
+          type="text"
+          value={reviewTitle}
+          onChange={(event) => {
+            setReviewTitle(event.target.value);
+            setValidationMessage("");
+          }}
+          placeholder="예: 냉간 시동 때 엔진 떨림이 있었습니다."
+          className={inputClassName}
+          aria-invalid={Boolean(validationMessage)}
+          aria-describedby={validationMessage ? "review-validation" : undefined}
+          maxLength={60}
+        />
+
+        <label className="mt-5 block text-gray-300 mb-3">
           이 차량을 보고 느낀 점
         </label>
         <div className="flex flex-wrap gap-2 mb-4">

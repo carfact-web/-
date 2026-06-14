@@ -87,7 +87,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "기아",
     model: "K8",
-    message: "K8은 스마트스트림 2.5 계열의 엔진 오일 감소 이슈 언급이 있어 오일 소모량과 보증 정비 이력을 확인해보세요.",
+    message: "K8은 스마트스트림 2.5 계열의 엔진 오일 감소 점검 사례가 있어 오일 소모량과 보증 정비 이력을 확인해보세요.",
   },
   {
     brand: "기아",

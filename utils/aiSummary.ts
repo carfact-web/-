@@ -1,5 +1,14 @@
 import { evBatteryInfo } from "@/data/evBatteryInfo";
 import type { EvBatteryInfo } from "@/data/evBatteryInfo";
+import {
+  getVehicleInspectionProfile,
+  getVehicleYearInspectionNotes,
+} from "@/data/vehicleInspectionData";
+import type {
+  VehicleEngineInspectionNote,
+  VehicleInspectionItem,
+  VehicleYearInspectionNote,
+} from "@/data/vehicleInspectionData";
 import { vehicleKnowledge } from "@/data/vehicleKnowledge";
 import type { VehicleKnowledge } from "@/data/vehicleKnowledge";
 import {
@@ -23,6 +32,10 @@ interface AiSummaryOptions {
 export interface StructuredAiSummary {
   mileageSummary: string;
   modelIssues: string[];
+  inspectionSummary?: string;
+  inspectionItems: VehicleInspectionItem[];
+  yearInspectionNotes: VehicleYearInspectionNote[];
+  engineInspectionNotes: VehicleEngineInspectionNote[];
   checkPoints: string[];
   conclusion: string;
 }
@@ -266,6 +279,19 @@ const collectAiSummaryParts = (
     });
   });
 
+  const inspectionProfile = getVehicleInspectionProfile(
+    brand,
+    model,
+    options.generation
+  );
+
+  if (inspectionProfile) {
+    pushSummary(modelSummaries, inspectionProfile.summary, isElectric);
+    inspectionProfile.checkItems.slice(0, 5).forEach((item) => {
+      pushSummary(modelSummaries, item.aiSummary, isElectric);
+    });
+  }
+
   evBatteryInfo.forEach((batteryInfo) => {
     if (!matchesEvBatteryInfo(batteryInfo, brand, model, options)) {
       return;
@@ -414,11 +440,11 @@ const addUniqueCheckPoint = (checkPoints: string[], checkPoint: string) => {
 };
 
 const addCheckPointsFromMessage = (checkPoints: string[], message: string) => {
-  if (/엔진|오일 소모|오일 감소|누유|GDI|노킹/.test(message)) {
+  if (/엔진|오일 소모|오일 감소|누유|GDI|노킹|점화|터보/.test(message)) {
     addUniqueCheckPoint(checkPoints, "엔진룸 누유 및 오일 소모 흔적");
   }
 
-  if (/냉각수|냉각계통|워터펌프/.test(message)) {
+  if (/냉각수|냉각계통|워터펌프|서모스탯|냉각팬/.test(message)) {
     addUniqueCheckPoint(checkPoints, "냉각수 보조탱크 및 호스 상태");
   }
 
@@ -438,7 +464,7 @@ const addCheckPointsFromMessage = (checkPoints: string[], message: string) => {
     addUniqueCheckPoint(checkPoints, "최근 정비내역서 및 리콜 처리 이력");
   }
 
-  if (/전장|경고등|계기판|공조|시트|주행 보조|전자/.test(message)) {
+  if (/전장|경고등|계기판|공조|시트|주행 보조|전자|디스플레이|BCM|에어컨/.test(message)) {
     addUniqueCheckPoint(checkPoints, "계기판 경고등 및 전장품 작동 상태");
   }
 
@@ -497,7 +523,7 @@ const getConclusion = (mileage: string, hasModelIssues: boolean) => {
 
   if (mileageNumber >= 80000) {
     return hasModelIssues
-      ? "차종 이슈와 정비 이력이 함께 확인되면 구매 판단이 훨씬 명확해지는 구간입니다."
+      ? "차종 점검 항목과 정비 이력이 함께 확인되면 구매 판단이 훨씬 명확해지는 구간입니다."
       : "상태가 좋아 보여도 오일류와 소모품 교체 이력은 가격 협상 전에 확인해야 합니다.";
   }
 
@@ -516,6 +542,11 @@ export function getStructuredAiSummary(
   options: AiSummaryOptions = {}
 ): StructuredAiSummary {
   const parts = collectAiSummaryParts(brand, model, year, mileage, options);
+  const inspectionProfile = getVehicleInspectionProfile(
+    brand,
+    model,
+    options.generation
+  );
   const modelIssuesOnly = getUniqueSummaries([
     ...parts.modelSummaries,
     ...parts.evBatterySummaries,
@@ -533,6 +564,10 @@ export function getStructuredAiSummary(
     addCheckPointsFromMessage(checkPoints, message);
   });
 
+  inspectionProfile?.checkItems.forEach((item) => {
+    addCheckPointsFromMessage(checkPoints, item.aiSummary);
+  });
+
   addUniqueCheckPoint(checkPoints, "최근 정비내역서 유무");
 
   return {
@@ -540,9 +575,17 @@ export function getStructuredAiSummary(
     modelIssues:
       modelIssuesOnly.length > 0
         ? modelIssuesOnly
-        : ["등록된 차종별 이슈 정보가 아직 없습니다."],
+        : ["등록된 차종별 점검 정보가 아직 없습니다."],
+    inspectionSummary: inspectionProfile?.summary,
+    inspectionItems: inspectionProfile?.checkItems ?? [],
+    yearInspectionNotes: inspectionProfile
+      ? getVehicleYearInspectionNotes(inspectionProfile, year)
+      : [],
+    engineInspectionNotes: inspectionProfile?.engineNotes ?? [],
     checkPoints: checkPoints.slice(0, 6),
-    conclusion: getConclusion(mileage, modelIssuesOnly.length > 0),
+    conclusion:
+      inspectionProfile?.summary ??
+      getConclusion(mileage, modelIssuesOnly.length > 0),
   };
 }
 

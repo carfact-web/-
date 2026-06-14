@@ -1,9 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
+import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -16,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import {
   deleteCommunityPost,
   fetchCommunityComments,
+  fetchCommunityPostById,
   fetchCommunityPosts,
   reportCommunityPost,
   saveCommunityComment,
@@ -35,6 +46,21 @@ import {
   sanitizeMultilineUserText,
   sanitizeUserText,
 } from "@/utils/inputSanitizer";
+import {
+  applyCommunityTextColorToMarkup,
+  communityTextColorOptions,
+  isCommunityTextColor,
+  parseCommunityTextColorSegments,
+  serializeCommunityTextColorSegments,
+  stripCommunityTextColorMarkup,
+  wrapCommunityTextColor,
+  type CommunityTextColor,
+  type CommunityTextColorSegment,
+} from "@/utils/communityTextColor";
+import {
+  createCommunityImageToken,
+  stripCommunityImageTokens,
+} from "@/utils/communityRichContent";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
@@ -95,6 +121,25 @@ const reportCancelButtonClassName = cn(
   "mt-2 w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-300 transition",
   "hover:bg-zinc-800 active:scale-[0.99]",
 );
+const communityTextColorClassNames: Record<CommunityTextColor, string> = {
+  black: "text-black",
+  blue: "text-blue-400",
+  green: "text-emerald-400",
+  red: "text-red-400",
+  white: "text-white",
+  yellow: "text-yellow-300",
+};
+const communityTextColorUi: Record<
+  CommunityTextColor,
+  { label: string; swatchClassName: string }
+> = {
+  black: { label: "검정", swatchClassName: "bg-black" },
+  blue: { label: "파랑", swatchClassName: "bg-blue-500" },
+  green: { label: "초록", swatchClassName: "bg-emerald-500" },
+  red: { label: "빨강", swatchClassName: "bg-red-500" },
+  white: { label: "흰색", swatchClassName: "bg-white" },
+  yellow: { label: "노랑", swatchClassName: "bg-yellow-300" },
+};
 
 const normalizeField = (value: string, maxLength: number) =>
   sanitizeUserText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -113,7 +158,8 @@ const allowedCommunityImageTypes = [
   "image/heic-sequence",
   "image/heif-sequence",
 ] as const;
-const maxCommunityImages = 3;
+const maxDefaultCommunityImages = 3;
+const maxRichCommunityImages = 5;
 const maxCommunityOriginalImageBytes = 25 * 1024 * 1024;
 const postsPerPage = 5;
 type CommunitySortOption = "latest" | "popular" | "weekly";
@@ -136,6 +182,16 @@ const communityReportReasons: CommunityReportReason[] = [
   "개인정보 노출",
   "기타",
 ];
+
+const getMaxCommunityImages = (
+  category: CommunityCategory,
+  isNotice: boolean,
+) => (isNotice || category === "news" ? maxRichCommunityImages : maxDefaultCommunityImages);
+
+const isRichCommunityImageEditor = (
+  category: CommunityCategory,
+  isNotice: boolean,
+) => isNotice || category === "news";
 
 const isAllowedCommunityImageFile = (file: File) =>
   allowedCommunityImageTypes.includes(
@@ -185,6 +241,163 @@ const readCommunityImageFile = async (
   });
 };
 
+const isBlockEditorElement = (element: Element) =>
+  ["DIV", "P", "LI"].includes(element.tagName);
+
+const serializeCommunityTextEditorNode = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? "";
+  }
+
+  if (!(node instanceof HTMLElement)) {
+    return "";
+  }
+
+  if (node.tagName === "BR") {
+    return "\n";
+  }
+
+  const imageId = node.dataset.communityImageId;
+
+  if (imageId) {
+    return createCommunityImageToken(imageId);
+  }
+
+  const text = Array.from(node.childNodes)
+    .map((childNode) => serializeCommunityTextEditorNode(childNode))
+    .join("");
+  const color = node.dataset.communityTextColor;
+
+  return color && isCommunityTextColor(color) && text
+    ? wrapCommunityTextColor(stripCommunityTextColorMarkup(text), color)
+    : text;
+};
+
+const serializeCommunityTextEditor = (editor: HTMLElement) =>
+  Array.from(editor.childNodes)
+    .map((node, index) => {
+      const text = serializeCommunityTextEditorNode(node);
+
+      return index > 0 && node instanceof Element && isBlockEditorElement(node)
+        ? "\n" + text
+        : text;
+    })
+    .join("");
+
+const getCommunityTextEditorSelectionOffsets = (editor: HTMLElement) => {
+  const selection = window.getSelection();
+
+  if (!selection || selection.rangeCount === 0) {
+    return null;
+  }
+
+  const range = selection.getRangeAt(0);
+  const anchorNode = selection.anchorNode;
+  const focusNode = selection.focusNode;
+
+  if (
+    !anchorNode ||
+    !focusNode ||
+    !editor.contains(range.commonAncestorContainer) ||
+    !editor.contains(anchorNode) ||
+    !editor.contains(focusNode)
+  ) {
+    return null;
+  }
+
+  const startRange = document.createRange();
+  startRange.selectNodeContents(editor);
+  startRange.setEnd(range.startContainer, range.startOffset);
+
+  const endRange = document.createRange();
+  endRange.selectNodeContents(editor);
+  endRange.setEnd(range.endContainer, range.endOffset);
+
+  return {
+    end: endRange.toString().length,
+    start: startRange.toString().length,
+  };
+};
+
+const replaceCommunityTextEditorContent = (
+  editor: HTMLElement,
+  content: string,
+) => {
+  editor.replaceChildren();
+
+  const appendText = (textContent: string) => {
+    parseCommunityTextColorSegments(textContent).forEach((segment) => {
+      const textNode = document.createTextNode(segment.text);
+
+      if (!segment.color) {
+        editor.append(textNode);
+        return;
+      }
+
+      const span = document.createElement("span");
+      span.dataset.communityTextColor = segment.color;
+      span.className = cn("font-semibold", communityTextColorClassNames[segment.color]);
+      span.append(textNode);
+      editor.append(span);
+    });
+  };
+
+  content.split(/(\[\[image:[^\]]+\]\])/g).forEach((part) => {
+    const imageMatch = /^\[\[image:([^\]]+)\]\]$/.exec(part);
+
+    if (!imageMatch) {
+      appendText(part);
+      return;
+    }
+
+    const imageChip = document.createElement("span");
+    imageChip.dataset.communityImageId = imageMatch[1];
+    imageChip.contentEditable = "false";
+    imageChip.className =
+      "my-2 inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-5 text-sm font-bold text-zinc-200";
+    imageChip.textContent = "본문 이미지";
+    editor.append(imageChip);
+  });
+};
+
+const normalizeCommunityTextColorContent = (
+  content: string,
+  maxLength: number,
+  options: { multiline: boolean },
+) => {
+  const segments: CommunityTextColorSegment[] = [];
+  let remainingLength = maxLength;
+
+  parseCommunityTextColorSegments(content).forEach((segment) => {
+    if (remainingLength <= 0) {
+      return;
+    }
+
+    const sanitizedText = options.multiline
+      ? sanitizeMultilineUserText(segment.text)
+          .replace(/[ \t]+/g, " ")
+          .replace(/\n{4,}/g, "\n\n\n")
+      : sanitizeUserText(segment.text).replace(/\s+/g, " ");
+    const text = sanitizedText.slice(0, remainingLength);
+
+    if (!text) {
+      return;
+    }
+
+    const previousSegment = segments[segments.length - 1];
+
+    if (previousSegment && previousSegment.color === segment.color) {
+      previousSegment.text += text;
+    } else {
+      segments.push({ color: segment.color, text });
+    }
+
+    remainingLength -= text.length;
+  });
+
+  return serializeCommunityTextColorSegments(segments);
+};
+
 export default function CommunityPage() {
   const router = useRouter();
   const { isAdmin, isAuthenticated, isAuthReady, user } = useAuth();
@@ -198,6 +411,7 @@ export default function CommunityPage() {
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [postImages, setPostImages] = useState<CommunityImageAttachment[]>([]);
   const [targetPostId, setTargetPostId] = useState("");
+  const [targetEditPostId, setTargetEditPostId] = useState("");
   const [sortOption, setSortOption] = useState<CommunitySortOption>("latest");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -220,6 +434,9 @@ export default function CommunityPage() {
     () => new Set(),
   );
   const [message, setMessage] = useState("");
+  const writeTitleEditorRef = useRef<HTMLDivElement | null>(null);
+  const writeContentEditorRef = useRef<HTMLDivElement | null>(null);
+  const [writeEditorResetKey, setWriteEditorResetKey] = useState(0);
 
   const activeCategoryLabel = useMemo(
     () => getCommunityCategoryLabel(activeCategory),
@@ -233,7 +450,10 @@ export default function CommunityPage() {
         return true;
       }
 
-      return [post.title, post.content]
+      return [
+        stripCommunityTextColorMarkup(post.title),
+        stripCommunityImageTokens(stripCommunityTextColorMarkup(post.content)),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
@@ -270,6 +490,11 @@ export default function CommunityPage() {
 
     return visiblePosts.slice(startIndex, startIndex + postsPerPage);
   }, [currentPage, visiblePosts]);
+  const isRichImageEditor = isRichCommunityImageEditor(
+    writeCategory,
+    writeIsNotice,
+  );
+  const maxWriteImages = getMaxCommunityImages(writeCategory, writeIsNotice);
   const canDeleteSelectedPost = Boolean(
     user && selectedPost && (selectedPost.userId === user.id || isAdmin),
   );
@@ -289,24 +514,30 @@ export default function CommunityPage() {
     const params = new URLSearchParams(window.location.search);
     const category = params.get("category");
     const postId = params.get("post");
+    const editPostId = params.get("edit");
 
     void Promise.resolve().then(() => {
       if (category && isCommunityCategory(category)) {
         setActiveCategory(category);
       }
 
+      if (editPostId) {
+        setTargetEditPostId(editPostId);
+        return;
+      }
+
       if (postId) {
-        setTargetPostId(postId);
+        router.replace("/community/post/" + encodeURIComponent(postId));
       }
     });
-  }, []);
+  }, [router]);
 
-  const goToLogin = () => {
+  const goToLogin = useCallback(() => {
     const redirectTo =
       typeof window === "undefined" ? "/community" : window.location.href;
 
     router.push("/login?redirectTo=" + encodeURIComponent(redirectTo));
-  };
+  }, [router]);
 
   const getAuthorNickname = async () => {
     const nickname = reviewNickname || (await ensureReviewNickname());
@@ -421,7 +652,7 @@ export default function CommunityPage() {
       .map((post) => ({
         id: post.id,
         imageCount: post.images.length,
-        images: post.images.slice(0, maxCommunityImages),
+        images: post.images.slice(0, getMaxCommunityImages(post.category, post.isNotice)),
       }));
 
     if (postsWithImages.length > 0) {
@@ -440,7 +671,10 @@ export default function CommunityPage() {
     console.log("community-post-images-render", {
       surface: "detail",
       postId: selectedPost.id,
-      images: selectedPost.images.slice(0, maxCommunityImages),
+      images: selectedPost.images.slice(
+        0,
+        getMaxCommunityImages(selectedPost.category, selectedPost.isNotice),
+      ),
     });
   }, [selectedPost]);
 
@@ -467,6 +701,7 @@ export default function CommunityPage() {
     setWriteIsPinned(false);
     setPostImages([]);
     setIsWriting(true);
+    setWriteEditorResetKey((key) => key + 1);
     setMessage("");
   };
 
@@ -481,19 +716,247 @@ export default function CommunityPage() {
     setMessage("");
   };
 
+  const startEditingPost = useCallback((post: CommunityPost) => {
+    const canEditPost = Boolean(user && (post.userId === user.id || isAdmin));
+
+    if (!canEditPost) {
+      return;
+    }
+
+    setSelectedPost(post);
+    setEditingPostId(post.id);
+    setWriteCategory(post.category);
+    setWriteTitle(
+      isAdmin
+        ? post.title
+        : stripCommunityTextColorMarkup(post.title),
+    );
+    setWriteContent(
+      isAdmin
+        ? post.content
+        : stripCommunityTextColorMarkup(post.content),
+    );
+    setWriteIsNotice(post.isNotice);
+    setWriteIsPinned(post.isPinned);
+    setPostImages(
+      post.images.slice(0, getMaxCommunityImages(post.category, post.isNotice)),
+    );
+    setIsWriting(true);
+    setWriteEditorResetKey((key) => key + 1);
+    setMessage("");
+  }, [isAdmin, user]);
+
   const startEditingSelectedPost = () => {
     if (!selectedPost || !canEditSelectedPost) {
       return;
     }
 
-    setEditingPostId(selectedPost.id);
-    setWriteCategory(selectedPost.category);
-    setWriteTitle(selectedPost.title);
-    setWriteContent(selectedPost.content);
-    setWriteIsNotice(selectedPost.isNotice);
-    setWriteIsPinned(selectedPost.isPinned);
-    setPostImages(selectedPost.images.slice(0, maxCommunityImages));
-    setIsWriting(true);
+    startEditingPost(selectedPost);
+  };
+
+  useEffect(() => {
+    if (!targetEditPostId || !isAuthReady) {
+      return;
+    }
+
+    if (!isAuthenticated || !user) {
+      goToLogin();
+      return;
+    }
+
+    let isActive = true;
+
+    void Promise.resolve()
+      .then(async () => {
+        const editPost = await fetchCommunityPostById(targetEditPostId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!editPost) {
+          setMessage("수정할 게시글을 찾을 수 없습니다.");
+          setTargetEditPostId("");
+          return;
+        }
+
+        if (editPost.userId !== user.id && !isAdmin) {
+          setMessage("수정 권한이 없습니다.");
+          setTargetEditPostId("");
+          return;
+        }
+
+        setActiveCategory(editPost.isNotice ? "notice" : editPost.category);
+        startEditingPost(editPost);
+        setTargetEditPostId("");
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "수정할 게시글을 불러오지 못했습니다.",
+        );
+        setTargetEditPostId("");
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    goToLogin,
+    isAdmin,
+    isAuthReady,
+    isAuthenticated,
+    startEditingPost,
+    targetEditPostId,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isWriting ||
+      (!isAdmin && !isRichImageEditor) ||
+      !writeContentEditorRef.current
+    ) {
+      return;
+    }
+
+    replaceCommunityTextEditorContent(
+      writeContentEditorRef.current,
+      writeContent,
+    );
+  }, [isAdmin, isRichImageEditor, isWriting, writeEditorResetKey]);
+
+  useEffect(() => {
+    if (!isWriting || !isAdmin || !writeTitleEditorRef.current) {
+      return;
+    }
+
+    replaceCommunityTextEditorContent(writeTitleEditorRef.current, writeTitle);
+  }, [isAdmin, isWriting, writeEditorResetKey]);
+
+  const syncWriteContentFromEditor = () => {
+    const editor = writeContentEditorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    setWriteContent(serializeCommunityTextEditor(editor));
+    setMessage("");
+  };
+
+  const syncWriteTitleFromEditor = () => {
+    const editor = writeTitleEditorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    setWriteTitle(serializeCommunityTextEditor(editor));
+    setMessage("");
+  };
+
+  const applyWriteEditorTextColor = (
+    editor: HTMLElement | null,
+    currentContent: string,
+    setContent: (content: string) => void,
+    color: CommunityTextColor,
+    emptySelectionMessage: string,
+  ) => {
+    if (!isAdmin) {
+      return;
+    }
+
+    const selectionOffsets = editor
+      ? getCommunityTextEditorSelectionOffsets(editor)
+      : null;
+
+    if (
+      !editor ||
+      !selectionOffsets ||
+      selectionOffsets.start === selectionOffsets.end
+    ) {
+      setMessage(emptySelectionMessage);
+      return;
+    }
+
+    const serializedContent = serializeCommunityTextEditor(editor);
+    const nextContent = applyCommunityTextColorToMarkup(
+      serializedContent || currentContent,
+      selectionOffsets.start,
+      selectionOffsets.end,
+      color,
+    );
+
+    setContent(nextContent);
+    replaceCommunityTextEditorContent(editor, nextContent);
+    setMessage("");
+  };
+
+  const applyWriteTitleColor = (color: CommunityTextColor) => {
+    applyWriteEditorTextColor(
+      writeTitleEditorRef.current,
+      writeTitle,
+      setWriteTitle,
+      color,
+      "제목에서 색상을 적용할 문장을 선택해주세요.",
+    );
+  };
+
+  const applyWriteTextColor = (color: CommunityTextColor) => {
+    applyWriteEditorTextColor(
+      writeContentEditorRef.current,
+      writeContent,
+      setWriteContent,
+      color,
+      "본문에서 색상을 적용할 문장을 선택해주세요.",
+    );
+  };
+
+  const insertPostImageBlock = (image: CommunityImageAttachment) => {
+    const editor = writeContentEditorRef.current;
+
+    if (!editor) {
+      setWriteContent((current) =>
+        current.trim()
+          ? current + "\n\n" + createCommunityImageToken(image.id) + "\n"
+          : createCommunityImageToken(image.id) + "\n",
+      );
+      setWriteEditorResetKey((key) => key + 1);
+      return;
+    }
+
+    const selection = window.getSelection();
+    const imageChip = document.createElement("span");
+    imageChip.dataset.communityImageId = image.id;
+    imageChip.contentEditable = "false";
+    imageChip.className =
+      "my-2 inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-5 text-sm font-bold text-zinc-200";
+    imageChip.textContent = "본문 이미지";
+
+    if (
+      selection &&
+      selection.rangeCount > 0 &&
+      editor.contains(selection.getRangeAt(0).commonAncestorContainer)
+    ) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createElement("br"));
+      range.insertNode(imageChip);
+      range.insertNode(document.createElement("br"));
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      editor.append(document.createElement("br"), imageChip, document.createElement("br"));
+    }
+
+    setWriteContent(serializeCommunityTextEditor(editor));
     setMessage("");
   };
 
@@ -502,10 +965,11 @@ export default function CommunityPage() {
       return;
     }
 
-    const remainingSlots = maxCommunityImages - postImages.length;
+    const maxImages = getMaxCommunityImages(writeCategory, writeIsNotice);
+    const remainingSlots = maxImages - postImages.length;
 
     if (remainingSlots <= 0) {
-      setMessage("이미지는 최대 3장까지 첨부할 수 있습니다.");
+      setMessage("이미지는 최대 " + maxImages + "장까지 첨부할 수 있습니다.");
       return;
     }
 
@@ -517,11 +981,11 @@ export default function CommunityPage() {
       );
 
       setPostImages((current) =>
-        [...current, ...nextImages].slice(0, maxCommunityImages),
+        [...current, ...nextImages].slice(0, maxImages),
       );
       setMessage(
         files.length > remainingSlots
-          ? "이미지는 최대 3장까지 첨부할 수 있습니다."
+          ? "이미지는 최대 " + maxImages + "장까지 첨부할 수 있습니다."
           : "",
       );
     } catch (error) {
@@ -568,15 +1032,38 @@ export default function CommunityPage() {
     }
 
     const formData = new FormData(form);
-    const title = normalizeField(String(formData.get("title") ?? ""), 80);
-    const content = normalizeMultilineField(
-      String(formData.get("content") ?? ""),
-      2000,
-    );
+    const rawAdminTitle =
+      isAdmin && writeTitleEditorRef.current
+        ? serializeCommunityTextEditor(writeTitleEditorRef.current)
+        : writeTitle;
+    const rawAdminContent =
+      (isAdmin || isRichImageEditor) && writeContentEditorRef.current
+        ? serializeCommunityTextEditor(writeContentEditorRef.current)
+        : writeContent;
+    const title = isAdmin
+      ? normalizeCommunityTextColorContent(rawAdminTitle, 80, {
+          multiline: false,
+        })
+      : stripCommunityTextColorMarkup(
+          normalizeField(String(formData.get("title") ?? ""), 80),
+        );
+    const plainTitle = stripCommunityTextColorMarkup(title).trim();
+    const content = isAdmin
+      ? normalizeCommunityTextColorContent(rawAdminContent, 2000, {
+          multiline: true,
+        })
+      : isRichImageEditor
+        ? normalizeMultilineField(rawAdminContent, 2000)
+      : stripCommunityTextColorMarkup(
+          normalizeMultilineField(String(formData.get("content") ?? ""), 2000),
+        );
     const isNoticePost = isAdmin && formData.get("isNotice") === "on";
     const isPinnedPost = isAdmin && formData.get("isPinned") === "on";
 
-    if (title.length < 2 || content.length < 5) {
+    if (
+      plainTitle.length < 2 ||
+      stripCommunityImageTokens(stripCommunityTextColorMarkup(content)).length < 5
+    ) {
       setMessage("제목은 2자 이상, 내용은 5자 이상 입력해주세요.");
       return;
     }
@@ -1127,30 +1614,228 @@ export default function CommunityPage() {
                   ))}
                 </select>
               </label>
-              <input
-                className={inputClassName}
-                name="title"
-                placeholder="제목"
-                value={writeTitle}
-                onChange={(event) => setWriteTitle(event.currentTarget.value)}
-                maxLength={80}
-                required
-              />
-              <textarea
-                className={cn(inputClassName, "min-h-40 resize-y")}
-                name="content"
-                placeholder="내용"
-                value={writeContent}
-                onChange={(event) => setWriteContent(event.currentTarget.value)}
-                maxLength={2000}
-                required
-              />
+              {isAdmin ? (
+                <div className="relative">
+                  {!stripCommunityTextColorMarkup(writeTitle) ? (
+                    <span className="pointer-events-none absolute left-4 top-3 text-sm text-zinc-600">
+                      제목
+                    </span>
+                  ) : null}
+                  <div
+                    ref={writeTitleEditorRef}
+                    className={cn(
+                      inputClassName,
+                      "min-h-11 whitespace-pre-wrap break-words",
+                    )}
+                    contentEditable
+                    role="textbox"
+                    aria-label="제목"
+                    suppressContentEditableWarning
+                    onInput={syncWriteTitleFromEditor}
+                    onBlur={syncWriteTitleFromEditor}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                      }
+                    }}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      const text = event.clipboardData
+                        .getData("text/plain")
+                        .replace(/[\r\n]+/g, " ");
+                      const selection = window.getSelection();
+
+                      if (!selection || selection.rangeCount === 0) {
+                        return;
+                      }
+
+                      const range = selection.getRangeAt(0);
+                      range.deleteContents();
+                      range.insertNode(document.createTextNode(text));
+                      range.collapse(false);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      syncWriteTitleFromEditor();
+                    }}
+                  />
+                </div>
+              ) : (
+                <input
+                  className={inputClassName}
+                  name="title"
+                  placeholder="제목"
+                  value={writeTitle}
+                  onChange={(event) => setWriteTitle(event.currentTarget.value)}
+                  maxLength={80}
+                  required
+                />
+              )}
+              {isAdmin ? (
+                <div className="rounded-lg border border-zinc-800 bg-black/40 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-white">
+                        제목 색상
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        제목에서 선택한 단어에만 색상을 적용합니다.
+                      </p>
+                    </div>
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      role="toolbar"
+                      aria-label="관리자 제목 색상 도구"
+                    >
+                      <span
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-950 text-base font-black text-white"
+                        aria-hidden="true"
+                      >
+                        A
+                      </span>
+                      {communityTextColorOptions.map((option) => {
+                        const colorUi = communityTextColorUi[option.value];
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-xs font-bold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-900 focus:border-red-400 focus:outline-none"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => applyWriteTitleColor(option.value)}
+                            aria-label={colorUi.label + " 제목 색상 적용"}
+                            title={colorUi.label}
+                          >
+                            <span
+                              className={cn(
+                                "h-4 w-4 rounded-full border",
+                                option.value === "black"
+                                  ? "border-zinc-500"
+                                  : "border-white/60",
+                                colorUi.swatchClassName,
+                              )}
+                              aria-hidden="true"
+                            />
+                            {colorUi.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {isAdmin ? (
+                <div className="rounded-lg border border-zinc-800 bg-black/40 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-white">
+                        본문 색상
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        본문에서 선택한 문장에만 색상을 적용합니다.
+                      </p>
+                    </div>
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      role="toolbar"
+                      aria-label="관리자 글씨 색상 도구"
+                    >
+                      <span
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-950 text-base font-black text-white"
+                        aria-hidden="true"
+                      >
+                        A
+                      </span>
+                      {communityTextColorOptions.map((option) => {
+                        const colorUi = communityTextColorUi[option.value];
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-xs font-bold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-900 focus:border-red-400 focus:outline-none"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => applyWriteTextColor(option.value)}
+                            aria-label={colorUi.label + " 글씨 색상 적용"}
+                            title={colorUi.label}
+                          >
+                            <span
+                              className={cn(
+                                "h-4 w-4 rounded-full border",
+                                option.value === "black"
+                                  ? "border-zinc-500"
+                                  : "border-white/60",
+                                colorUi.swatchClassName,
+                              )}
+                              aria-hidden="true"
+                            />
+                            {colorUi.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {isAdmin || isRichImageEditor ? (
+                <div className="relative">
+                  {!stripCommunityTextColorMarkup(writeContent) ? (
+                    <span className="pointer-events-none absolute left-4 top-3 text-sm text-zinc-600">
+                      {isRichImageEditor
+                        ? "본문을 입력하고 이미지 블록을 원하는 위치에 삽입하세요."
+                        : "내용"}
+                    </span>
+                  ) : null}
+                  <div
+                    ref={writeContentEditorRef}
+                    className={cn(
+                      inputClassName,
+                      "min-h-40 whitespace-pre-wrap break-words",
+                    )}
+                    contentEditable
+                    role="textbox"
+                    aria-label="내용"
+                    aria-multiline="true"
+                    suppressContentEditableWarning
+                    onInput={syncWriteContentFromEditor}
+                    onBlur={syncWriteContentFromEditor}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      const text = event.clipboardData.getData("text/plain");
+                      const selection = window.getSelection();
+
+                      if (!selection || selection.rangeCount === 0) {
+                        return;
+                      }
+
+                      const range = selection.getRangeAt(0);
+                      range.deleteContents();
+                      range.insertNode(document.createTextNode(text));
+                      range.collapse(false);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      syncWriteContentFromEditor();
+                    }}
+                  />
+                </div>
+              ) : (
+                <textarea
+                  className={cn(inputClassName, "min-h-40 resize-y")}
+                  name="content"
+                  placeholder="내용"
+                  value={writeContent}
+                  onChange={(event) =>
+                    setWriteContent(event.currentTarget.value)
+                  }
+                  maxLength={2000}
+                  required
+                />
+              )}
               <div className="rounded-lg border border-dashed border-zinc-700 bg-black/40 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-bold text-white">이미지 첨부</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      jpg, png, webp, heic · 최대 3장 · 자동 압축
+                      jpg, png, webp, heic · 최대 {maxWriteImages}장 · webp 자동 변환
                     </p>
                   </div>
                   <label
@@ -1175,32 +1860,45 @@ export default function CommunityPage() {
                     {postImages.map((image) => (
                       <div
                         key={image.id}
-                        className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
+                        className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
                       >
-                        {image.url ? (
-                          <Image
-                            src={image.dataUrl ?? image.url}
-                            alt={image.name}
-                            fill
-                            unoptimized
-                            sizes="120px"
-                            className="object-cover"
-                            onError={() => {
-                              console.error("community-image-render-error", {
-                                storedImageValue:
-                                  image.path ?? image.url ?? image.dataUrl,
-                                finalImageUrl: image.dataUrl ?? image.url,
-                              });
-                            }}
-                          />
-                        ) : null}
-                        <button
-                          type="button"
-                          className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-bold text-white"
-                          onClick={() => removePostImage(image.id)}
-                        >
-                          삭제
-                        </button>
+                        <div className="relative aspect-square">
+                          {image.url ? (
+                            <Image
+                              src={image.dataUrl ?? image.url}
+                              alt={image.name}
+                              fill
+                              unoptimized
+                              sizes="120px"
+                              className="object-cover"
+                              onError={() => {
+                                console.error("community-image-render-error", {
+                                  storedImageValue:
+                                    image.path ?? image.url ?? image.dataUrl,
+                                  finalImageUrl: image.dataUrl ?? image.url,
+                                });
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="grid gap-1 p-2">
+                          {isRichImageEditor ? (
+                            <button
+                              type="button"
+                              className="rounded-md border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-100"
+                              onClick={() => insertPostImageBlock(image)}
+                            >
+                              본문에 삽입
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="rounded-md bg-black/70 px-2 py-1 text-xs font-bold text-white"
+                            onClick={() => removePostImage(image.id)}
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1251,7 +1949,7 @@ export default function CommunityPage() {
           </section>
         ) : null}
 
-        <section className="grid gap-5 lg:grid-cols-2">
+        <section className="grid gap-5">
           <div className={panelClassName}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-xl font-extrabold">{activeCategoryLabel}</h2>
@@ -1279,25 +1977,18 @@ export default function CommunityPage() {
               <div>
                 <div className="divide-y divide-zinc-800">
                   {currentPagePosts.map((post) => {
-                    const isSelected = selectedPost?.id === post.id;
                     const thumbnailImage = post.images[0];
                     const thumbnailImageUrl =
                       thumbnailImage?.url ?? thumbnailImage?.dataUrl;
 
                     return (
-                      <button
+                      <Link
                         key={post.id}
-                        type="button"
                         className={cn(
                           "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
-                          isSelected
-                            ? "rounded-lg bg-red-500/10 px-4"
-                            : "hover:bg-zinc-900/50",
+                          "hover:bg-zinc-900/50",
                         )}
-                        onClick={() => {
-                          setSelectedPost(post);
-                          setIsWriting(false);
-                        }}
+                        href={`/community/post/${post.id}`}
                       >
                         <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
                           {getCommunityCategoryLabel(post.category)}
@@ -1313,7 +2004,7 @@ export default function CommunityPage() {
                           </span>
                         ) : null}
                         <span className="block text-base font-extrabold text-white sm:text-lg">
-                          {post.title}
+                          {renderCommunityTextColorSegments(post.title)}
                         </span>
                         <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
                           <VerifiedNickname
@@ -1354,7 +2045,7 @@ export default function CommunityPage() {
                             </span>
                           </span>
                         ) : null}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -1387,196 +2078,7 @@ export default function CommunityPage() {
             )}
           </div>
 
-          <article className={panelClassName}>
-            {selectedPost ? (
-              <div className="flex flex-col gap-5">
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
-                        <span>
-                          {getCommunityCategoryLabel(selectedPost.category)}
-                        </span>
-                        {selectedPost.isNotice ? <span>공지</span> : null}
-                        {selectedPost.isPinned ? <span>상단고정</span> : null}
-                        <VerifiedNickname
-                          isVerifiedDealer={selectedPost.authorIsVerifiedDealer}
-                        >
-                          {selectedPost.authorNickname}
-                        </VerifiedNickname>
-                        <span>{selectedPost.createdAt}</span>
-                      </div>
-                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                        {selectedPost.title}
-                      </h2>
-                    </div>
-                    {canEditSelectedPost ? (
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={secondaryButtonClassName}
-                          onClick={startEditingSelectedPost}
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          className={dangerButtonClassName}
-                          onClick={handleDeletePost}
-                          disabled={isDeletingPost}
-                        >
-                          {isDeletingPost ? "삭제 중" : "삭제"}
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                  <p className="mt-4 whitespace-pre-wrap break-words text-base leading-[1.7] text-zinc-200">
-                    {selectedPost.content}
-                  </p>
-                  {selectedPost.images.length > 0 ? (
-                    <div className="mt-5 grid grid-cols-3 gap-3">
-                      {selectedPost.images
-                        .slice(0, maxCommunityImages)
-                        .map((image) => {
-                          const finalImageUrl = image.url ?? image.dataUrl;
 
-                          return (
-                            <a
-                              key={image.id}
-                              href={finalImageUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="relative aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
-                            >
-                              {finalImageUrl ? (
-                                <Image
-                                  src={finalImageUrl}
-                                  alt={image.name}
-                                  fill
-                                  unoptimized
-                                  sizes="160px"
-                                  className="object-cover"
-                                  onError={() => {
-                                    console.error(
-                                      "community-image-render-error",
-                                      {
-                                        storedImageValue:
-                                          image.path ??
-                                          image.url ??
-                                          image.dataUrl,
-                                        finalImageUrl,
-                                      },
-                                    );
-                                  }}
-                                />
-                              ) : null}
-                            </a>
-                          );
-                        })}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="border-t border-zinc-800 pt-5">
-                  <h3 className="text-lg font-extrabold">
-                    댓글 {selectedPost.commentCount}
-                  </h3>
-                  <form
-                    className="mt-3 flex flex-col gap-3"
-                    onSubmit={submitComment}
-                  >
-                    <textarea
-                      className={cn(inputClassName, "min-h-24 resize-y")}
-                      name="comment"
-                      placeholder={
-                        isAuthenticated
-                          ? "댓글을 입력하세요"
-                          : "로그인 후 댓글을 작성할 수 있습니다"
-                      }
-                      maxLength={500}
-                      required
-                    />
-                    <button
-                      type="submit"
-                      className={primaryButtonClassName}
-                      disabled={isSubmitting}
-                    >
-                      댓글 등록
-                    </button>
-                  </form>
-
-                  <div className="mt-5 flex flex-col gap-3">
-                    {isLoadingComments ? (
-                      <p className={mutedTextClassName}>
-                        댓글을 불러오는 중입니다.
-                      </p>
-                    ) : comments.length === 0 ? (
-                      <p className={mutedTextClassName}>
-                        아직 댓글이 없습니다.
-                      </p>
-                    ) : (
-                      comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="rounded-lg border border-zinc-800 bg-black p-3"
-                        >
-                          <div className="flex flex-wrap gap-2 text-xs font-bold text-zinc-500">
-                            <VerifiedNickname
-                              isVerifiedDealer={comment.authorIsVerifiedDealer}
-                            >
-                              {comment.authorNickname}
-                            </VerifiedNickname>
-                            <span>{comment.createdAt}</span>
-                          </div>
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-[1.7] text-zinc-200">
-                            {comment.content}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className={secondaryButtonClassName}
-                      onClick={handleLike}
-                      disabled={selectedPost.likedByMe}
-                    >
-                      {selectedPost.likedByMe
-                        ? "좋아요됨 " + selectedPost.likeCount
-                        : "좋아요 " + selectedPost.likeCount}
-                    </button>
-                    <button
-                      type="button"
-                      className={reportButtonClassName}
-                      onClick={handleReport}
-                      disabled={
-                        selectedPost.reportedByMe ||
-                        reportedPostIds.has(selectedPost.id)
-                      }
-                    >
-                      {selectedPost.reportedByMe ||
-                      reportedPostIds.has(selectedPost.id)
-                        ? "신고됨 " + selectedPost.reportCount
-                        : "🚨 신고 " + selectedPost.reportCount}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-64 items-center justify-center text-center">
-                <div>
-                  <h2 className="text-xl font-extrabold">글 상세</h2>
-                  <p
-                    className={cn(mutedTextClassName, "mx-auto mt-2 max-w-xs")}
-                  >
-                    목록에서 글을 선택하면 상세 내용과 댓글을 확인할 수
-                    있습니다.
-                  </p>
-                </div>
-              </div>
-            )}
-          </article>
         </section>
 
         {isReportModalOpen && selectedPost ? (

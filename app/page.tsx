@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -12,7 +13,11 @@ import {
   reviewsChangeEventName,
 } from "@/hooks/useReviews";
 import { getVehicleStorageKey } from "@/hooks/useVehicle";
-import { fetchCommunityNotices } from "@/lib/communityData";
+import { getCommunityCategoryLabel } from "@/lib/communityCategories";
+import {
+  fetchCommunityNotices,
+  fetchCommunityPosts,
+} from "@/lib/communityData";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   fetchHomeTrafficRankings,
@@ -27,7 +32,8 @@ import {
   normalizeVehiclePlateNumber,
 } from "@/utils/vehiclePlateValidation";
 import { filterValidReviews } from "@/utils/reviewValidation";
-import type { FormEvent, ReactNode, TouchEvent } from "react";
+import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
+import type { FormEvent, ReactNode, TouchEvent, UIEvent } from "react";
 import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
@@ -75,6 +81,20 @@ const recentCarouselButtonClassName = cn(
 const recentCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
 );
+const guideCarouselButtonClassName = cn(
+  "hidden h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-zinc-100 text-lg font-black text-zinc-950 shadow-2xl shadow-black/45 transition sm:inline-flex",
+  "hover:border-[#FF3B30]/70 hover:bg-white hover:text-[#FF3B30] active:scale-95",
+);
+const guideCarouselDotClassName = cn(
+  "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
+);
+const guideCardClassName = cn(
+  "group flex h-full flex-col overflow-hidden rounded-lg border bg-[#0b0c10] shadow-2xl shadow-black/40 transition duration-300",
+  "hover:border-[#FF3B30]/70 hover:bg-zinc-950",
+);
+const guideImageClassName = cn(
+  "relative flex min-h-[10.5rem] items-center justify-center overflow-hidden bg-black sm:min-h-[11.5rem]",
+);
 const recentBadgeStackClassName = cn(
   "flex max-w-[45%] shrink-0 flex-col items-end gap-1 sm:max-w-none sm:gap-1.5",
 );
@@ -85,14 +105,17 @@ const recentStatusBadgeClassName = cn(
   "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full bg-[#FF3B30]/15 px-2 py-0.5 text-[11px] font-bold leading-tight text-[#FF7A73] sm:px-2.5 sm:py-1 sm:text-xs",
 );
 const topRankingCardClassName = cn(
-  "flex h-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 shadow-2xl shadow-black/20 sm:p-4 md:p-5",
+  "flex h-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 md:p-5",
 );
 const topRankingItemClassName = cn(
   "grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-1.5 rounded-lg border border-zinc-800 bg-black p-2 md:grid-cols-[2rem_1fr_auto] md:gap-3 md:p-3",
 );
 const topRankingButtonClassName = cn(
-  "shrink-0 whitespace-nowrap rounded-full border border-[#FF4D4F]/70 px-2 py-1 text-[10px] font-black leading-none text-[#FF4D4F] transition md:px-3 md:text-xs",
+  "shrink-0 whitespace-nowrap rounded-full border border-[#FF4D4F]/70 px-2.5 py-1.5 text-[11px] font-black leading-none text-[#FF4D4F] transition sm:px-3 sm:text-xs",
   "hover:border-[#FF4D4F] hover:bg-[#FF4D4F]/[0.08] hover:text-[#FF6B6D] active:scale-[0.98]",
+);
+const topRankingCarouselDotClassName = cn(
+  "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
 );
 const authButtonClassName = cn(
   "inline-flex rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition",
@@ -125,6 +148,8 @@ const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentReviewsPerSlide = 3;
 const recentReviewSlideIntervalMs = 5000;
 const recentReviewSwipeThresholdPx = 48;
+const communityGuidePreviewCount = 8;
+const communityGuideSwipeThresholdPx = 42;
 const heroCopyIntervalMs = 3500;
 const noticeRollIntervalMs = 3000;
 const topVehiclesPreviewCount = 3;
@@ -348,19 +373,101 @@ const getRecentViewBadge = (recentViewCount: number) => {
   return null;
 };
 
+const getCommunityPostHref = (post: CommunityPost) =>
+  `/community?category=${post.category}&post=${encodeURIComponent(post.id)}`;
+
+const getCommunityPostPreviewText = (content: string) => {
+  const normalizedContent = stripCommunityTextColorMarkup(content)
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalizedContent) {
+    return "본문에서 자세한 자동차 정보를 확인하세요.";
+  }
+
+  return normalizedContent.length > 86
+    ? normalizedContent.slice(0, 86).trimEnd() + "..."
+    : normalizedContent;
+};
+
+type GuideCarouselSlot = "left" | "center" | "right";
+type GuideCarouselDirection = -1 | 1;
+const guideCarouselMotionTransition = {
+  duration: 0.6,
+  ease: [0.22, 1, 0.36, 1],
+} as const;
+
+const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
+  if (slot === "center") {
+    return {
+      opacity: 1,
+      filter: "none",
+      transform: "translate3d(-50%, 0, 0) scale(1)",
+      zIndex: 30,
+      willChange: "transform, opacity, filter",
+      backfaceVisibility: "hidden" as const,
+      transformStyle: "preserve-3d" as const,
+      boxShadow:
+        "0 24px 62px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,59,48,0.58)",
+    };
+  }
+
+  return {
+    opacity: 0.42,
+    filter: "saturate(0.72) brightness(0.74)",
+    transform:
+      slot === "left"
+        ? "translate3d(-112%, 1.25rem, -90px) scale(0.75) rotateY(7deg) rotateZ(-2deg)"
+        : "translate3d(12%, 1.25rem, -90px) scale(0.75) rotateY(-7deg) rotateZ(2deg)",
+    zIndex: 10,
+    willChange: "transform, opacity, filter",
+    backfaceVisibility: "hidden" as const,
+    transformStyle: "preserve-3d" as const,
+    boxShadow: "0 14px 38px rgba(0,0,0,0.58)",
+  };
+};
+
+const getGuideCarouselEntryStyle = (
+  slot: GuideCarouselSlot,
+  direction: GuideCarouselDirection,
+) => {
+  const slotStyle = getGuideCarouselSlotStyle(slot);
+
+  if (slot === "center") {
+    return slotStyle;
+  }
+
+  const entersFromLeft = slot === "left" || direction < 0;
+
+  return {
+    ...slotStyle,
+    opacity: 0,
+    transform: entersFromLeft
+      ? "translate3d(-148%, 1.25rem, -140px) scale(0.68) rotateY(7deg) rotateZ(-2deg)"
+      : "translate3d(48%, 1.25rem, -140px) scale(0.68) rotateY(-7deg) rotateZ(2deg)",
+  };
+};
+
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, signOut } = useAuth();
   const [carNumber, setCarNumber] = useState("");
   const [heroCopyIndex, setHeroCopyIndex] = useState(0);
   const [recentSlideIndex, setRecentSlideIndex] = useState(0);
+  const [topRankingSlideIndex, setTopRankingSlideIndex] = useState(0);
+  const [guideSlideIndex, setGuideSlideIndex] = useState(0);
+  const [guideSlideDirection, setGuideSlideDirection] =
+    useState<GuideCarouselDirection>(1);
   const [recentCarouselHeight, setRecentCarouselHeight] = useState<
     number | null
   >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
   const recentTouchStartX = useRef<number | null>(null);
+  const guideTouchStartX = useRef<number | null>(null);
   const recentSlideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const topRankingCardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
+  const [guidePosts, setGuidePosts] = useState<CommunityPost[]>([]);
   const [trafficRankings, setTrafficRankings] =
     useState<HomeTrafficRankings | null>(null);
   const recentReviewsSnapshot = useSyncExternalStore(
@@ -388,9 +495,86 @@ export default function Home() {
     recentPageCount > 0
       ? Math.min(recentSlideIndex, recentPageCount - 1)
       : 0;
+  const activeTopRankingSlideIndex = Math.min(topRankingSlideIndex, 1);
+  const activeGuideSlideIndex =
+    guidePosts.length > 0
+      ? Math.min(guideSlideIndex, guidePosts.length - 1)
+      : 0;
   const heroCopy = heroCopies[heroCopyIndex];
   const activeNotice =
     homeNotices[noticeIndex % Math.max(homeNotices.length, 1)];
+  const guideCarouselCards = useMemo(() => {
+    const postCount = guidePosts.length;
+
+    if (postCount === 0) {
+      return [];
+    }
+
+    if (postCount === 1) {
+      return [{ index: activeGuideSlideIndex, slot: "center" as const }];
+    }
+
+    if (postCount === 2) {
+      return guideSlideDirection < 0
+        ? [
+            {
+              index: (activeGuideSlideIndex + 1) % postCount,
+              slot: "left" as const,
+            },
+            { index: activeGuideSlideIndex, slot: "center" as const },
+          ]
+        : [
+            { index: activeGuideSlideIndex, slot: "center" as const },
+            {
+              index: (activeGuideSlideIndex + 1) % postCount,
+              slot: "right" as const,
+            },
+          ];
+    }
+
+    return [
+      {
+        index: (activeGuideSlideIndex - 1 + postCount) % postCount,
+        slot: "left" as const,
+      },
+      { index: activeGuideSlideIndex, slot: "center" as const },
+      {
+        index: (activeGuideSlideIndex + 1) % postCount,
+        slot: "right" as const,
+      },
+    ];
+  }, [activeGuideSlideIndex, guidePosts.length, guideSlideDirection]);
+  const getGuideCarouselCardMotionKey = (
+    index: number,
+    slot: GuideCarouselSlot,
+  ) => {
+    const postCount = guidePosts.length;
+
+    if (postCount <= 2) {
+      return "guide-track-" + guidePosts[index].id;
+    }
+
+    const previousActiveIndex =
+      guideSlideDirection > 0
+        ? (activeGuideSlideIndex - 1 + postCount) % postCount
+        : (activeGuideSlideIndex + 1) % postCount;
+    const isMovingCard =
+      index === activeGuideSlideIndex || index === previousActiveIndex;
+
+    return isMovingCard
+      ? "guide-track-" + guidePosts[index].id
+      : [
+          "guide-enter",
+          guideSlideDirection,
+          activeGuideSlideIndex,
+          slot,
+          guidePosts[index].id,
+        ].join("-");
+  };
+  const isGuideCarouselEnteringCard = (
+    index: number,
+    slot: GuideCarouselSlot,
+  ) => getGuideCarouselCardMotionKey(index, slot).startsWith("guide-enter-");
   const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
@@ -406,6 +590,67 @@ export default function Home() {
     setRecentSlideIndex((currentIndex) =>
       recentPageCount > 0 ? (currentIndex + 1) % recentPageCount : 0,
     );
+  };
+  const scrollToTopRankingSlide = (nextIndex: number) => {
+    const normalizedIndex = (nextIndex + 2) % 2;
+
+    setTopRankingSlideIndex(normalizedIndex);
+    topRankingCardRefs.current[normalizedIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  };
+  const handleTopRankingScroll = (event: UIEvent<HTMLDivElement>) => {
+    const scroller = event.currentTarget;
+    const scrollerCenter =
+      scroller.getBoundingClientRect().left + scroller.clientWidth / 2;
+    const nearestIndex = topRankingCardRefs.current.reduce(
+      (nearest, card, index) => {
+        if (!card) {
+          return nearest;
+        }
+
+        const rect = card.getBoundingClientRect();
+        const distance = Math.abs(rect.left + rect.width / 2 - scrollerCenter);
+
+        return distance < nearest.distance ? { distance, index } : nearest;
+      },
+      { distance: Number.POSITIVE_INFINITY, index: activeTopRankingSlideIndex },
+    ).index;
+
+    if (nearestIndex !== activeTopRankingSlideIndex) {
+      setTopRankingSlideIndex(nearestIndex);
+    }
+  };
+  const goToPreviousGuideSlide = () => {
+    scrollToGuidePost(activeGuideSlideIndex - 1, -1);
+  };
+  const goToNextGuideSlide = () => {
+    scrollToGuidePost(activeGuideSlideIndex + 1, 1);
+  };
+  const scrollToGuidePost = (
+    nextIndex: number,
+    direction?: GuideCarouselDirection,
+  ) => {
+    const postCount = guidePosts.length;
+
+    if (postCount === 0) {
+      setGuideSlideIndex(0);
+      return;
+    }
+
+    const normalizedIndex = (nextIndex + postCount) % postCount;
+    if (direction) {
+      setGuideSlideDirection(direction);
+    } else if (normalizedIndex !== activeGuideSlideIndex) {
+      const forwardDistance =
+        (normalizedIndex - activeGuideSlideIndex + postCount) % postCount;
+      const backwardDistance =
+        (activeGuideSlideIndex - normalizedIndex + postCount) % postCount;
+      setGuideSlideDirection(forwardDistance <= backwardDistance ? 1 : -1);
+    }
+    setGuideSlideIndex(normalizedIndex);
   };
   const handleRecentTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     recentTouchStartX.current = event.touches[0]?.clientX ?? null;
@@ -429,6 +674,30 @@ export default function Home() {
       goToNextRecentSlide();
     } else {
       goToPreviousRecentSlide();
+    }
+  };
+  const handleGuideTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    guideTouchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleGuideTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startX = guideTouchStartX.current;
+    guideTouchStartX.current = null;
+
+    if (startX === null || guidePosts.length < 2) {
+      return;
+    }
+
+    const endX = event.changedTouches[0]?.clientX ?? startX;
+    const deltaX = endX - startX;
+
+    if (Math.abs(deltaX) < communityGuideSwipeThresholdPx) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      goToNextGuideSlide();
+    } else {
+      goToPreviousGuideSlide();
     }
   };
 
@@ -551,6 +820,44 @@ export default function Home() {
         if (isActive) {
           setHomeNotices([]);
           setNoticeIndex(0);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isSupabaseConfigured) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchCommunityPosts("news")
+      .then((posts) => {
+        if (!isActive) {
+          return;
+        }
+
+        setGuidePosts(
+          posts
+            .filter((post) => post.category === "news" && !post.isNotice)
+            .sort(
+              (left, right) =>
+                Date.parse(right.createdAtRaw) - Date.parse(left.createdAtRaw),
+            )
+            .slice(0, communityGuidePreviewCount),
+        );
+        setGuideSlideIndex(0);
+      })
+      .catch(() => {
+        if (isActive) {
+          setGuidePosts([]);
+          setGuideSlideIndex(0);
         }
       });
 
@@ -740,9 +1047,53 @@ export default function Home() {
         {trafficRankings &&
         (trafficRankings.topVehicles.length ||
           trafficRankings.topModels.length) ? (
-          <section className="mb-2 grid grid-cols-2 items-stretch gap-2 sm:mb-0 sm:gap-3 md:gap-4">
-            <HomeTopVehiclesPanel rankings={trafficRankings} />
-            <HomeTopModelsPanel rankings={trafficRankings} />
+          <section className="mb-2 sm:mb-0">
+            <div
+              className="snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden"
+              onScroll={handleTopRankingScroll}
+              data-testid="top-rankings-carousel"
+            >
+              <div className="flex gap-3 px-[6%] md:contents md:px-0">
+                <div
+                  ref={(element) => {
+                    topRankingCardRefs.current[0] = element;
+                  }}
+                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
+                >
+                  <HomeTopVehiclesPanel rankings={trafficRankings} />
+                </div>
+                <div
+                  ref={(element) => {
+                    topRankingCardRefs.current[1] = element;
+                  }}
+                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
+                >
+                  <HomeTopModelsPanel rankings={trafficRankings} />
+                </div>
+              </div>
+            </div>
+            <div
+              className="mt-3 flex items-center justify-center gap-2 md:hidden"
+              aria-label="실시간 인기 순위 슬라이드 위치"
+            >
+              {[0, 1].map((index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className={cn(
+                    topRankingCarouselDotClassName,
+                    index === activeTopRankingSlideIndex && "w-6 bg-[#FF3B30]",
+                  )}
+                  onClick={() => scrollToTopRankingSlide(index)}
+                  aria-label={
+                    index === 0
+                      ? "실시간 인기 차량 보기"
+                      : "실시간 인기 모델 보기"
+                  }
+                  aria-current={index === activeTopRankingSlideIndex}
+                />
+              ))}
+            </div>
           </section>
         ) : null}
 
@@ -902,6 +1253,159 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        <section className="w-full max-w-3xl min-w-0">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-white">
+              📚 자동차 정보 &amp; 구매 가이드
+            </h2>
+          </div>
+
+          {guidePosts.length === 0 ? (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-center text-sm font-semibold text-zinc-500">
+              등록된 자동차 정보 글이 없습니다.
+            </div>
+          ) : (
+            <div
+              className="relative left-1/2 w-screen max-w-[44rem] -translate-x-1/2 overflow-visible py-3 sm:w-[calc(100vw-2rem)] sm:py-4"
+              onTouchStart={handleGuideTouchStart}
+              onTouchEnd={handleGuideTouchEnd}
+              data-testid="auto-guides-carousel"
+            >
+              {guidePosts.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    className={cn(
+                      guideCarouselButtonClassName,
+                      "absolute left-[calc(50%_-_15rem)] top-[43%] z-40 -translate-y-1/2",
+                    )}
+                    onClick={goToPreviousGuideSlide}
+                    aria-label="이전 자동차 정보"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      guideCarouselButtonClassName,
+                      "absolute right-[calc(50%_-_15rem)] top-[43%] z-40 -translate-y-1/2",
+                    )}
+                    onClick={goToNextGuideSlide}
+                    aria-label="다음 자동차 정보"
+                  >
+                    &gt;
+                  </button>
+                </>
+              ) : null}
+
+              <div className="relative h-[23rem] overflow-visible touch-pan-y [perspective:1100px] sm:h-[25rem]">
+                {guideCarouselCards.map(({ index, slot }) => {
+                  const post = guidePosts[index];
+                  const representativeImage = post.images[0];
+                  const representativeImageUrl =
+                    representativeImage?.url ?? representativeImage?.dataUrl;
+                  const isActiveGuide = slot === "center";
+                  const isDuplicatePreview =
+                    guidePosts.length === 1 && !isActiveGuide;
+                  const motionKey = getGuideCarouselCardMotionKey(index, slot);
+                  const isEnteringGuideCard =
+                    isGuideCarouselEnteringCard(index, slot);
+
+                  return (
+                    <motion.div
+                      key={motionKey}
+                      className="absolute left-1/2 top-4 h-[21rem] w-[68vw] max-w-[16rem] origin-center sm:h-[23rem] sm:w-[17rem] sm:max-w-none"
+                      initial={
+                        isEnteringGuideCard
+                          ? getGuideCarouselEntryStyle(
+                              slot,
+                              guideSlideDirection,
+                            )
+                          : false
+                      }
+                      animate={getGuideCarouselSlotStyle(slot)}
+                      transition={guideCarouselMotionTransition}
+                    >
+                      <Link
+                        href={getCommunityPostHref(post)}
+                        className={cn(
+                          guideCardClassName,
+                          !isActiveGuide && "cursor-pointer",
+                          isDuplicatePreview && "pointer-events-none",
+                          isActiveGuide
+                            ? "border-[#FF3B30]/80"
+                            : "border-zinc-800",
+                        )}
+                        onClick={(event) => {
+                          if (!isActiveGuide) {
+                            event.preventDefault();
+                            scrollToGuidePost(index);
+                          }
+                        }}
+                        aria-label={post.title}
+                        aria-hidden={isDuplicatePreview}
+                        tabIndex={isDuplicatePreview ? -1 : undefined}
+                      >
+                        <div className={guideImageClassName}>
+                          {representativeImageUrl ? (
+                            <Image
+                              src={representativeImageUrl}
+                              alt={representativeImage.name}
+                              fill
+                              unoptimized
+                              sizes="(min-width: 640px) 272px, 68vw"
+                              className="object-cover transition duration-500 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(255,59,48,0.35),transparent_32%),linear-gradient(135deg,#171717_0%,#050505_58%,#2a0808_100%)] transition duration-500 group-hover:scale-105" />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                        </div>
+
+                        <div className="relative flex flex-1 flex-col p-3 sm:p-4">
+                          <span className="mb-2 inline-flex w-fit rounded-full border border-[#FF3B30]/30 bg-[#FF3B30]/10 px-2 py-0.5 text-[10px] font-black text-[#FF8A82]">
+                            {getCommunityCategoryLabel(post.category)}
+                          </span>
+                          <h3 className="overflow-hidden text-sm font-black leading-snug text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:text-base">
+                            {post.title}
+                          </h3>
+                          <p className="mt-2 min-h-10 overflow-hidden text-xs leading-5 text-zinc-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                            {getCommunityPostPreviewText(post.content)}
+                          </p>
+                          <p className="mt-auto pt-3 text-[11px] font-bold text-zinc-500">
+                            {post.createdAt}
+                          </p>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {guidePosts.length > 1 ? (
+            <div
+              className="mt-4 flex items-center justify-center gap-2"
+              aria-label="자동차 정보 슬라이드 위치"
+            >
+              {guidePosts.map((post, index) => (
+                <button
+                  key={post.id}
+                  type="button"
+                  className={cn(
+                    guideCarouselDotClassName,
+                    index === activeGuideSlideIndex && "w-6 bg-[#FF3B30]",
+                  )}
+                  onClick={() => scrollToGuidePost(index)}
+                  aria-label={`${index + 1}번째 자동차 정보 보기`}
+                  aria-current={index === activeGuideSlideIndex}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
       </div>
     </main>
   );
@@ -914,8 +1418,8 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
 
   return (
     <div className={topRankingCardClassName}>
-      <div className="flex items-center justify-between gap-1.5 md:gap-2">
-        <h2 className="min-w-0 truncate text-[11px] font-black text-white sm:text-base md:text-lg">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-black leading-tight text-white sm:text-base md:text-lg">
           <span>🔥 실시간 인기 차량</span>
         </h2>
         {topVehicles.length ? (
@@ -1038,8 +1542,8 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
 
   return (
     <div className={topRankingCardClassName}>
-      <div className="flex items-center justify-between gap-1.5 md:gap-2">
-        <h2 className="min-w-0 truncate text-[11px] font-black text-white sm:text-base md:text-lg">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-black leading-tight text-white sm:text-base md:text-lg">
           <span>🔥 실시간 인기 모델</span>
         </h2>
         {topModels.length ? (

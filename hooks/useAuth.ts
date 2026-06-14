@@ -145,16 +145,36 @@ const syncUserProfile = async (user: User | null) => {
   return updatedProfile;
 };
 
+const fetchCurrentUserHasAdminRole = async () => {
+  if (!supabase) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("current_user_has_admin_role");
+
+    if (error) {
+      return false;
+    }
+
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+};
+
 export function useAuth(): UseAuthResult {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [hasAdminRoleByRpc, setHasAdminRoleByRpc] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(!isSupabaseConfigured);
   const [isProfileReady, setIsProfileReady] = useState(!isSupabaseConfigured);
   const [authError, setAuthError] = useState("");
   const user = session?.user ?? null;
   const userLabel = useMemo(() => getUserLabel(user), [user]);
   const role = profile?.role ?? defaultUserRole;
-  const isAdmin = role === "admin" || role === "super_admin";
+  const isAdmin =
+    role === "admin" || role === "super_admin" || hasAdminRoleByRpc;
   const isSuperAdmin = role === "super_admin";
 
   useEffect(() => {
@@ -216,6 +236,7 @@ export function useAuth(): UseAuthResult {
     if (!user) {
       void Promise.resolve().then(() => {
         setProfile(null);
+        setHasAdminRoleByRpc(false);
         setIsProfileReady(true);
       });
       return;
@@ -249,13 +270,17 @@ export function useAuth(): UseAuthResult {
         });
       });
 
-    syncUserProfile(user)
-      .then((nextProfile) => {
+    Promise.all([
+      syncUserProfile(user),
+      fetchCurrentUserHasAdminRole(),
+    ])
+      .then(([nextProfile, nextHasAdminRole]) => {
         if (!isActive) {
           return;
         }
 
         setProfile(nextProfile);
+        setHasAdminRoleByRpc(nextHasAdminRole);
         setIsProfileReady(true);
       })
       .catch(() => {
@@ -264,6 +289,7 @@ export function useAuth(): UseAuthResult {
         }
 
         setProfile(null);
+        setHasAdminRoleByRpc(false);
         setIsProfileReady(true);
         // Profile persistence is additive for Kakao channel/AlimTalk readiness.
         // Auth must continue even if the table has not been applied yet.
@@ -335,6 +361,7 @@ export function useAuth(): UseAuthResult {
     if (!supabase) {
       setSession(null);
       setProfile(null);
+      setHasAdminRoleByRpc(false);
       setIsProfileReady(true);
       return;
     }
@@ -350,6 +377,7 @@ export function useAuth(): UseAuthResult {
 
     setSession(null);
     setProfile(null);
+    setHasAdminRoleByRpc(false);
     setIsProfileReady(true);
   }, []);
 

@@ -39,6 +39,7 @@ export interface CommunityPost {
   commentCount: number;
   reportedByMe: boolean;
   reportCount: number;
+  viewCount?: number;
   createdAt: string;
   createdAtRaw: string;
 }

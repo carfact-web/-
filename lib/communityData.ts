@@ -501,6 +501,38 @@ export const fetchCommunityPosts = async (category: CommunityBoardFilter) => {
   );
 };
 
+export const fetchCommunityPostById = async (postId: string) => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data: post, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("id", postId)
+    .eq("is_hidden", false)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!post) {
+    return null;
+  }
+
+  const [counts, authorProfiles, interactions] = await Promise.all([
+    fetchCommunityPostCounts([post.id]),
+    fetchCommunityAuthorProfiles(
+      [post.user_id],
+      post.author_nickname?.trim() ? [] : [post.user_id],
+    ),
+    fetchCommunityInteractionState([post.id]),
+  ]);
+
+  return mapCommunityPost(post, authorProfiles, counts, interactions);
+};
+
 export const fetchCommunityNotices = async (limit = 5) => {
   if (!supabase) {
     return [] as CommunityPost[];

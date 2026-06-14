@@ -103,7 +103,7 @@ export async function GET(request: Request) {
             textAlign: "center",
           }}
         >
-          판매글에는 없는 이야기
+          중고차 실매물 후기 공유 플랫폼
         </div>
       </div>
     ),
