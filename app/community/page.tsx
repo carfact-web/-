@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
@@ -284,6 +284,94 @@ const serializeCommunityTextEditor = (editor: HTMLElement) =>
     })
     .join("");
 
+const getCommunityEditorImageBlockClassName = () =>
+  "my-3 block w-full overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 text-left shadow-lg shadow-black/20";
+
+const createCommunityImageEditorBlock = (
+  image: CommunityImageAttachment | undefined,
+  imageId: string,
+) => {
+  const imageBlock = document.createElement("div");
+  imageBlock.dataset.communityImageId = imageId;
+  imageBlock.contentEditable = "false";
+  imageBlock.className = getCommunityEditorImageBlockClassName();
+
+  const imageUrl = image?.dataUrl ?? image?.url;
+
+  if (imageUrl) {
+    const preview = document.createElement("img");
+    preview.src = imageUrl;
+    preview.alt = image?.name ?? "본문 이미지";
+    preview.className = "max-h-72 w-full object-contain bg-black";
+    imageBlock.append(preview);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className =
+      "flex min-h-36 items-center justify-center bg-black px-3 py-8 text-sm font-bold text-zinc-400";
+    placeholder.textContent = image?.name ?? "본문 이미지";
+    imageBlock.append(placeholder);
+  }
+
+  const toolbar = document.createElement("div");
+  toolbar.className =
+    "flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 bg-zinc-950 px-3 py-2";
+
+  const label = document.createElement("span");
+  label.className = "min-w-0 truncate text-xs font-bold text-zinc-300";
+  label.textContent = image?.name ?? "본문 이미지";
+
+  const controls = document.createElement("span");
+  controls.className = "inline-flex shrink-0 gap-1";
+
+  ([
+    ["up", "위로"],
+    ["down", "아래로"],
+  ] as const).forEach(([action, labelText]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.communityImageAction = action;
+    button.dataset.communityImageId = imageId;
+    button.className =
+      "rounded-md border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800";
+    button.textContent = labelText;
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    controls.append(button);
+  });
+
+  toolbar.append(label, controls);
+  imageBlock.append(toolbar);
+
+  return imageBlock;
+};
+
+const moveCommunityImageTokenInContent = (
+  content: string,
+  imageId: string,
+  direction: "down" | "up",
+) => {
+  const token = createCommunityImageToken(imageId);
+  const parts = content
+    .split(/(\[\[image:[^\]]+\]\])/g)
+    .filter((part) => part.length > 0);
+  const tokenIndex = parts.findIndex((part) => part === token);
+
+  if (tokenIndex < 0) {
+    return content;
+  }
+
+  const swapIndex = direction === "up" ? tokenIndex - 1 : tokenIndex + 1;
+
+  if (swapIndex < 0 || swapIndex >= parts.length) {
+    return content;
+  }
+
+  [parts[tokenIndex], parts[swapIndex]] = [parts[swapIndex], parts[tokenIndex]];
+
+  return parts.join("").replace(/\n{4,}/g, "\n\n\n");
+};
+
 const getCommunityTextEditorSelectionOffsets = (editor: HTMLElement) => {
   const selection = window.getSelection();
 
@@ -322,8 +410,10 @@ const getCommunityTextEditorSelectionOffsets = (editor: HTMLElement) => {
 const replaceCommunityTextEditorContent = (
   editor: HTMLElement,
   content: string,
+  images: CommunityImageAttachment[] = [],
 ) => {
   editor.replaceChildren();
+  const imageMap = new Map(images.map((image) => [image.id, image]));
 
   const appendText = (textContent: string) => {
     parseCommunityTextColorSegments(textContent).forEach((segment) => {
@@ -350,13 +440,12 @@ const replaceCommunityTextEditorContent = (
       return;
     }
 
-    const imageChip = document.createElement("span");
-    imageChip.dataset.communityImageId = imageMatch[1];
-    imageChip.contentEditable = "false";
-    imageChip.className =
-      "my-2 inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-5 text-sm font-bold text-zinc-200";
-    imageChip.textContent = "본문 이미지";
-    editor.append(imageChip);
+    editor.append(
+      createCommunityImageEditorBlock(
+        imageMap.get(imageMatch[1]),
+        imageMatch[1],
+      ),
+    );
   });
 };
 
@@ -436,6 +525,7 @@ export default function CommunityPage() {
   const [message, setMessage] = useState("");
   const writeTitleEditorRef = useRef<HTMLDivElement | null>(null);
   const writeContentEditorRef = useRef<HTMLDivElement | null>(null);
+  const writeContentSelectionRangeRef = useRef<Range | null>(null);
   const [writeEditorResetKey, setWriteEditorResetKey] = useState(0);
 
   const activeCategoryLabel = useMemo(
@@ -828,6 +918,7 @@ export default function CommunityPage() {
     replaceCommunityTextEditorContent(
       writeContentEditorRef.current,
       writeContent,
+      postImages,
     );
   }, [isAdmin, isRichImageEditor, isWriting, writeEditorResetKey]);
 
@@ -839,6 +930,43 @@ export default function CommunityPage() {
     replaceCommunityTextEditorContent(writeTitleEditorRef.current, writeTitle);
   }, [isAdmin, isWriting, writeEditorResetKey]);
 
+  const saveWriteContentSelectionRange = () => {
+    const editor = writeContentEditorRef.current;
+    const selection = window.getSelection();
+
+    if (!editor || !selection || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+
+    if (!editor.contains(range.commonAncestorContainer)) {
+      return;
+    }
+
+    writeContentSelectionRangeRef.current = range.cloneRange();
+  };
+
+  const restoreWriteContentSelectionRange = () => {
+    const editor = writeContentEditorRef.current;
+    const range = writeContentSelectionRangeRef.current;
+    const selection = window.getSelection();
+
+    if (
+      !editor ||
+      !range ||
+      !selection ||
+      !editor.contains(range.commonAncestorContainer)
+    ) {
+      return null;
+    }
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    return range.cloneRange();
+  };
+
   const syncWriteContentFromEditor = () => {
     const editor = writeContentEditorRef.current;
 
@@ -847,6 +975,7 @@ export default function CommunityPage() {
     }
 
     setWriteContent(serializeCommunityTextEditor(editor));
+    saveWriteContentSelectionRange();
     setMessage("");
   };
 
@@ -894,7 +1023,11 @@ export default function CommunityPage() {
     );
 
     setContent(nextContent);
-    replaceCommunityTextEditorContent(editor, nextContent);
+    replaceCommunityTextEditorContent(
+      editor,
+      nextContent,
+      editor === writeContentEditorRef.current ? postImages : [],
+    );
     setMessage("");
   };
 
@@ -920,6 +1053,7 @@ export default function CommunityPage() {
 
   const insertPostImageBlock = (image: CommunityImageAttachment) => {
     const editor = writeContentEditorRef.current;
+    const imageBlock = createCommunityImageEditorBlock(image, image.id);
 
     if (!editor) {
       setWriteContent((current) =>
@@ -931,33 +1065,89 @@ export default function CommunityPage() {
       return;
     }
 
+    editor.focus();
+    const restoredRange = restoreWriteContentSelectionRange();
     const selection = window.getSelection();
-    const imageChip = document.createElement("span");
-    imageChip.dataset.communityImageId = image.id;
-    imageChip.contentEditable = "false";
-    imageChip.className =
-      "my-2 inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-5 text-sm font-bold text-zinc-200";
-    imageChip.textContent = "본문 이미지";
 
     if (
+      restoredRange &&
       selection &&
       selection.rangeCount > 0 &&
       editor.contains(selection.getRangeAt(0).commonAncestorContainer)
     ) {
       const range = selection.getRangeAt(0);
       range.deleteContents();
-      range.insertNode(document.createElement("br"));
-      range.insertNode(imageChip);
-      range.insertNode(document.createElement("br"));
-      range.collapse(false);
+      const leadingBreak = document.createElement("br");
+      const trailingBreak = document.createElement("br");
+      range.insertNode(trailingBreak);
+      range.insertNode(imageBlock);
+      range.insertNode(leadingBreak);
+      range.setStartAfter(trailingBreak);
+      range.collapse(true);
       selection.removeAllRanges();
       selection.addRange(range);
     } else {
-      editor.append(document.createElement("br"), imageChip, document.createElement("br"));
+      editor.append(document.createElement("br"), imageBlock, document.createElement("br"));
     }
 
     setWriteContent(serializeCommunityTextEditor(editor));
+    saveWriteContentSelectionRange();
     setMessage("");
+  };
+
+  const movePostImageBlock = (imageId: string, direction: "down" | "up") => {
+    const editor = writeContentEditorRef.current;
+
+    if (!editor) {
+      setWriteContent((current) =>
+        moveCommunityImageTokenInContent(current, imageId, direction),
+      );
+      setWriteEditorResetKey((key) => key + 1);
+      return;
+    }
+
+    const currentContent = serializeCommunityTextEditor(editor);
+    const nextContent = moveCommunityImageTokenInContent(
+      currentContent,
+      imageId,
+      direction,
+    );
+
+    if (nextContent === currentContent) {
+      return;
+    }
+
+    setWriteContent(nextContent);
+    replaceCommunityTextEditorContent(editor, nextContent, postImages);
+    setMessage("");
+  };
+
+  const handleWriteContentEditorClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      saveWriteContentSelectionRange();
+      return;
+    }
+
+    const actionButton = target.closest<HTMLButtonElement>(
+      "button[data-community-image-action][data-community-image-id]",
+    );
+
+    if (!actionButton) {
+      saveWriteContentSelectionRange();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = actionButton.dataset.communityImageAction;
+    const imageId = actionButton.dataset.communityImageId;
+
+    if ((action === "down" || action === "up") && imageId) {
+      movePostImageBlock(imageId, action);
+    }
   };
 
   const addPostImages = async (files: FileList | null) => {
@@ -1796,7 +1986,11 @@ export default function CommunityPage() {
                     aria-label="내용"
                     aria-multiline="true"
                     suppressContentEditableWarning
+                    onClick={handleWriteContentEditorClick}
+                    onFocus={saveWriteContentSelectionRange}
                     onInput={syncWriteContentFromEditor}
+                    onKeyUp={saveWriteContentSelectionRange}
+                    onMouseUp={saveWriteContentSelectionRange}
                     onBlur={syncWriteContentFromEditor}
                     onPaste={(event) => {
                       event.preventDefault();
@@ -1814,6 +2008,7 @@ export default function CommunityPage() {
                       selection.removeAllRanges();
                       selection.addRange(range);
                       syncWriteContentFromEditor();
+                      saveWriteContentSelectionRange();
                     }}
                   />
                 </div>
@@ -1886,6 +2081,7 @@ export default function CommunityPage() {
                             <button
                               type="button"
                               className="rounded-md border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-100"
+                              onMouseDown={(event) => event.preventDefault()}
                               onClick={() => insertPostImageBlock(image)}
                             >
                               본문에 삽입
