@@ -391,10 +391,14 @@ const getCommunityPostPreviewText = (content: string) => {
 };
 
 type GuideCarouselSlot = "left" | "center" | "right";
+type GuideCarouselDirection = "next" | "previous";
 const guideCarouselTransition =
   "transform 560ms cubic-bezier(0.22, 1, 0.36, 1), opacity 520ms cubic-bezier(0.22, 1, 0.36, 1), filter 520ms cubic-bezier(0.22, 1, 0.36, 1)";
+const guideCarouselDurationMs = 560;
 
-const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
+const getGuideCarouselBaseSlotStyle = (
+  slot: GuideCarouselSlot | "offLeft" | "offRight",
+) => {
   if (slot === "center") {
     return {
       opacity: 1,
@@ -407,6 +411,23 @@ const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
       transformStyle: "preserve-3d" as const,
       boxShadow:
         "0 24px 62px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,59,48,0.58)",
+    };
+  }
+
+  if (slot === "offLeft" || slot === "offRight") {
+    return {
+      opacity: 0,
+      filter: "saturate(0.72) brightness(0.74)",
+      transform:
+        slot === "offLeft"
+          ? "translateX(-145%) scale(0.64) rotateY(8deg)"
+          : "translateX(45%) scale(0.64) rotateY(-8deg)",
+      transition: guideCarouselTransition,
+      zIndex: 0,
+      willChange: "transform, opacity, filter",
+      backfaceVisibility: "hidden" as const,
+      transformStyle: "preserve-3d" as const,
+      boxShadow: "0 14px 38px rgba(0,0,0,0.58)",
     };
   }
 
@@ -426,6 +447,32 @@ const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
   };
 };
 
+const getGuideCarouselSlotStyle = (
+  slot: GuideCarouselSlot,
+  options: {
+    direction: GuideCarouselDirection | null;
+    isAnimating: boolean;
+    shouldAnimate: boolean;
+  },
+) => {
+  let targetSlot: GuideCarouselSlot | "offLeft" | "offRight" = slot;
+
+  if (options.isAnimating && options.direction === "next") {
+    targetSlot =
+      slot === "left" ? "offLeft" : slot === "center" ? "left" : "center";
+  }
+
+  if (options.isAnimating && options.direction === "previous") {
+    targetSlot =
+      slot === "left" ? "center" : slot === "center" ? "right" : "offRight";
+  }
+
+  return {
+    ...getGuideCarouselBaseSlotStyle(targetSlot),
+    transition: options.shouldAnimate ? guideCarouselTransition : "none",
+  };
+};
+
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, signOut } = useAuth();
@@ -434,12 +481,17 @@ export default function Home() {
   const [recentSlideIndex, setRecentSlideIndex] = useState(0);
   const [topRankingSlideIndex, setTopRankingSlideIndex] = useState(0);
   const [guideSlideIndex, setGuideSlideIndex] = useState(0);
+  const [guideAnimationDirection, setGuideAnimationDirection] =
+    useState<GuideCarouselDirection | null>(null);
+  const [isGuideAnimating, setIsGuideAnimating] = useState(false);
+  const [shouldAnimateGuide, setShouldAnimateGuide] = useState(true);
   const [recentCarouselHeight, setRecentCarouselHeight] = useState<
     number | null
   >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
   const recentTouchStartX = useRef<number | null>(null);
   const guideTouchStartX = useRef<number | null>(null);
+  const guideAnimationTimeoutRef = useRef<number | null>(null);
   const recentSlideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const topRankingCardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
@@ -551,24 +603,43 @@ export default function Home() {
     }
   };
   const goToPreviousGuideSlide = () => {
-    const postCount = guidePosts.length;
-
-    if (postCount < 2) {
-      return;
-    }
-
-    setGuideSlideIndex(
-      (currentIndex) => (currentIndex - 1 + postCount) % postCount,
-    );
+    startGuideCarouselTransition("previous");
   };
   const goToNextGuideSlide = () => {
+    startGuideCarouselTransition("next");
+  };
+  const startGuideCarouselTransition = (direction: GuideCarouselDirection) => {
     const postCount = guidePosts.length;
 
-    if (postCount < 2) {
+    if (postCount < 2 || isGuideAnimating) {
       return;
     }
 
-    setGuideSlideIndex((currentIndex) => (currentIndex + 1) % postCount);
+    if (guideAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(guideAnimationTimeoutRef.current);
+    }
+
+    setShouldAnimateGuide(true);
+    setGuideAnimationDirection(direction);
+    setIsGuideAnimating(true);
+
+    guideAnimationTimeoutRef.current = window.setTimeout(() => {
+      setShouldAnimateGuide(false);
+      setGuideSlideIndex((currentIndex) =>
+        direction === "next"
+          ? (currentIndex + 1) % postCount
+          : (currentIndex - 1 + postCount) % postCount,
+      );
+      setIsGuideAnimating(false);
+      setGuideAnimationDirection(null);
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setShouldAnimateGuide(true);
+        });
+      });
+      guideAnimationTimeoutRef.current = null;
+    }, guideCarouselDurationMs);
   };
   const scrollToGuidePost = (nextIndex: number) => {
     const postCount = guidePosts.length;
@@ -579,7 +650,7 @@ export default function Home() {
     }
 
     const normalizedIndex = (nextIndex + postCount) % postCount;
-    if (normalizedIndex === activeGuideSlideIndex) {
+    if (normalizedIndex === activeGuideSlideIndex || isGuideAnimating) {
       return;
     }
 
@@ -642,6 +713,14 @@ export default function Home() {
     }, heroCopyIntervalMs);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (guideAnimationTimeoutRef.current !== null) {
+        window.clearTimeout(guideAnimationTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -1242,16 +1321,16 @@ export default function Home() {
                   const isDuplicatePreview =
                     guidePosts.length === 1 && !isActiveGuide;
 
-	                  return (
-	                    <div
-	                      key={
-	                        guidePosts.length >= 3
-	                          ? String(post.id)
-	                          : String(post.id) + "-" + slot
-	                      }
-	                      className="absolute left-1/2 top-4 h-[21rem] w-[68vw] max-w-[16rem] origin-center sm:h-[23rem] sm:w-[17rem] sm:max-w-none"
-	                      style={getGuideCarouselSlotStyle(slot)}
-	                    >
+                  return (
+                    <div
+                      key={slot}
+                      className="absolute left-1/2 top-4 h-[21rem] w-[68vw] max-w-[16rem] origin-center sm:h-[23rem] sm:w-[17rem] sm:max-w-none"
+                      style={getGuideCarouselSlotStyle(slot, {
+                        direction: guideAnimationDirection,
+                        isAnimating: isGuideAnimating,
+                        shouldAnimate: shouldAnimateGuide,
+                      })}
+                    >
                       <Link
                         href={getCommunityPostHref(post)}
                         className={cn(
