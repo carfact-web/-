@@ -254,7 +254,6 @@ export interface Database {
           vehicle_id: string;
           author_id: string | null;
           author_nickname: string | null;
-          title: string | null;
           content: string;
           tags: string[];
           images: Json;
@@ -270,7 +269,6 @@ export interface Database {
           vehicle_id: string;
           author_id?: string | null;
           author_nickname?: string | null;
-          title?: string | null;
           content: string;
           tags?: string[];
           images?: Json;
@@ -286,7 +284,6 @@ export interface Database {
           vehicle_id?: string;
           author_id?: string | null;
           author_nickname?: string | null;
-          title?: string | null;
           content?: string;
           tags?: string[];
           images?: Json;
@@ -653,7 +650,6 @@ export interface Database {
           vehicle_id: string;
           author_id: string | null;
           author_nickname: string | null;
-          title: string | null;
           content: string;
           tags: string[];
           images: Json;
@@ -911,7 +907,6 @@ export interface Database {
       update_review: {
         Args: {
           target_review_id: string;
-          next_title: string;
           next_content: string;
           next_tags: string[];
           next_images: Json;

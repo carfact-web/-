@@ -122,7 +122,6 @@ interface AdminReview {
   vehicle_id: string;
   author_id: string | null;
   author_nickname: string | null;
-  title: string | null;
   content: string;
   tags: string[];
   images: Json;
@@ -1643,11 +1642,6 @@ export default function AdminPage() {
                         />
                       </td>
                       <td className={tableCellClassName}>
-                        {review.title ? (
-                          <p className="max-w-lg break-words font-bold text-white">
-                            {review.title}
-                          </p>
-                        ) : null}
                         <p className="max-w-lg whitespace-pre-wrap break-words leading-[1.7] text-white">
                           {review.content}
                         </p>

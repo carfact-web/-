@@ -67,8 +67,7 @@ export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
 const normalizeKeywordText = (value: string) =>
   value.toLowerCase().replace(/[^0-9a-zㄱ-ㅎ가-힣]+/g, "");
 
-const getReviewSearchText = (review: Review) =>
-  [review.title, review.content].filter(Boolean).join(" ");
+const getReviewSearchText = (review: Review) => review.content;
 
 export const getReviewKeywordStatsSummary = (
   modelName: string,

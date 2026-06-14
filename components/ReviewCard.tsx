@@ -56,7 +56,6 @@ const tagClassName = cn(
   "rounded-full bg-red-500/15 px-3 py-1 text-xs font-medium text-red-300",
   "ring-1 ring-red-500/25",
 );
-const titleClassName = cn("mb-2 break-words text-base font-black text-white");
 const contentClassName = cn(
   "mb-4 whitespace-pre-line break-words text-sm leading-[1.7] text-gray-100",
 );
@@ -472,8 +471,6 @@ export function ReviewCard({
         ))}
       </div>
 
-      {review.title ? <h3 className={titleClassName}>{review.title}</h3> : null}
-
       <p className={contentClassName}>{review.content}</p>
 
       {reviewImages.length > 0 && (
@@ -632,9 +629,9 @@ export function ReviewCard({
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-bold text-white">
-                  {review.title || "후기 상세"}
-                </h3>
+	                <h3 className="text-lg font-bold text-white">
+	                  후기 상세
+	                </h3>
                 <p className="mt-1 text-xs text-zinc-500">{review.createdAt}</p>
               </div>
               <button

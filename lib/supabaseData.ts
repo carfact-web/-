@@ -166,7 +166,6 @@ export const mapReviewRow = (
   authorIsVerifiedDealer: row.author_id
     ? (verifiedDealers[row.author_id] ?? false)
     : false,
-  title: typeof row.title === "string" ? row.title : undefined,
   content: row.content,
   tags: row.tags ?? [],
   images: toReviewImages(row.images),
@@ -365,7 +364,6 @@ export const saveSupabaseReview = async (
     vehicle_id: vehicle.id,
     author_id: authorId,
     author_nickname: authorNickname,
-    title: review.title?.trim() || "차량 후기",
     content: review.content,
     tags: review.tags ?? [],
     images: getPersistableReviewImages(uploadedImages) as Json,
@@ -409,7 +407,7 @@ export const saveSupabaseReview = async (
 
 export const updateSupabaseReview = async (
   reviewId: string,
-  input: Pick<Review, "title" | "content" | "tags" | "images">,
+  input: Pick<Review, "content" | "tags" | "images">,
 ) => {
   if (!supabase) {
     return false;
@@ -418,7 +416,6 @@ export const updateSupabaseReview = async (
   const uploadedImages = await uploadReviewImages(input.images ?? [], reviewId);
   const { data, error } = await supabase.rpc("update_review", {
     target_review_id: reviewId,
-    next_title: input.title?.trim() || "차량 후기",
     next_content: input.content,
     next_tags: input.tags ?? [],
     next_images: getPersistableReviewImages(uploadedImages) as Json,

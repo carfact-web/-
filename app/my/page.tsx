@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthLoginPanel } from "@/components/AuthLoginPanel";
+import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { clearAuthRedirect, resolveAuthRedirect } from "@/lib/authRedirect";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +18,7 @@ import {
 import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
+import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 
 const pageClassName = cn(
   "min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6",
@@ -430,7 +432,10 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
-              searchText: [post.title, post.content].filter(Boolean).join(" "),
+              searchText: [post.title, post.content]
+                .filter(Boolean)
+                .map(stripCommunityTextColorMarkup)
+                .join(" "),
               title: post.title,
             }))}
           />
@@ -447,7 +452,10 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
-              searchText: [post.title, post.content].filter(Boolean).join(" "),
+              searchText: [post.title, post.content]
+                .filter(Boolean)
+                .map(stripCommunityTextColorMarkup)
+                .join(" "),
               title: post.title,
             }))}
           />
@@ -522,7 +530,9 @@ function ActivityList({
               href={item.href}
               className={activityLinkClassName}
             >
-              <p className="font-bold text-white">{item.title}</p>
+              <p className="font-bold text-white">
+                {renderCommunityTextColorSegments(item.title)}
+              </p>
               <p className="mt-1 text-xs text-zinc-500">{item.meta}</p>
             </Link>
           ))
@@ -573,4 +583,4 @@ function ActivityList({
 }
 
 const normalizeActivitySearch = (value: string) =>
-  value.toLowerCase().replace(/\s+/g, " ").trim();
+  stripCommunityTextColorMarkup(value).toLowerCase().replace(/\s+/g, " ").trim();

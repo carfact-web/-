@@ -229,14 +229,6 @@ export default function CommunityPostDetailPage() {
     }
   };
 
-  const navigateToNeighborPost = (targetPost: CommunityPost | null) => {
-    if (!targetPost) {
-      return;
-    }
-
-    router.push("/community/post/" + encodeURIComponent(targetPost.id));
-  };
-
   return (
     <main className={pageClassName}>
       <div className={shellClassName}>
@@ -371,22 +363,38 @@ export default function CommunityPostDetailPage() {
             </section>
 
             <nav className="grid grid-cols-2 gap-3" aria-label="게시글 이동">
-              <button
-                type="button"
-                className={secondaryButtonClassName}
-                onClick={() => navigateToNeighborPost(previousPost)}
-                disabled={!previousPost || isLoading}
-              >
-                이전글
-              </button>
-              <button
-                type="button"
-                className={secondaryButtonClassName}
-                onClick={() => navigateToNeighborPost(nextPost)}
-                disabled={!nextPost || isLoading}
-              >
-                다음글
-              </button>
+              {previousPost ? (
+                <Link
+                  className={secondaryButtonClassName}
+                  href={"/community/post/" + encodeURIComponent(previousPost.id)}
+                >
+                  이전글
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className={secondaryButtonClassName}
+                  disabled
+                >
+                  이전글
+                </button>
+              )}
+              {nextPost ? (
+                <Link
+                  className={secondaryButtonClassName}
+                  href={"/community/post/" + encodeURIComponent(nextPost.id)}
+                >
+                  다음글
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className={secondaryButtonClassName}
+                  disabled
+                >
+                  다음글
+                </button>
+              )}
             </nav>
           </>
         ) : (

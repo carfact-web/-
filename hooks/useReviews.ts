@@ -26,7 +26,7 @@ interface UseReviewsResult {
   deleteReview: (reviewId: string) => Promise<boolean>;
   updateReview: (
     reviewId: string,
-    review: Pick<Review, "title" | "content" | "tags" | "images">
+    review: Pick<Review, "content" | "tags" | "images">
   ) => Promise<ReviewValidationResult>;
 }
 
@@ -133,7 +133,6 @@ export function useReviews(carNumber: string): UseReviewsResult {
       );
       const nextReview = {
         ...review,
-        title: review.title?.trim(),
         content: validation.content,
       };
 
@@ -167,7 +166,7 @@ export function useReviews(carNumber: string): UseReviewsResult {
   const updateReview = useCallback(
     async (
       reviewId: string,
-      review: Pick<Review, "title" | "content" | "tags" | "images">
+      review: Pick<Review, "content" | "tags" | "images">
     ) => {
       if (!isAuthReady || !isAuthenticated) {
         return {
@@ -203,7 +202,6 @@ export function useReviews(carNumber: string): UseReviewsResult {
         String(savedReview.id) === reviewId
           ? {
               ...savedReview,
-              title: review.title?.trim(),
               content: validation.content,
               tags: review.tags ?? [],
               images: review.images ?? [],
