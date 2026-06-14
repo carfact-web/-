@@ -391,18 +391,16 @@ const getCommunityPostPreviewText = (content: string) => {
 };
 
 type GuideCarouselSlot = "left" | "center" | "right";
-type GuideCarouselDirection = -1 | 1;
-const guideCarouselMotionTransition = {
-  duration: 0.6,
-  ease: [0.22, 1, 0.36, 1],
-} as const;
+const guideCarouselTransition =
+  "transform 560ms cubic-bezier(0.22, 1, 0.36, 1), opacity 520ms cubic-bezier(0.22, 1, 0.36, 1), filter 520ms cubic-bezier(0.22, 1, 0.36, 1)";
 
 const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
   if (slot === "center") {
     return {
       opacity: 1,
       filter: "none",
-      transform: "translate3d(-50%, 0, 0) scale(1)",
+      transform: "translateX(-50%) scale(1) rotateY(0deg)",
+      transition: guideCarouselTransition,
       zIndex: 30,
       willChange: "transform, opacity, filter",
       backfaceVisibility: "hidden" as const,
@@ -413,38 +411,18 @@ const getGuideCarouselSlotStyle = (slot: GuideCarouselSlot) => {
   }
 
   return {
-    opacity: 0.42,
+    opacity: 0.38,
     filter: "saturate(0.72) brightness(0.74)",
     transform:
       slot === "left"
-        ? "translate3d(-112%, 1.25rem, -90px) scale(0.75) rotateY(7deg) rotateZ(-2deg)"
-        : "translate3d(12%, 1.25rem, -90px) scale(0.75) rotateY(-7deg) rotateZ(2deg)",
+        ? "translateX(-115%) scale(0.72) rotateY(8deg)"
+        : "translateX(15%) scale(0.72) rotateY(-8deg)",
+    transition: guideCarouselTransition,
     zIndex: 10,
     willChange: "transform, opacity, filter",
     backfaceVisibility: "hidden" as const,
     transformStyle: "preserve-3d" as const,
     boxShadow: "0 14px 38px rgba(0,0,0,0.58)",
-  };
-};
-
-const getGuideCarouselEntryStyle = (
-  slot: GuideCarouselSlot,
-  direction: GuideCarouselDirection,
-) => {
-  const slotStyle = getGuideCarouselSlotStyle(slot);
-
-  if (slot === "center") {
-    return slotStyle;
-  }
-
-  const entersFromLeft = slot === "left" || direction < 0;
-
-  return {
-    ...slotStyle,
-    opacity: 0,
-    transform: entersFromLeft
-      ? "translate3d(-148%, 1.25rem, -140px) scale(0.68) rotateY(7deg) rotateZ(-2deg)"
-      : "translate3d(48%, 1.25rem, -140px) scale(0.68) rotateY(-7deg) rotateZ(2deg)",
   };
 };
 
@@ -456,8 +434,6 @@ export default function Home() {
   const [recentSlideIndex, setRecentSlideIndex] = useState(0);
   const [topRankingSlideIndex, setTopRankingSlideIndex] = useState(0);
   const [guideSlideIndex, setGuideSlideIndex] = useState(0);
-  const [guideSlideDirection, setGuideSlideDirection] =
-    useState<GuideCarouselDirection>(1);
   const [recentCarouselHeight, setRecentCarouselHeight] = useState<
     number | null
   >(null);
@@ -514,24 +490,6 @@ export default function Home() {
       return [{ index: activeGuideSlideIndex, slot: "center" as const }];
     }
 
-    if (postCount === 2) {
-      return guideSlideDirection < 0
-        ? [
-            {
-              index: (activeGuideSlideIndex + 1) % postCount,
-              slot: "left" as const,
-            },
-            { index: activeGuideSlideIndex, slot: "center" as const },
-          ]
-        : [
-            { index: activeGuideSlideIndex, slot: "center" as const },
-            {
-              index: (activeGuideSlideIndex + 1) % postCount,
-              slot: "right" as const,
-            },
-          ];
-    }
-
     return [
       {
         index: (activeGuideSlideIndex - 1 + postCount) % postCount,
@@ -543,38 +501,7 @@ export default function Home() {
         slot: "right" as const,
       },
     ];
-  }, [activeGuideSlideIndex, guidePosts.length, guideSlideDirection]);
-  const getGuideCarouselCardMotionKey = (
-    index: number,
-    slot: GuideCarouselSlot,
-  ) => {
-    const postCount = guidePosts.length;
-
-    if (postCount <= 2) {
-      return "guide-track-" + guidePosts[index].id;
-    }
-
-    const previousActiveIndex =
-      guideSlideDirection > 0
-        ? (activeGuideSlideIndex - 1 + postCount) % postCount
-        : (activeGuideSlideIndex + 1) % postCount;
-    const isMovingCard =
-      index === activeGuideSlideIndex || index === previousActiveIndex;
-
-    return isMovingCard
-      ? "guide-track-" + guidePosts[index].id
-      : [
-          "guide-enter",
-          guideSlideDirection,
-          activeGuideSlideIndex,
-          slot,
-          guidePosts[index].id,
-        ].join("-");
-  };
-  const isGuideCarouselEnteringCard = (
-    index: number,
-    slot: GuideCarouselSlot,
-  ) => getGuideCarouselCardMotionKey(index, slot).startsWith("guide-enter-");
+  }, [activeGuideSlideIndex, guidePosts.length]);
   const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
@@ -624,15 +551,12 @@ export default function Home() {
     }
   };
   const goToPreviousGuideSlide = () => {
-    scrollToGuidePost(activeGuideSlideIndex - 1, -1);
+    scrollToGuidePost(activeGuideSlideIndex - 1);
   };
   const goToNextGuideSlide = () => {
-    scrollToGuidePost(activeGuideSlideIndex + 1, 1);
+    scrollToGuidePost(activeGuideSlideIndex + 1);
   };
-  const scrollToGuidePost = (
-    nextIndex: number,
-    direction?: GuideCarouselDirection,
-  ) => {
+  const scrollToGuidePost = (nextIndex: number) => {
     const postCount = guidePosts.length;
 
     if (postCount === 0) {
@@ -641,15 +565,6 @@ export default function Home() {
     }
 
     const normalizedIndex = (nextIndex + postCount) % postCount;
-    if (direction) {
-      setGuideSlideDirection(direction);
-    } else if (normalizedIndex !== activeGuideSlideIndex) {
-      const forwardDistance =
-        (normalizedIndex - activeGuideSlideIndex + postCount) % postCount;
-      const backwardDistance =
-        (activeGuideSlideIndex - normalizedIndex + postCount) % postCount;
-      setGuideSlideDirection(forwardDistance <= backwardDistance ? 1 : -1);
-    }
     setGuideSlideIndex(normalizedIndex);
   };
   const handleRecentTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -1308,24 +1223,12 @@ export default function Home() {
                   const isActiveGuide = slot === "center";
                   const isDuplicatePreview =
                     guidePosts.length === 1 && !isActiveGuide;
-                  const motionKey = getGuideCarouselCardMotionKey(index, slot);
-                  const isEnteringGuideCard =
-                    isGuideCarouselEnteringCard(index, slot);
 
                   return (
-                    <motion.div
-                      key={motionKey}
+                    <div
+                      key={guidePosts.length > 2 ? post.id : `${slot}-${post.id}`}
                       className="absolute left-1/2 top-4 h-[21rem] w-[68vw] max-w-[16rem] origin-center sm:h-[23rem] sm:w-[17rem] sm:max-w-none"
-                      initial={
-                        isEnteringGuideCard
-                          ? getGuideCarouselEntryStyle(
-                              slot,
-                              guideSlideDirection,
-                            )
-                          : false
-                      }
-                      animate={getGuideCarouselSlotStyle(slot)}
-                      transition={guideCarouselMotionTransition}
+                      style={getGuideCarouselSlotStyle(slot)}
                     >
                       <Link
                         href={getCommunityPostHref(post)}
@@ -1378,7 +1281,7 @@ export default function Home() {
                           </p>
                         </div>
                       </Link>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>
