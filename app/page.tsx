@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -962,7 +963,7 @@ export default function Home() {
               }
               className={noticeTickerClassName}
             >
-              📢 {activeNotice.title}
+              📢 {renderCommunityTextColorSegments(activeNotice.title)}
             </Link>
           ) : (
             <p className={noticeTickerClassName}>

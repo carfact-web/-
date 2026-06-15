@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { CommunityImageAttachment } from "@/types/community";
 import { parseCommunityTextColorSegments } from "@/utils/communityTextColor";
 import { parseCommunityRichContentBlocks } from "@/utils/communityRichContent";
@@ -14,21 +14,37 @@ const communityTextColorClassNames = {
   yellow: "text-yellow-300",
 } as const;
 
-export const renderCommunityTextColorSegments = (content: string): ReactNode =>
-  parseCommunityTextColorSegments(content).map((segment, index) => {
+export const renderCommunityTextColorSegments = (content: string): ReactNode => {
+  const segments = parseCommunityTextColorSegments(content);
+
+  return segments.map((segment, index) => {
+    const previousText = segments[index - 1]?.text ?? "";
+    const needsLeadingSpace =
+      segment.color &&
+      segment.text.startsWith("[") &&
+      previousText &&
+      !/\s$/.test(previousText);
+    const segmentText = segment.text;
+
     if (!segment.color) {
-      return segment.text;
+      return segmentText;
     }
 
-    return (
+    const coloredSegment = (
       <span
-        key={index}
         className={cn("font-semibold", communityTextColorClassNames[segment.color])}
       >
-        {segment.text}
+        {segmentText}
       </span>
     );
+
+    return needsLeadingSpace ? (
+      <Fragment key={index}> {coloredSegment}</Fragment>
+    ) : (
+      <Fragment key={index}>{coloredSegment}</Fragment>
+    );
   });
+};
 
 interface CommunityPostBodyProps {
   className?: string;

@@ -27,7 +27,6 @@ import {
   subscribeToHelpfulChanges,
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
-import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
@@ -43,20 +42,6 @@ const actionLinkClassName = cn(
 const editLinkClassName = cn(
   "mt-3 mb-6 block w-full rounded-xl bg-zinc-700 p-3 text-center text-sm font-bold transition",
   "hover:bg-zinc-600",
-);
-const timelineSectionClassName = cn("mb-8");
-const timelineListClassName = cn(
-  "relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-3 before:w-px before:bg-zinc-700",
-);
-const timelineItemClassName = cn("relative pl-9");
-const timelineDotClassName = cn(
-  "absolute top-2 left-1.5 h-3 w-3 rounded-full border-2 border-zinc-900 bg-red-500",
-);
-const timelineCardClassName = cn(
-  "rounded-xl border border-zinc-800 bg-zinc-800/70 p-4",
-);
-const timelineTagClassName = cn(
-  "rounded-full bg-zinc-700 px-2.5 py-1 text-xs text-gray-300",
 );
 const reviewPaginationClassName = cn(
   "mb-8 flex flex-wrap items-center justify-center gap-2",
@@ -88,18 +73,6 @@ const keywordStatsPillClassName = cn(
   "rounded-full border border-red-500/30 bg-black/25 px-3 py-2 text-sm font-bold text-red-100",
 );
 
-type VehicleSnapshotWithCreatedAt = Vehicle & {
-  createdAt?: string;
-};
-
-interface TimelineItem {
-  review: Review;
-  dateLabel: string;
-  mileageLabel: string;
-  snapshotLabel: string;
-  sortTime: number;
-}
-
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 
@@ -114,43 +87,6 @@ const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
 
   return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
 };
-
-const getVehicleSnapshotLabel = (snapshot?: Vehicle) => {
-  if (!snapshot) {
-    return "";
-  }
-
-  return [
-    snapshot.brand,
-    snapshot.model,
-    snapshot.generation,
-    snapshot.year && `${snapshot.year}년`,
-    snapshot.fuelType,
-    snapshot.mileage && `${Number(snapshot.mileage).toLocaleString()}km`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-};
-
-const getTimelineItems = (reviews: Review[]): TimelineItem[] =>
-  reviews
-    .map((review) => {
-      const snapshot = review.vehicleSnapshot as
-        | VehicleSnapshotWithCreatedAt
-        | undefined;
-      const dateLabel = snapshot?.createdAt || review.createdAt;
-
-      return {
-        review,
-        dateLabel,
-        mileageLabel: snapshot?.mileage
-          ? `${Number(snapshot.mileage).toLocaleString()}km`
-          : "주행거리 정보 없음",
-        snapshotLabel: getVehicleSnapshotLabel(snapshot),
-        sortTime: getParsedTime(dateLabel, review.id),
-      };
-    })
-    .sort((left, right) => right.sortTime - left.sortTime);
 
 export default function CarReportPage() {
   const params = useParams();
@@ -186,8 +122,6 @@ export default function CarReportPage() {
     generation,
     fuelType,
   });
-  const timelineItems = getTimelineItems(reviews);
-  const visibleTimelineItems = timelineItems.slice(0, 3);
   const helpfulCountsSnapshot = useSyncExternalStore(
     subscribeToHelpfulChanges,
     getHelpfulCountsSnapshot,
@@ -388,91 +322,39 @@ export default function CarReportPage() {
             </>
           ) : (
             <>
-              <div className="rounded-xl bg-zinc-800 p-4 mb-6">
-                <p className="text-gray-300">
-                  {[brand, model, generation, year && `${year}년`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {(fuelType || mileage) && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    {[
-                      fuelType,
-                      mileage &&
-                        `주행거리: ${Number(mileage).toLocaleString()}km`,
-                    ]
+              <section className="mb-6">
+                <h2 className="mb-4 text-2xl font-bold">차량정보</h2>
+                <div className="rounded-xl bg-zinc-800 p-4">
+                  <p className="text-gray-300">
+                    {[brand, model, generation, year && `${year}년`]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
-                )}
-              </div>
+                  {(fuelType || mileage) && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      {[
+                        fuelType,
+                        mileage &&
+                          `주행거리: ${Number(mileage).toLocaleString()}km`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </div>
 
-              <Link
-                href={`/car/${encodeURIComponent(carNumber)}/edit`}
-                className={editLinkClassName}
-              >
-                차량정보가 바뀌었나요?
-              </Link>
-
-              <section className={timelineSectionClassName}>
-                <h2 className="mb-4 text-2xl font-bold">차량 이력 타임라인</h2>
-
-                {timelineItems.length === 0 ? (
-                  <p className="rounded-xl border border-zinc-800 bg-zinc-800/70 p-4 text-sm text-gray-400">
-                    아직 차량 이력이 없습니다.
-                  </p>
-                ) : (
-                  <div className={timelineListClassName}>
-                    {visibleTimelineItems.map((item) => {
-                      const tags = item.review.tags ?? [];
-
-                      return (
-                        <article
-                          key={item.review.id}
-                          className={timelineItemClassName}
-                        >
-                          <span className={timelineDotClassName} />
-
-                          <div className={timelineCardClassName}>
-                            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                              <span>{item.dateLabel}</span>
-                              <span aria-hidden>·</span>
-                              <span>{item.mileageLabel}</span>
-                            </div>
-
-                            {tags.length > 0 && (
-                              <div className="mb-3 flex flex-wrap gap-2">
-                                {tags.map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className={timelineTagClassName}
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            <p className="whitespace-pre-wrap break-words text-sm leading-[1.7] text-gray-200">
-                              {item.review.content}
-                            </p>
-
-                            <p className="mt-3 border-t border-zinc-700 pt-3 text-xs leading-5 text-gray-500">
-                              {item.snapshotLabel ||
-                                "작성 당시 차량 스냅샷 정보 없음"}
-                            </p>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
+                <Link
+                  href={`/car/${encodeURIComponent(carNumber)}/edit`}
+                  className={editLinkClassName}
+                >
+                  차량정보가 바뀌었나요?
+                </Link>
               </section>
 
               <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
 
               <div className={reviewHeaderClassName}>
-                <h2 className="text-3xl font-bold">등록된 팩트</h2>
+                <h2 className="text-3xl font-bold">등록된 팩트/후기</h2>
                 <div className={sortControlClassName} aria-label="후기 정렬">
                   <button
                     type="button"
