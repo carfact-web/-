@@ -20,6 +20,7 @@ import {
 import type { CommunityComment, CommunityPost } from "@/types/community";
 import { sanitizeMultilineUserText } from "@/utils/inputSanitizer";
 import { cn } from "@/utils/cn";
+import { markCommunityPostEditIntent } from "@/utils/communityEditIntent";
 
 const pageClassName = cn(
   "min-h-screen bg-black px-4 py-5 pb-28 text-white sm:px-6 sm:py-8",
@@ -297,6 +298,7 @@ export default function CommunityPostDetailPage() {
                     <Link
                       className={secondaryButtonClassName}
                       href={"/community?edit=" + encodeURIComponent(post.id)}
+                      onClick={() => markCommunityPostEditIntent(post.id)}
                     >
                       수정
                     </Link>

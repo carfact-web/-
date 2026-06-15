@@ -61,6 +61,10 @@ import {
   createCommunityImageToken,
   stripCommunityImageTokens,
 } from "@/utils/communityRichContent";
+import {
+  clearCommunityEditIntentStorage,
+  consumeCommunityPostEditIntent,
+} from "@/utils/communityEditIntent";
 import { cn } from "@/utils/cn";
 
 const pageClassName = cn(
@@ -590,6 +594,33 @@ export default function CommunityPage() {
   );
   const canEditSelectedPost = canDeleteSelectedPost;
 
+  const resetCommunityEditorState = useCallback(
+    ({
+      clearMessage = false,
+      clearSelectedPost = false,
+    }: {
+      clearMessage?: boolean;
+      clearSelectedPost?: boolean;
+    } = {}) => {
+      if (clearSelectedPost) {
+        setSelectedPost(null);
+      }
+
+      setIsWriting(false);
+      setEditingPostId(null);
+      setWriteTitle("");
+      setWriteContent("");
+      setWriteIsNotice(false);
+      setWriteIsPinned(false);
+      setPostImages([]);
+
+      if (clearMessage) {
+        setMessage("");
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     void Promise.resolve().then(() => {
       setCurrentTime(Date.now());
@@ -605,13 +636,34 @@ export default function CommunityPage() {
     const category = params.get("category");
     const postId = params.get("post");
     const editPostId = params.get("edit");
+    const canOpenEditForm =
+      editPostId && consumeCommunityPostEditIntent(editPostId);
+
+    if (editPostId) {
+      params.delete("edit");
+      const nextSearch = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        "/community" + (nextSearch ? "?" + nextSearch : ""),
+      );
+    }
+
+    if (!canOpenEditForm) {
+      clearCommunityEditIntentStorage();
+    }
 
     void Promise.resolve().then(() => {
+      resetCommunityEditorState({
+        clearMessage: !canOpenEditForm,
+        clearSelectedPost: true,
+      });
+
       if (category && isCommunityCategory(category)) {
         setActiveCategory(category);
       }
 
-      if (editPostId) {
+      if (canOpenEditForm && editPostId) {
         setTargetEditPostId(editPostId);
         return;
       }
@@ -620,7 +672,7 @@ export default function CommunityPage() {
         router.replace("/community/post/" + encodeURIComponent(postId));
       }
     });
-  }, [router]);
+  }, [resetCommunityEditorState, router]);
 
   const goToLogin = useCallback(() => {
     const redirectTo =
@@ -778,32 +830,18 @@ export default function CommunityPage() {
       return;
     }
 
-    setSelectedPost(null);
+    resetCommunityEditorState({ clearMessage: true, clearSelectedPost: true });
     setWriteCategory(
       activeCategory === "all" || activeCategory === "notice"
         ? "free"
         : activeCategory,
     );
-    setEditingPostId(null);
-    setWriteTitle("");
-    setWriteContent("");
-    setWriteIsNotice(false);
-    setWriteIsPinned(false);
-    setPostImages([]);
     setIsWriting(true);
     setWriteEditorResetKey((key) => key + 1);
-    setMessage("");
   };
 
   const cancelWriting = () => {
-    setIsWriting(false);
-    setEditingPostId(null);
-    setWriteTitle("");
-    setWriteContent("");
-    setWriteIsNotice(false);
-    setWriteIsPinned(false);
-    setPostImages([]);
-    setMessage("");
+    resetCommunityEditorState({ clearMessage: true, clearSelectedPost: true });
   };
 
   const startEditingPost = useCallback((post: CommunityPost) => {
@@ -1196,16 +1234,14 @@ export default function CommunityPage() {
     event.preventDefault();
     setSearchQuery(normalizeField(searchInput, 80));
     setCurrentPage(1);
-    setSelectedPost(null);
-    setMessage("");
+    resetCommunityEditorState({ clearMessage: true, clearSelectedPost: true });
   };
 
   const clearSearch = () => {
     setSearchInput("");
     setSearchQuery("");
     setCurrentPage(1);
-    setSelectedPost(null);
-    setMessage("");
+    resetCommunityEditorState({ clearMessage: true, clearSelectedPost: true });
   };
 
   const submitPost = async (event: FormEvent<HTMLFormElement>) => {
@@ -1309,22 +1345,7 @@ export default function CommunityPage() {
               : post,
           ),
         );
-        setSelectedPost((current) =>
-          current && current.id === editingPostId
-            ? {
-                ...current,
-                category: writeCategory,
-                content,
-                images: postImages,
-                isNotice: isNoticePost,
-                isPinned: isPinnedPost,
-                title,
-              }
-            : current,
-        );
-        setIsWriting(false);
-        setEditingPostId(null);
-        setPostImages([]);
+        resetCommunityEditorState({ clearSelectedPost: true });
         setMessage("게시글을 수정했습니다.");
         form.reset();
         return;
@@ -1744,8 +1765,10 @@ export default function CommunityPage() {
                   onClick={() => {
                     setActiveCategory(category.value);
                     setCurrentPage(1);
-                    setIsWriting(false);
-                    setMessage("");
+                    resetCommunityEditorState({
+                      clearMessage: true,
+                      clearSelectedPost: true,
+                    });
                   }}
                 >
                   {category.shortLabel ?? category.label}
@@ -2154,6 +2177,10 @@ export default function CommunityPage() {
                 className={secondaryButtonClassName}
                 onClick={() => {
                   setCurrentPage(1);
+                  resetCommunityEditorState({
+                    clearMessage: true,
+                    clearSelectedPost: true,
+                  });
                   void loadPosts(activeCategory);
                 }}
               >
