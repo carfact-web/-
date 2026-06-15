@@ -2198,59 +2198,76 @@ export default function CommunityPage() {
               </p>
             ) : (
               <div>
-                <div className="divide-y divide-zinc-800">
+                <div className="grid gap-3">
                   {currentPagePosts.map((post) => {
                     const thumbnailImage = post.images[0];
                     const thumbnailImageUrl =
                       thumbnailImage?.url ?? thumbnailImage?.dataUrl;
+                    const summaryText = stripCommunityImageTokens(
+                      stripCommunityTextColorMarkup(post.content),
+                    )
+                      .replace(/\s+/g, " ")
+                      .trim();
 
                     return (
                       <Link
                         key={post.id}
                         className={cn(
-                          "block w-full px-1 py-4 text-left transition first:pt-0 last:pb-0",
-                          "hover:bg-zinc-900/50",
+                          "grid w-full gap-3 rounded-lg border border-zinc-800 bg-black/40 p-3 text-left transition",
+                          "hover:border-zinc-700 hover:bg-zinc-900/70 active:scale-[0.995]",
+                          thumbnailImageUrl
+                            ? "grid-cols-[minmax(0,1fr)_96px] sm:grid-cols-[minmax(0,1fr)_180px]"
+                            : "grid-cols-1",
                         )}
                         href={`/community/post/${post.id}`}
                       >
-                        <span className="mb-2 inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-extrabold text-red-200">
-                          {getCommunityCategoryLabel(post.category)}
-                        </span>
-                        {post.isNotice ? (
-                          <span className="mb-2 ml-2 inline-flex rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-xs font-extrabold text-amber-200">
-                            공지
+                        <span className="flex min-w-0 flex-col">
+                          <span className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-zinc-500">
+                            <VerifiedNickname
+                              isVerifiedDealer={post.authorIsVerifiedDealer}
+                            >
+                              {post.authorNickname}
+                            </VerifiedNickname>
+                            <span>{post.createdAt}</span>
+                            <span className="inline-flex rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[11px] font-extrabold text-red-200">
+                              {getCommunityCategoryLabel(post.category)}
+                            </span>
+                            {post.isNotice ? (
+                              <span className="inline-flex rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-200">
+                                공지
+                              </span>
+                            ) : null}
+                            {post.isPinned ? (
+                              <span className="inline-flex rounded-md border border-zinc-500 bg-zinc-800 px-1.5 py-0.5 text-[11px] font-extrabold text-zinc-100">
+                                상단고정
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
-                        {post.isPinned ? (
-                          <span className="mb-2 ml-2 inline-flex rounded-md border border-zinc-500 bg-zinc-800 px-2 py-1 text-xs font-extrabold text-zinc-100">
-                            상단고정
+                          <span className="overflow-hidden text-base font-extrabold leading-snug text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1] sm:text-lg sm:[-webkit-line-clamp:2]">
+                            {renderCommunityTextColorSegments(post.title)}
                           </span>
-                        ) : null}
-                        <span className="block text-base font-extrabold text-white sm:text-lg">
-                          {renderCommunityTextColorSegments(post.title)}
-                        </span>
-                        <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-500">
-                          <VerifiedNickname
-                            isVerifiedDealer={post.authorIsVerifiedDealer}
-                          >
-                            {post.authorNickname}
-                          </VerifiedNickname>
-                          <span>댓글 {post.commentCount}</span>
-                          <span>좋아요 {post.likeCount}</span>
-                          <span>{post.createdAt}</span>
-                          {post.images.length > 0 ? (
-                            <span>이미지 {post.images.length}</span>
+                          {summaryText ? (
+                            <span className="mt-1.5 overflow-hidden text-sm leading-5 text-zinc-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                              {summaryText}
+                            </span>
                           ) : null}
+                          <span className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2 text-xs font-bold text-zinc-500">
+                            <span>공감 {post.likeCount}</span>
+                            <span>댓글 {post.commentCount}</span>
+                            <span>공유</span>
+                            {post.images.length > 0 ? (
+                              <span>이미지 {post.images.length}</span>
+                            ) : null}
+                          </span>
                         </span>
                         {thumbnailImageUrl ? (
-                          <span className="mt-3 block">
-                            <span className="relative block aspect-[16/9] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                          <span className="relative block h-20 w-24 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 sm:h-28 sm:w-[180px]">
                               <Image
                                 src={thumbnailImageUrl}
                                 alt={thumbnailImage.name}
                                 fill
                                 unoptimized
-                                sizes="360px"
+                                sizes="(min-width: 640px) 180px, 96px"
                                 className="object-cover"
                                 onError={() => {
                                   console.error(
@@ -2265,7 +2282,6 @@ export default function CommunityPage() {
                                   );
                                 }}
                               />
-                            </span>
                           </span>
                         ) : null}
                       </Link>
