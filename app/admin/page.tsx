@@ -141,6 +141,12 @@ interface AdminUserProfile {
   role: AdminRole;
   is_suspended: boolean;
   is_verified_dealer: boolean;
+  login_provider: string | null;
+  email: string | null;
+  provider_profile_name: string | null;
+  provider_avatar_url: string | null;
+  provider_user_id: string | null;
+  last_sign_in_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -259,6 +265,12 @@ const formatDate = (value: string) => {
     timeStyle: "short",
   });
 };
+
+const formatOptionalDate = (value: string | null | undefined) =>
+  value ? formatDate(value) : "정보 없음";
+
+const getDisplayValue = (value: string | null | undefined) =>
+  value?.trim() ? value : "정보 없음";
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
@@ -1700,11 +1712,13 @@ export default function AdminPage() {
                 <tr>
                   <th className={tableHeadCellClassName}>회원 ID</th>
                   <th className={tableHeadCellClassName}>닉네임</th>
+                  <th className={tableHeadCellClassName}>로그인 정보</th>
                   <th className={tableHeadCellClassName}>변경권</th>
                   <th className={tableHeadCellClassName}>Role</th>
                   <th className={tableHeadCellClassName}>인증딜러</th>
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>가입일</th>
+                  <th className={tableHeadCellClassName}>최근 로그인</th>
                   <th className={tableHeadCellClassName}>관리</th>
                 </tr>
               </thead>
@@ -1723,6 +1737,44 @@ export default function AdminPage() {
                         >
                           {account.nickname ?? "닉네임 없음"}
                         </VerifiedNickname>
+                      </td>
+                      <td className={tableCellClassName}>
+                        <div className="flex min-w-64 gap-3">
+                          {account.provider_avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={account.provider_avatar_url}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              className="h-10 w-10 shrink-0 rounded-full border border-zinc-800 bg-zinc-900 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-xs font-bold text-zinc-500">
+                              없음
+                            </div>
+                          )}
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-bold text-red-200">
+                                {getDisplayValue(account.login_provider)}
+                              </span>
+                              <span className="text-xs text-zinc-400">
+                                {getDisplayValue(account.provider_profile_name)}
+                              </span>
+                            </div>
+                            <div className="break-all text-xs text-zinc-300">
+                              {getDisplayValue(account.email)}
+                            </div>
+                            <details className="text-xs text-zinc-500">
+                              <summary className="cursor-pointer select-none text-zinc-400">
+                                제공자 상세
+                              </summary>
+                              <div className="mt-1 max-w-72 break-all font-mono text-[11px] leading-relaxed text-zinc-500">
+                                {getDisplayValue(account.provider_user_id)}
+                              </div>
+                            </details>
+                          </div>
+                        </div>
                       </td>
                       <td className={tableCellClassName}>
                         <span className="font-mono text-sm font-bold text-zinc-100">
@@ -1757,6 +1809,9 @@ export default function AdminPage() {
                       </td>
                       <td className={tableCellClassName}>
                         {formatDate(account.created_at)}
+                      </td>
+                      <td className={tableCellClassName}>
+                        {formatOptionalDate(account.last_sign_in_at)}
                       </td>
                       <td className={tableCellClassName}>
                         <div className="flex flex-wrap gap-2">
@@ -1813,7 +1868,7 @@ export default function AdminPage() {
                     </tr>
                   ))
                 ) : (
-                  <EmptyTableRow colSpan={8} message="회원이 없습니다." />
+                  <EmptyTableRow colSpan={10} message="회원이 없습니다." />
                 )}
               </tbody>
             </table>

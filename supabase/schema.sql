@@ -42,6 +42,12 @@ create table if not exists public.user_profiles (
   nickname_changed boolean not null default false,
   role text not null default 'user' check (role in ('user', 'admin', 'super_admin')),
   is_verified_dealer boolean not null default false,
+  login_provider text,
+  email text,
+  provider_profile_name text,
+  provider_avatar_url text,
+  provider_user_id text,
+  last_sign_in_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -109,6 +115,24 @@ alter table public.user_profiles
 
 alter table public.user_profiles
   add column if not exists is_verified_dealer boolean not null default false;
+
+alter table public.user_profiles
+  add column if not exists login_provider text;
+
+alter table public.user_profiles
+  add column if not exists email text;
+
+alter table public.user_profiles
+  add column if not exists provider_profile_name text;
+
+alter table public.user_profiles
+  add column if not exists provider_avatar_url text;
+
+alter table public.user_profiles
+  add column if not exists provider_user_id text;
+
+alter table public.user_profiles
+  add column if not exists last_sign_in_at timestamptz;
 
 alter table public.user_profiles
   drop constraint if exists user_profiles_role_check;
@@ -198,18 +222,135 @@ begin
 end;
 $$;
 
+create or replace function public.get_auth_user_profile_name(metadata jsonb)
+returns text
+language sql
+immutable
+as $$
+  select nullif(
+    coalesce(
+      metadata ->> 'nickname',
+      metadata ->> 'name',
+      metadata ->> 'full_name',
+      metadata ->> 'preferred_username',
+      metadata ->> 'user_name'
+    ),
+    ''
+  );
+$$;
+
+create or replace function public.get_auth_user_avatar_url(metadata jsonb)
+returns text
+language sql
+immutable
+as $$
+  select nullif(
+    coalesce(
+      metadata ->> 'avatar_url',
+      metadata ->> 'picture',
+      metadata ->> 'profile_image',
+      metadata ->> 'profile_image_url'
+    ),
+    ''
+  );
+$$;
+
+create or replace function public.sync_user_profile_auth_metadata(target_user_id uuid)
+returns public.user_profiles
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  auth_user auth.users%rowtype;
+  auth_identity auth.identities%rowtype;
+  synced_profile public.user_profiles%rowtype;
+begin
+  select *
+    into auth_user
+  from auth.users
+  where id = target_user_id;
+
+  if auth_user.id is null then
+    raise exception '대상 회원을 찾지 못했습니다.';
+  end if;
+
+  select *
+    into auth_identity
+  from auth.identities
+  where user_id = target_user_id
+  order by
+    case when provider = coalesce(auth_user.raw_app_meta_data ->> 'provider', '') then 0 else 1 end,
+    updated_at desc nulls last,
+    created_at desc nulls last
+  limit 1;
+
+  perform set_config('app.syncing_auth_profile', 'true', true);
+
+  update public.user_profiles as profile
+  set
+    login_provider = coalesce(
+      nullif(auth_user.raw_app_meta_data ->> 'provider', ''),
+      nullif(auth_identity.provider, ''),
+      'email'
+    ),
+    email = nullif(auth_user.email, ''),
+    provider_profile_name = public.get_auth_user_profile_name(auth_user.raw_user_meta_data),
+    provider_avatar_url = public.get_auth_user_avatar_url(auth_user.raw_user_meta_data),
+    provider_user_id = nullif(
+      coalesce(
+        auth_identity.identity_data ->> 'provider_id',
+        auth_identity.identity_data ->> 'sub',
+        auth_identity.id::text
+      ),
+      ''
+    ),
+    last_sign_in_at = auth_user.last_sign_in_at,
+    updated_at = now()
+  where profile.id = target_user_id
+  returning *
+    into synced_profile;
+
+  return synced_profile;
+end;
+$$;
+
+create or replace function public.sync_current_user_auth_profile()
+returns public.user_profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  return public.sync_user_profile_auth_metadata(current_user_id);
+end;
+$$;
+
 create or replace function public.handle_new_auth_user_profile()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  new_profile public.user_profiles%rowtype;
 begin
   insert into public.user_profiles (
     id,
     nickname,
     nickname_changed,
     role,
+    login_provider,
+    email,
+    provider_profile_name,
+    provider_avatar_url,
+    last_sign_in_at,
     created_at,
     updated_at
   )
@@ -218,10 +359,21 @@ begin
     public.generate_random_profile_nickname(),
     false,
     'user',
+    coalesce(nullif(new.raw_app_meta_data ->> 'provider', ''), 'email'),
+    nullif(new.email, ''),
+    public.get_auth_user_profile_name(new.raw_user_meta_data),
+    public.get_auth_user_avatar_url(new.raw_user_meta_data),
+    new.last_sign_in_at,
     now(),
     now()
   )
-  on conflict (id) do nothing;
+  on conflict (id) do nothing
+  returning *
+    into new_profile;
+
+  if new_profile.id is not null then
+    perform public.sync_user_profile_auth_metadata(new.id);
+  end if;
 
   return new;
 end;
@@ -276,9 +428,19 @@ begin
     return new;
   end if;
 
+  if current_setting('app.syncing_auth_profile', true) = 'true' then
+    return new;
+  end if;
+
   if tg_op = 'INSERT' and auth.uid() is not null and (
     new.role <> 'user'
     or new.is_verified_dealer <> false
+    or new.login_provider is not null
+    or new.email is not null
+    or new.provider_profile_name is not null
+    or new.provider_avatar_url is not null
+    or new.provider_user_id is not null
+    or new.last_sign_in_at is not null
   ) then
     raise exception 'profile privileged fields cannot be set by client';
   end if;
@@ -288,6 +450,12 @@ begin
     and (
       new.role is distinct from old.role
       or new.is_verified_dealer is distinct from old.is_verified_dealer
+      or new.login_provider is distinct from old.login_provider
+      or new.email is distinct from old.email
+      or new.provider_profile_name is distinct from old.provider_profile_name
+      or new.provider_avatar_url is distinct from old.provider_avatar_url
+      or new.provider_user_id is distinct from old.provider_user_id
+      or new.last_sign_in_at is distinct from old.last_sign_in_at
     ) then
     raise exception 'profile privileged fields cannot be changed by client';
   end if;
@@ -319,6 +487,12 @@ $$;
 
 revoke all on function public.current_user_has_admin_role() from public;
 grant execute on function public.current_user_has_admin_role() to authenticated;
+
+revoke all on function public.get_auth_user_profile_name(jsonb) from public;
+revoke all on function public.get_auth_user_avatar_url(jsonb) from public;
+revoke all on function public.sync_user_profile_auth_metadata(uuid) from public;
+revoke all on function public.sync_current_user_auth_profile() from public;
+grant execute on function public.sync_current_user_auth_profile() to authenticated;
 
 create or replace function public.list_verified_dealer_profiles(target_user_ids uuid[])
 returns table (

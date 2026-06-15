@@ -71,6 +71,14 @@ const isMissingRoleColumnError = (error: unknown) =>
   "message" in error &&
   String((error as { message?: unknown }).message ?? "").includes("role");
 
+const isMissingAuthProfileSyncError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "message" in error &&
+  String((error as { message?: unknown }).message ?? "").includes(
+    "sync_current_user_auth_profile"
+  );
+
 const syncUserProfile = async (user: User | null) => {
   if (!supabase || !user) {
     return null;
@@ -143,6 +151,24 @@ const syncUserProfile = async (user: User | null) => {
   }
 
   return updatedProfile;
+};
+
+const syncCurrentUserAuthProfile = async () => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.rpc("sync_current_user_auth_profile");
+
+  if (error) {
+    if (isMissingAuthProfileSyncError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data ?? null;
 };
 
 const fetchCurrentUserHasAdminRole = async () => {
@@ -271,7 +297,13 @@ export function useAuth(): UseAuthResult {
       });
 
     Promise.all([
-      syncUserProfile(user),
+      syncUserProfile(user).then(async (fallbackProfile) => {
+        try {
+          return (await syncCurrentUserAuthProfile()) ?? fallbackProfile;
+        } catch {
+          return fallbackProfile;
+        }
+      }),
       fetchCurrentUserHasAdminRole(),
     ])
       .then(([nextProfile, nextHasAdminRole]) => {

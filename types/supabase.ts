@@ -415,6 +415,12 @@ export interface Database {
           role: "user" | "admin" | "super_admin";
           is_suspended: boolean;
           is_verified_dealer: boolean;
+          login_provider: string | null;
+          email: string | null;
+          provider_profile_name: string | null;
+          provider_avatar_url: string | null;
+          provider_user_id: string | null;
+          last_sign_in_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -426,6 +432,12 @@ export interface Database {
           role?: "user" | "admin" | "super_admin";
           is_suspended?: boolean;
           is_verified_dealer?: boolean;
+          login_provider?: string | null;
+          email?: string | null;
+          provider_profile_name?: string | null;
+          provider_avatar_url?: string | null;
+          provider_user_id?: string | null;
+          last_sign_in_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -437,6 +449,12 @@ export interface Database {
           role?: "user" | "admin" | "super_admin";
           is_suspended?: boolean;
           is_verified_dealer?: boolean;
+          login_provider?: string | null;
+          email?: string | null;
+          provider_profile_name?: string | null;
+          provider_avatar_url?: string | null;
+          provider_user_id?: string | null;
+          last_sign_in_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -744,9 +762,19 @@ export interface Database {
           role: "user" | "admin" | "super_admin";
           is_suspended: boolean;
           is_verified_dealer: boolean;
+          login_provider: string | null;
+          email: string | null;
+          provider_profile_name: string | null;
+          provider_avatar_url: string | null;
+          provider_user_id: string | null;
+          last_sign_in_at: string | null;
           created_at: string;
           updated_at: string;
         }[];
+      };
+      sync_current_user_auth_profile: {
+        Args: Record<PropertyKey, never>;
+        Returns: Database["public"]["Tables"]["user_profiles"]["Row"];
       };
       admin_list_popup_notices: {
         Args: {
