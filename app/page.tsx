@@ -34,6 +34,7 @@ import {
 } from "@/utils/vehiclePlateValidation";
 import { filterValidReviews } from "@/utils/reviewValidation";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
+import { getCommunityPreviewText } from "@/utils/communityRichContent";
 import type { FormEvent, ReactNode, TouchEvent, UIEvent } from "react";
 import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
@@ -378,13 +379,10 @@ const getCommunityPostHref = (post: CommunityPost) =>
   `/community?category=${post.category}&post=${encodeURIComponent(post.id)}`;
 
 const getCommunityPostPreviewText = (content: string) => {
-  const normalizedContent = stripCommunityTextColorMarkup(content)
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!normalizedContent) {
-    return "본문에서 자세한 자동차 정보를 확인하세요.";
-  }
+  const normalizedContent = getCommunityPreviewText(
+    stripCommunityTextColorMarkup(content),
+    "자세한 내용은 게시글에서 확인하세요.",
+  );
 
   return normalizedContent.length > 86
     ? normalizedContent.slice(0, 86).trimEnd() + "..."

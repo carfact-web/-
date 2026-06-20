@@ -1,6 +1,8 @@
 import { fetchCommunityPostsByAuthor } from "@/lib/communityData";
 import { supabase } from "@/lib/supabase";
 import { mapReviewRow } from "@/lib/supabaseData";
+import { getCommunityPreviewText } from "@/utils/communityRichContent";
+import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import type { CommunityCategory, CommunityPost } from "@/types/community";
 import type { Review, ReviewRow } from "@/types/review";
 
@@ -107,7 +109,12 @@ export const fetchAccountActivity = async (
         count: post.likeCount,
         href: getCommunityHref(post),
         label: getCommunityCategoryTitle(post.category),
-        searchText: [post.title, post.content].filter(Boolean).join(" "),
+        searchText: [
+          post.title,
+          getCommunityPreviewText(stripCommunityTextColorMarkup(post.content)),
+        ]
+          .filter(Boolean)
+          .join(" "),
         title: post.title,
       })),
   ].sort((left, right) => right.count - left.count);

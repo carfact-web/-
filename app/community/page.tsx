@@ -59,7 +59,7 @@ import {
 } from "@/utils/communityTextColor";
 import {
   createCommunityImageToken,
-  stripCommunityImageTokens,
+  getCommunityPreviewText,
 } from "@/utils/communityRichContent";
 import {
   clearCommunityEditIntentStorage,
@@ -546,7 +546,7 @@ export default function CommunityPage() {
 
       return [
         stripCommunityTextColorMarkup(post.title),
-        stripCommunityImageTokens(stripCommunityTextColorMarkup(post.content)),
+        getCommunityPreviewText(stripCommunityTextColorMarkup(post.content)),
       ]
         .join(" ")
         .toLowerCase()
@@ -1288,7 +1288,7 @@ export default function CommunityPage() {
 
     if (
       plainTitle.length < 2 ||
-      stripCommunityImageTokens(stripCommunityTextColorMarkup(content)).length < 5
+      getCommunityPreviewText(stripCommunityTextColorMarkup(content)).length < 5
     ) {
       setMessage("제목은 2자 이상, 내용은 5자 이상 입력해주세요.");
       return;
@@ -2203,11 +2203,9 @@ export default function CommunityPage() {
                     const thumbnailImage = post.images[0];
                     const thumbnailImageUrl =
                       thumbnailImage?.url ?? thumbnailImage?.dataUrl;
-                    const summaryText = stripCommunityImageTokens(
+                    const summaryText = getCommunityPreviewText(
                       stripCommunityTextColorMarkup(post.content),
-                    )
-                      .replace(/\s+/g, " ")
-                      .trim();
+                    );
 
                     return (
                       <Link

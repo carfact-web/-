@@ -19,6 +19,7 @@ import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
+import { getCommunityPreviewText } from "@/utils/communityRichContent";
 
 const pageClassName = cn(
   "min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6",
@@ -432,10 +433,15 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
-              searchText: [post.title, post.content]
-                .filter(Boolean)
-                .map(stripCommunityTextColorMarkup)
-                .join(" "),
+              searchText: [
+                stripCommunityTextColorMarkup(post.title),
+                getCommunityPreviewText(
+                  stripCommunityTextColorMarkup(post.content),
+                ),
+              ].join(" "),
+              summary: getCommunityPreviewText(
+                stripCommunityTextColorMarkup(post.content),
+              ),
               title: post.title,
             }))}
           />
@@ -452,10 +458,15 @@ export default function MyPage() {
                 post.commentCount +
                 " · 좋아요 " +
                 post.likeCount,
-              searchText: [post.title, post.content]
-                .filter(Boolean)
-                .map(stripCommunityTextColorMarkup)
-                .join(" "),
+              searchText: [
+                stripCommunityTextColorMarkup(post.title),
+                getCommunityPreviewText(
+                  stripCommunityTextColorMarkup(post.content),
+                ),
+              ].join(" "),
+              summary: getCommunityPreviewText(
+                stripCommunityTextColorMarkup(post.content),
+              ),
               title: post.title,
             }))}
           />
@@ -484,7 +495,13 @@ function ActivityList({
   title,
 }: {
   emptyText: string;
-  items: { href: string; meta: string; searchText?: string; title: string }[];
+  items: {
+    href: string;
+    meta: string;
+    searchText?: string;
+    summary?: string;
+    title: string;
+  }[];
   searchQuery: string;
   title: string;
 }) {
@@ -533,6 +550,11 @@ function ActivityList({
               <p className="font-bold text-white">
                 {renderCommunityTextColorSegments(item.title)}
               </p>
+              {item.summary ? (
+                <p className="mt-1 overflow-hidden text-sm leading-5 text-zinc-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                  {item.summary}
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-zinc-500">{item.meta}</p>
             </Link>
           ))
@@ -583,4 +605,7 @@ function ActivityList({
 }
 
 const normalizeActivitySearch = (value: string) =>
-  stripCommunityTextColorMarkup(value).toLowerCase().replace(/\s+/g, " ").trim();
+  getCommunityPreviewText(stripCommunityTextColorMarkup(value))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
