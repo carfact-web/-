@@ -1,14 +1,6 @@
 import { evBatteryInfo } from "@/data/evBatteryInfo";
 import type { EvBatteryInfo } from "@/data/evBatteryInfo";
-import {
-  getVehicleInspectionProfile,
-  getVehicleYearInspectionNotes,
-} from "@/data/vehicleInspectionData";
-import type {
-  VehicleEngineInspectionNote,
-  VehicleInspectionItem,
-  VehicleYearInspectionNote,
-} from "@/data/vehicleInspectionData";
+import { getVehicleInspectionProfile } from "@/data/vehicleInspectionData";
 import { vehicleKnowledge } from "@/data/vehicleKnowledge";
 import type { VehicleKnowledge } from "@/data/vehicleKnowledge";
 import {
@@ -23,21 +15,62 @@ import type {
   ModelIssueRule,
   YearCheckRule,
 } from "@/data/vehicleRules";
+import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
 
 interface AiSummaryOptions {
   generation?: string;
   fuelType?: string;
+  grade?: string;
+  productUrl?: string;
+  reviewKeywordStats?: ReviewKeywordStat[];
+  vehicleNumber?: string;
+}
+
+export interface UsedCarProductApiResponse {
+  vehicleNumber?: string | null;
+  productUrl?: string | null;
+  manufacturer?: string | null;
+  brand?: string | null;
+  modelName?: string | null;
+  model?: string | null;
+  generation?: string | null;
+  year?: string | number | null;
+  mileage?: string | number | null;
+  fuelType?: string | null;
+  grade?: string | null;
+  trim?: string | null;
+  reviewKeywords?: ReviewKeywordStat[];
+}
+
+export interface AiSummaryVehicleSource {
+  vehicleNumber?: string;
+  productUrl?: string;
+  brand: string;
+  modelName: string;
+  generation?: string;
+  year?: string;
+  mileage?: string;
+  fuelType?: string;
+  grade?: string;
+}
+
+export interface AiSummaryMaintenanceIssue {
+  title: string;
+  description: string;
+  estimatedRepairCost: string;
+  symptoms: string[];
+  causes: string[];
+  replacementParts: string[];
+  additionalDescription: string;
 }
 
 export interface StructuredAiSummary {
-  mileageSummary: string;
-  modelIssues: string[];
-  inspectionSummary?: string;
-  inspectionItems: VehicleInspectionItem[];
-  yearInspectionNotes: VehicleYearInspectionNote[];
-  engineInspectionNotes: VehicleEngineInspectionNote[];
-  checkPoints: string[];
-  conclusion: string;
+  vehicle: AiSummaryVehicleSource;
+  oneLineReview: string;
+  preDeliveryChecks: string[];
+  reviewKeywords: ReviewKeywordStat[];
+  maintenanceIssues: AiSummaryMaintenanceIssue[];
+  source: "manual" | "product-api" | "vehicle-number";
 }
 
 interface AiSummaryParts {
@@ -49,8 +82,217 @@ interface AiSummaryParts {
 }
 
 const MAX_SUMMARY_COUNT = 5;
+const MAX_PRE_DELIVERY_CHECK_COUNT = 5;
+const MAX_MAINTENANCE_ISSUE_COUNT = 5;
 
 const hasValue = (value: string) => value.trim().length > 0;
+
+const stringifyApiValue = (value: string | number | null | undefined) =>
+  value === null || value === undefined ? "" : String(value).trim();
+
+export const mapUsedCarProductApiResponseToAiSummaryInput = (
+  response: UsedCarProductApiResponse,
+): AiSummaryVehicleSource & { reviewKeywordStats?: ReviewKeywordStat[] } => ({
+  vehicleNumber: stringifyApiValue(response.vehicleNumber) || undefined,
+  productUrl: stringifyApiValue(response.productUrl) || undefined,
+  brand:
+    stringifyApiValue(response.brand) ||
+    stringifyApiValue(response.manufacturer),
+  modelName:
+    stringifyApiValue(response.modelName) || stringifyApiValue(response.model),
+  generation: stringifyApiValue(response.generation) || undefined,
+  year: stringifyApiValue(response.year) || undefined,
+  mileage: stringifyApiValue(response.mileage) || undefined,
+  fuelType: stringifyApiValue(response.fuelType) || undefined,
+  grade:
+    stringifyApiValue(response.grade) ||
+    stringifyApiValue(response.trim) ||
+    undefined,
+  reviewKeywordStats: response.reviewKeywords,
+});
+
+const getVehicleTitle = (vehicle: AiSummaryVehicleSource) =>
+  [
+    vehicle.brand,
+    vehicle.modelName,
+    vehicle.generation,
+    vehicle.grade,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || "이 차량";
+
+const getVehicleAge = (year: string) => {
+  const yearNumber = Number(year);
+
+  if (!hasValue(year) || !Number.isFinite(yearNumber)) {
+    return null;
+  }
+
+  return new Date().getFullYear() - yearNumber;
+};
+
+const getOneLineReview = (
+  vehicle: AiSummaryVehicleSource,
+  reviewKeywords: ReviewKeywordStat[],
+) => {
+  const mileageNumber = Number(vehicle.mileage);
+  const hasMileage =
+    hasValue(vehicle.mileage ?? "") && Number.isFinite(mileageNumber);
+  const topKeyword = reviewKeywords[0]?.label;
+  const vehicleAge = getVehicleAge(vehicle.year ?? "");
+
+  if (topKeyword && hasMileage && mileageNumber >= 120000) {
+    return "주행거리가 있는 편이라면 " + topKeyword + " 점검 여부가 차량 상태를 가르는 핵심일 수 있습니다.";
+  }
+
+  if (topKeyword && hasMileage && mileageNumber >= 80000) {
+    return "8만km를 넘긴 차량은 " + topKeyword + " 언급과 실제 정비 이력을 같이 보는 게 좋습니다.";
+  }
+
+  if (topKeyword) {
+    return "후기에서 " + topKeyword + " 이야기가 많아, 이 부분만 먼저 확인해도 판단이 빨라집니다.";
+  }
+
+  if (hasMileage && mileageNumber >= 120000) {
+    return "10만km 이상이라면 소모품보다 누적 정비 이력이 차량 상태를 더 잘 보여줍니다.";
+  }
+
+  if (vehicle.fuelType === "전기") {
+    return "전기차는 배터리 상태와 충전 이력만 먼저 봐도 구매 판단이 훨씬 쉬워집니다.";
+  }
+
+  if (vehicle.fuelType === "디젤") {
+    return "디젤 차량은 DPF와 인젝터 관리 이력을 먼저 확인하는 게 좋습니다.";
+  }
+
+  if (vehicleAge !== null && vehicleAge >= 8) {
+    return "연식이 있는 차량은 주행거리보다 누유와 하체 상태가 더 중요할 때가 많습니다.";
+  }
+
+  if (hasMileage && mileageNumber < 50000) {
+    return "주행거리는 낮은 편이지만 사고 이력과 기본 소모품 상태는 꼭 따로 보세요.";
+  }
+
+  return getVehicleTitle(vehicle) + "은 연식, 주행거리, 정비 이력을 함께 보면 핵심이 빠르게 보입니다.";
+};
+
+const getPreDeliveryChecks = (
+  year: string,
+  mileage: string,
+  fuelType: string | undefined,
+  summaryMessages: string[],
+) => {
+  const checkPoints = [
+    ...getMileageCheckPoints(mileage, fuelType === "전기"),
+  ];
+  const vehicleAge = getVehicleAge(year);
+
+  if (vehicleAge !== null && vehicleAge >= 7) {
+    addUniqueCheckPoint(checkPoints, "고무 부싱류와 냉각 라인 노후 상태");
+  }
+
+  if (vehicleAge !== null && vehicleAge >= 10) {
+    addUniqueCheckPoint(checkPoints, "누유, 부식, 전장품 작동 이력");
+  }
+
+  if (fuelType === "전기") {
+    addUniqueCheckPoint(checkPoints, "고전압 배터리 SOH 및 잔여 보증");
+    addUniqueCheckPoint(checkPoints, "급속충전 이력 및 충전 포트 상태");
+  } else if (fuelType === "디젤") {
+    addUniqueCheckPoint(checkPoints, "DPF, EGR, 인젝터 정비 이력");
+  } else if (fuelType === "하이브리드") {
+    addUniqueCheckPoint(checkPoints, "구동 배터리 보증과 회생제동 작동 상태");
+  }
+
+  summaryMessages.forEach((message) => {
+    addCheckPointsFromMessage(checkPoints, message);
+  });
+
+  addUniqueCheckPoint(checkPoints, "사고, 침수, 보험 이력");
+  addUniqueCheckPoint(checkPoints, "타이어와 브레이크 소모 상태");
+  addUniqueCheckPoint(checkPoints, "최근 정비내역서 유무");
+
+  return checkPoints.slice(0, MAX_PRE_DELIVERY_CHECK_COUNT);
+};
+
+const getMaintenanceIssueDescription = (title: string, mileage: string) => {
+  const mileageNumber = Number(mileage);
+  const isHighMileage = Number.isFinite(mileageNumber) && mileageNumber >= 100000;
+
+  if (/냉각|서모스탯|워터펌프/.test(title)) {
+    return isHighMileage ? "10만km 이상이면 먼저 확인" : "냉각수 감소 흔적 확인";
+  }
+
+  if (/변속|미션/.test(title)) {
+    return "시운전에서 변속 충격 확인";
+  }
+
+  if (/하체|부싱|링크|베어링/.test(title)) {
+    return "요철 주행 소음 확인";
+  }
+
+  if (/점화|엔진|터보/.test(title)) {
+    return "가속과 공회전 상태 확인";
+  }
+
+  if (/배터리|전장|디스플레이|BCM/.test(title)) {
+    return "경고등과 전장 작동 확인";
+  }
+
+  return isHighMileage ? "주행거리 누적 차량 우선 확인" : "현장 점검 때 확인";
+};
+
+const getMaintenanceIssueCauses = (title: string) => {
+  if (/냉각|서모스탯|워터펌프/.test(title)) {
+    return ["냉각계통 노후", "가스켓 또는 하우징 열화"];
+  }
+
+  if (/변속|미션/.test(title)) {
+    return ["변속기 오일 관리 부족", "밸브바디 또는 마운트 노후"];
+  }
+
+  if (/하체|부싱|링크|베어링/.test(title)) {
+    return ["고무 부싱 마모", "하체 부품 유격"];
+  }
+
+  if (/점화|엔진|터보/.test(title)) {
+    return ["점화계통 노후", "흡배기 또는 터보 계통 관리 부족"];
+  }
+
+  if (/배터리|전장|디스플레이|BCM/.test(title)) {
+    return ["배터리 전압 저하", "커넥터 또는 모듈 오류"];
+  }
+
+  return ["연식과 주행거리 누적", "소모품 교체 주기 지연"];
+};
+
+const getMaintenanceIssues = (
+  brand: string,
+  model: string,
+  mileage: string,
+  options: AiSummaryOptions,
+) => {
+  const inspectionProfile = getVehicleInspectionProfile(
+    brand,
+    model,
+    options.generation,
+  );
+
+  return (
+    inspectionProfile?.checkItems
+      .slice(0, MAX_MAINTENANCE_ISSUE_COUNT)
+      .map((item) => ({
+        title: item.title,
+        description: getMaintenanceIssueDescription(item.title, mileage),
+        estimatedRepairCost: item.estimatedRepairCost,
+        symptoms: item.symptoms,
+        causes: getMaintenanceIssueCauses(item.title),
+        replacementParts: item.relatedParts,
+        additionalDescription: item.aiSummary,
+      })) ?? []
+  );
+};
 
 const matchesModel = (rule: ModelIssueRule | EvCheckRule, model: string) => {
   if (rule.model) {
@@ -353,86 +595,6 @@ const collectAiSummaryParts = (
   };
 };
 
-const formatMileageLabel = (mileageNumber: number) =>
-  mileageNumber.toLocaleString("ko-KR") + "km";
-
-const getMileageBandLabel = (mileageNumber: number) => {
-  if (mileageNumber >= 200000) {
-    return "20만km 이상";
-  }
-
-  if (mileageNumber >= 150000) {
-    return "15만km 이상";
-  }
-
-  if (mileageNumber >= 120000) {
-    return "12만km 이상";
-  }
-
-  if (mileageNumber >= 100000) {
-    return "10만km 이상";
-  }
-
-  if (mileageNumber >= 80000) {
-    return "8만km 이상";
-  }
-
-  if (mileageNumber >= 50000) {
-    return "5만km 이상";
-  }
-
-  return "5만km 미만";
-};
-
-const getMileageSummary = (mileage: string) => {
-  const mileageNumber = Number(mileage);
-
-  if (!hasValue(mileage) || !Number.isFinite(mileageNumber)) {
-    return "현재 주행거리 정보가 없어 구간별 판단은 제한됩니다. 방문 시 계기판 주행거리와 정비내역서의 기록이 일치하는지 먼저 확인하는 것이 좋습니다.";
-  }
-
-  const mileageLabel = formatMileageLabel(mileageNumber);
-  const bandLabel = getMileageBandLabel(mileageNumber);
-
-  if (mileageNumber >= 120000) {
-    return (
-      "이 차량은 현재 " +
-      mileageLabel +
-      " 주행한 " +
-      bandLabel +
-      " 차량으로, 단순 소모품보다 누적 관리 상태가 중요한 구간입니다. 이전 구간에서 관리되지 않은 오일류, 냉각계통, 변속기, 하체 정비 이력이 누적되어 있을 수 있으므로 최근 정비내역 확인이 중요합니다."
-    );
-  }
-
-  if (mileageNumber >= 80000) {
-    return (
-      "이 차량은 현재 " +
-      mileageLabel +
-      " 주행한 " +
-      bandLabel +
-      " 차량으로, 기본 소모품 점검을 넘어 오일류와 냉각수, 변속기 상태까지 함께 봐야 하는 구간입니다. 이전 관리 이력이 부족하면 방문 후 추가 정비 비용이 생길 수 있습니다."
-    );
-  }
-
-  if (mileageNumber >= 50000) {
-    return (
-      "이 차량은 현재 " +
-      mileageLabel +
-      " 주행한 " +
-      bandLabel +
-      " 차량으로, 타이어와 브레이크, 배터리 같은 소모품 교체 이력이 가격 판단에 영향을 주는 구간입니다. 큰 고장보다 관리 주기 누락 여부를 먼저 확인하는 것이 좋습니다."
-    );
-  }
-
-  return (
-    "이 차량은 현재 " +
-    mileageLabel +
-    " 주행한 " +
-    bandLabel +
-    " 차량으로, 누적 마모 부담은 비교적 낮은 편입니다. 다만 연식과 운행 환경에 따라 소모품 상태 차이가 커질 수 있어 기본 점검과 정비 기록 확인은 필요합니다."
-  );
-};
-
 const addUniqueCheckPoint = (checkPoints: string[], checkPoint: string) => {
   if (!checkPoints.includes(checkPoint)) {
     checkPoints.push(checkPoint);
@@ -510,30 +672,6 @@ const getMileageCheckPoints = (mileage: string, isElectric: boolean) => {
   return checkPoints;
 };
 
-const getConclusion = (mileage: string, hasModelIssues: boolean) => {
-  const mileageNumber = Number(mileage);
-
-  if (!hasValue(mileage) || !Number.isFinite(mileageNumber)) {
-    return "주행거리와 정비 이력이 확인되기 전까지는 가격만 보고 판단하기 어렵습니다.";
-  }
-
-  if (mileageNumber >= 120000) {
-    return "가격이 좋아도 정비 이력이 빈약하면 추가 비용 가능성이 있는 구간입니다.";
-  }
-
-  if (mileageNumber >= 80000) {
-    return hasModelIssues
-      ? "차종 점검 항목과 정비 이력이 함께 확인되면 구매 판단이 훨씬 명확해지는 구간입니다."
-      : "상태가 좋아 보여도 오일류와 소모품 교체 이력은 가격 협상 전에 확인해야 합니다.";
-  }
-
-  if (mileageNumber >= 50000) {
-    return "소모품 관리가 잘 되어 있다면 부담은 낮지만, 교체 주기 누락 여부는 확인해야 합니다.";
-  }
-
-  return "주행거리는 낮은 편이지만 사고, 침수, 정비 기록 확인 없이 안심하기는 어렵습니다.";
-};
-
 export function getStructuredAiSummary(
   brand: string,
   model: string,
@@ -542,51 +680,70 @@ export function getStructuredAiSummary(
   options: AiSummaryOptions = {}
 ): StructuredAiSummary {
   const parts = collectAiSummaryParts(brand, model, year, mileage, options);
-  const inspectionProfile = getVehicleInspectionProfile(
-    brand,
-    model,
-    options.generation
-  );
   const modelIssuesOnly = getUniqueSummaries([
     ...parts.modelSummaries,
     ...parts.evBatterySummaries,
   ]);
-  const checkPoints = [
-    ...getMileageCheckPoints(mileage, options.fuelType === "전기"),
-  ];
-
-  [
+  const summaryMessages = [
     ...modelIssuesOnly,
     ...parts.yearSummaries,
     ...parts.brandSummaries,
     ...parts.mileageSummaries,
-  ].forEach((message) => {
-    addCheckPointsFromMessage(checkPoints, message);
-  });
-
-  inspectionProfile?.checkItems.forEach((item) => {
-    addCheckPointsFromMessage(checkPoints, item.aiSummary);
-  });
-
-  addUniqueCheckPoint(checkPoints, "최근 정비내역서 유무");
+  ];
+  const vehicle: AiSummaryVehicleSource = {
+    vehicleNumber: options.vehicleNumber,
+    productUrl: options.productUrl,
+    brand,
+    modelName: model,
+    generation: options.generation,
+    year,
+    mileage,
+    fuelType: options.fuelType,
+    grade: options.grade,
+  };
+  const reviewKeywords = (options.reviewKeywordStats ?? []).slice(
+    0,
+    MAX_SUMMARY_COUNT,
+  );
 
   return {
-    mileageSummary: getMileageSummary(mileage),
-    modelIssues:
-      modelIssuesOnly.length > 0
-        ? modelIssuesOnly
-        : ["등록된 차종별 점검 정보가 아직 없습니다."],
-    inspectionSummary: inspectionProfile?.summary,
-    inspectionItems: inspectionProfile?.checkItems ?? [],
-    yearInspectionNotes: inspectionProfile
-      ? getVehicleYearInspectionNotes(inspectionProfile, year)
-      : [],
-    engineInspectionNotes: inspectionProfile?.engineNotes ?? [],
-    checkPoints: checkPoints.slice(0, 6),
-    conclusion:
-      inspectionProfile?.summary ??
-      getConclusion(mileage, modelIssuesOnly.length > 0),
+    vehicle,
+    oneLineReview: getOneLineReview(vehicle, reviewKeywords),
+    preDeliveryChecks: getPreDeliveryChecks(
+      year,
+      mileage,
+      options.fuelType,
+      summaryMessages,
+    ),
+    reviewKeywords,
+    maintenanceIssues: getMaintenanceIssues(brand, model, mileage, options),
+    source: options.productUrl
+      ? "product-api"
+      : options.vehicleNumber
+        ? "vehicle-number"
+        : "manual",
   };
+}
+
+export function getStructuredAiSummaryFromApiResponse(
+  response: UsedCarProductApiResponse,
+): StructuredAiSummary {
+  const input = mapUsedCarProductApiResponseToAiSummaryInput(response);
+
+  return getStructuredAiSummary(
+    input.brand,
+    input.modelName,
+    input.year ?? "",
+    input.mileage ?? "",
+    {
+      fuelType: input.fuelType,
+      generation: input.generation,
+      grade: input.grade,
+      productUrl: input.productUrl,
+      reviewKeywordStats: input.reviewKeywordStats,
+      vehicleNumber: input.vehicleNumber,
+    },
+  );
 }
 
 export function getAiSummary(

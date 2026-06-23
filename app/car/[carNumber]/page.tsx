@@ -16,10 +16,7 @@ import { recordPageView } from "@/lib/pageViews";
 import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
-import {
-  getReviewKeywordStats,
-  getReviewKeywordStatsSummary,
-} from "@/utils/reviewKeywordStats";
+import { getReviewKeywordStats } from "@/utils/reviewKeywordStats";
 import {
   getHelpfulCountsSnapshot,
   getServerHelpfulCountsSnapshot,
@@ -65,14 +62,6 @@ const sortButtonClassName = cn(
   "hover:bg-zinc-800 hover:text-white active:scale-[0.98]",
 );
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
-const keywordStatsSectionClassName = cn(
-  "mb-8 rounded-xl border border-red-500/20 bg-red-500/10 p-4",
-);
-const keywordStatsListClassName = cn("flex flex-wrap gap-2");
-const keywordStatsPillClassName = cn(
-  "rounded-full border border-red-500/30 bg-black/25 px-3 py-2 text-sm font-bold text-red-100",
-);
-
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 
@@ -118,10 +107,6 @@ export default function CarReportPage() {
   const fuelType = vehicle?.fuelType ?? "";
   const hasVehicleInfo = Boolean(brand && model && generation && year);
 
-  const aiAnalysis = getStructuredAiSummary(brand, model, year, mileage, {
-    generation,
-    fuelType,
-  });
   const helpfulCountsSnapshot = useSyncExternalStore(
     subscribeToHelpfulChanges,
     getHelpfulCountsSnapshot,
@@ -167,9 +152,15 @@ export default function CarReportPage() {
     () => getReviewKeywordStats(reviews),
     [reviews],
   );
-  const reviewKeywordStatsSummary = useMemo(
-    () => getReviewKeywordStatsSummary(model, reviewKeywordStats),
-    [model, reviewKeywordStats],
+  const aiAnalysis = useMemo(
+    () =>
+      getStructuredAiSummary(brand, model, year, mileage, {
+        fuelType,
+        generation,
+        reviewKeywordStats,
+        vehicleNumber: carNumber,
+      }),
+    [brand, carNumber, fuelType, generation, mileage, model, reviewKeywordStats, year],
   );
   const totalReviewPages = Math.max(
     1,
@@ -391,29 +382,6 @@ export default function CarReportPage() {
                   </button>
                 </div>
               </div>
-
-              {reviewKeywordStats.length > 0 && (
-                <section className={keywordStatsSectionClassName}>
-                  <h2 className="mb-3 text-lg font-black text-white">
-                    실제 후기에서 많이 언급되는 내용
-                  </h2>
-                  {reviewKeywordStatsSummary && (
-                    <p className="mb-4 text-sm leading-[1.7] text-red-100/90">
-                      {reviewKeywordStatsSummary}
-                    </p>
-                  )}
-                  <div className={keywordStatsListClassName}>
-                    {reviewKeywordStats.map((stat) => (
-                      <span
-                        key={stat.label}
-                        className={keywordStatsPillClassName}
-                      >
-                        {stat.label} ({stat.count}건 · {stat.percentage}%)
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              )}
 
               {reviews.length === 0 ? (
                 <p className="text-gray-400 mb-8">

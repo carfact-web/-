@@ -8,155 +8,200 @@ interface AiSummaryCardProps {
   emptyMessage?: string;
 }
 
-const cardClassName = cn("mb-6 rounded-xl bg-zinc-800 p-5");
-const titleClassName = cn("mb-4 text-2xl font-bold text-red-400");
-const sectionClassName = cn("rounded-xl border border-zinc-700/70 bg-zinc-900/45 p-4");
-const sectionTitleClassName = cn("mb-2 text-base font-bold text-gray-100");
-const bodyTextClassName = cn("text-sm leading-[1.75] text-gray-300");
-const bulletListClassName = cn("space-y-2 text-sm leading-[1.65] text-gray-300");
-const inspectionGridClassName = cn("mt-4 grid gap-3");
-const inspectionItemClassName = cn(
-  "rounded-xl border border-zinc-700/70 bg-black/25 p-4",
+const cardClassName = cn(
+  "mb-5 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-5",
 );
-const inspectionMetaClassName = cn(
-  "mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-400",
+const headerClassName = cn("mb-3 flex items-start justify-between gap-3");
+const titleClassName = cn("text-lg font-black text-white sm:text-xl");
+const metaClassName = cn(
+  "mt-1 line-clamp-1 text-xs font-semibold text-zinc-500 sm:text-sm",
 );
-const conclusionClassName = cn(
-  "rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm font-semibold leading-[1.7] text-red-100",
+const sourceClassName = cn(
+  "shrink-0 rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-[11px] font-black text-red-100",
+);
+const sectionClassName = cn("border-t border-zinc-800/80 py-3 first:border-t-0 first:pt-0");
+const sectionTitleClassName = cn(
+  "mb-2 text-[13px] font-black tracking-[-0.01em] text-zinc-100",
+);
+const oneLineClassName = cn(
+  "line-clamp-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-[15px] font-bold leading-[1.55] text-red-50 sm:text-base",
+);
+const compactListClassName = cn("grid grid-cols-1 gap-1.5 sm:grid-cols-2");
+const compactItemClassName = cn(
+  "flex min-h-8 items-center gap-2 rounded-lg bg-black/20 px-3 py-2 text-sm font-semibold leading-5 text-zinc-200",
+);
+const issueListClassName = cn("space-y-2");
+const issueClassName = cn(
+  "rounded-xl border border-zinc-800 bg-black/20 px-3.5 py-3",
 );
 
-const getImportanceClassName = (importance: "상" | "중" | "하") =>
-  cn(
-    "rounded-full border px-2.5 py-1 text-xs font-black",
-    importance === "상" &&
-      "border-red-500/40 bg-red-500/15 text-red-200",
-    importance === "중" &&
-      "border-amber-400/35 bg-amber-400/10 text-amber-100",
-    importance === "하" &&
-      "border-zinc-500/40 bg-zinc-700/40 text-zinc-200",
-  );
+const formatMileage = (mileage?: string) => {
+  if (!mileage) {
+    return "";
+  }
+
+  const mileageNumber = Number(mileage);
+
+  if (!Number.isFinite(mileageNumber)) {
+    return mileage;
+  }
+
+  return mileageNumber.toLocaleString("ko-KR") + "km";
+};
+
+const getSourceLabel = (source: StructuredAiSummary["source"]) => {
+  if (source === "product-api") {
+    return "상품 API";
+  }
+
+  if (source === "vehicle-number") {
+    return "차량번호";
+  }
+
+  return "AI";
+};
 
 export function AiSummaryCard({
   analysis,
   summaries,
-  title = "카팩트 AI 분석",
-  emptyMessage = "차량 정보를 입력하면 AI 분석이 표시됩니다.",
+  title = "카팩트 AI 요약",
+  emptyMessage = "차량 정보를 입력하면 AI 요약이 표시됩니다.",
 }: AiSummaryCardProps) {
-  return (
-    <div className={cardClassName}>
-      <h2 className={titleClassName}>{title}</h2>
-
-      {analysis ? (
-        <div className="space-y-4">
-          <section className={sectionClassName}>
-            <h3 className={sectionTitleClassName}>현재 주행거리 기준 요약</h3>
-            <p className={bodyTextClassName}>{analysis.mileageSummary}</p>
-          </section>
-
-          {analysis.inspectionItems.length > 0 && (
-            <section className={sectionClassName}>
-              <h3 className={sectionTitleClassName}>
-                실제 중고차 검수 시 자주 확인되는 항목
-              </h3>
-              {analysis.inspectionSummary && (
-                <p className={bodyTextClassName}>
-                  {analysis.inspectionSummary}
-                </p>
-              )}
-
-              <div className={inspectionGridClassName}>
-                {analysis.inspectionItems.map((item) => (
-                  <article key={item.title} className={inspectionItemClassName}>
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h4 className="text-sm font-black text-white">
-                        {item.title}
-                      </h4>
-                      <span className={getImportanceClassName(item.importance)}>
-                        중요도 {item.importance}
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-sm leading-[1.65] text-zinc-300">
-                      {item.aiSummary}
-                    </p>
-
-                    <div className={inspectionMetaClassName}>
-                      <span>예상 수리비 {item.estimatedRepairCost}</span>
-                      <span aria-hidden>·</span>
-                      <span>{item.relatedParts.join(", ")}</span>
-                    </div>
-
-                    <p className="mt-2 text-xs leading-5 text-zinc-500">
-                      주요 증상: {item.symptoms.join(" / ")}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className={sectionClassName}>
-            <h3 className={sectionTitleClassName}>AI 요약 참고 문구</h3>
-            <ul className={bulletListClassName}>
-              {analysis.modelIssues.map((issue, index) => (
-                <li key={index}>- {issue}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className={sectionClassName}>
-            <h3 className={sectionTitleClassName}>방문 시 확인할 체크포인트</h3>
-            <ul className={bulletListClassName}>
-              {analysis.checkPoints.map((checkPoint, index) => (
-                <li key={index}>- {checkPoint}</li>
-              ))}
-            </ul>
-          </section>
-
-          {(analysis.yearInspectionNotes.length > 0 ||
-            analysis.engineInspectionNotes.length > 0) && (
-            <section className={sectionClassName}>
-              <h3 className={sectionTitleClassName}>연식 및 엔진별 참고</h3>
-              <div className="space-y-3">
-                {analysis.yearInspectionNotes.map((note) => (
-                  <p key={note.label} className={bodyTextClassName}>
-                    <span className="font-bold text-zinc-100">
-                      {note.label}
-                    </span>
-                    : {note.summary}
-                  </p>
-                ))}
-
-                {analysis.engineInspectionNotes.map((note) => (
-                  <p key={note.engine} className={bodyTextClassName}>
-                    <span className="font-bold text-zinc-100">
-                      {note.engine}
-                    </span>
-                    : {note.summary}
-                  </p>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section>
-            <h3 className={sectionTitleClassName}>구매 전 한 줄 결론</h3>
-            <p className={conclusionClassName}>{analysis.conclusion}</p>
-          </section>
-        </div>
-      ) : (
-        <div className="space-y-2">
+  if (!analysis) {
+    return (
+      <section className={cardClassName}>
+        <h2 className={titleClassName}>{title}</h2>
+        <div className="mt-3 space-y-2">
           {summaries.length === 0 ? (
-            <p className="text-gray-400">{emptyMessage}</p>
+            <p className="text-sm text-zinc-400">{emptyMessage}</p>
           ) : (
             summaries.map((summary, index) => (
-              <p key={index} className="text-gray-200">
-                • {summary}
+              <p key={index} className="text-sm leading-[1.7] text-zinc-200">
+                {summary}
               </p>
             ))
           )}
         </div>
-      )}
-    </div>
+      </section>
+    );
+  }
+
+  const vehicleMeta = [
+    analysis.vehicle.year && analysis.vehicle.year + "년식",
+    formatMileage(analysis.vehicle.mileage),
+    analysis.vehicle.fuelType,
+    analysis.vehicle.grade,
+  ].filter(Boolean);
+  const vehicleTitle = [
+    analysis.vehicle.brand,
+    analysis.vehicle.modelName,
+    analysis.vehicle.generation,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <section className={cardClassName} aria-labelledby="ai-summary-title">
+      <div className={headerClassName}>
+        <div className="min-w-0">
+          <h2 id="ai-summary-title" className={titleClassName}>
+            {title}
+          </h2>
+          <p className={metaClassName}>
+            {[vehicleTitle, ...vehicleMeta].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <span className={sourceClassName}>{getSourceLabel(analysis.source)}</span>
+      </div>
+
+      <section className={sectionClassName}>
+        <h3 className={sectionTitleClassName}>💡 카팩트 한줄평</h3>
+        <p className={oneLineClassName}>{analysis.oneLineReview}</p>
+      </section>
+
+      <section className={sectionClassName}>
+        <h3 className={sectionTitleClassName}>🔥 사람들이 많이 이야기한 내용</h3>
+        {analysis.reviewKeywords.length > 0 ? (
+          <ul className={compactListClassName}>
+            {analysis.reviewKeywords.map((keyword) => (
+              <li key={keyword.label} className={compactItemClassName}>
+                <span className="text-red-300">•</span>
+                <span className="line-clamp-1">{keyword.label}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm leading-6 text-zinc-500">
+            후기 키워드가 쌓이면 많이 언급된 내용부터 자동 정렬됩니다.
+          </p>
+        )}
+      </section>
+
+      <section className={sectionClassName}>
+        <h3 className={sectionTitleClassName}>⭐ 출고 전 꼭 확인</h3>
+        <ul className={compactListClassName}>
+          {analysis.preDeliveryChecks.map((checkPoint) => (
+            <li key={checkPoint} className={compactItemClassName}>
+              <span className="text-red-300">✔</span>
+              <span className="line-clamp-1">{checkPoint}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="border-t border-zinc-800/80 pt-3">
+        <h3 className={sectionTitleClassName}>🚨 자주 발생하는 정비 이슈</h3>
+        {analysis.maintenanceIssues.length > 0 ? (
+          <div className={issueListClassName}>
+            {analysis.maintenanceIssues.map((issue) => (
+              <details key={issue.title} className={issueClassName}>
+                <summary className="cursor-pointer list-none">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="line-clamp-1 text-sm font-black text-white">
+                        {issue.title}
+                      </h4>
+                      <p className="mt-1 line-clamp-1 text-sm font-semibold text-zinc-400">
+                        {issue.description}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-red-100">
+                        💰 예상수리비 {issue.estimatedRepairCost}
+                      </p>
+                    </div>
+                    <span className="shrink-0 pt-0.5 text-xs font-bold text-zinc-500">
+                      ▼ 자세히 보기
+                    </span>
+                  </div>
+                </summary>
+
+                <div className="mt-3 space-y-2 border-t border-zinc-800 pt-3 text-xs leading-5 text-zinc-400">
+                  <p>
+                    <span className="font-bold text-zinc-200">주요 증상</span>{" "}
+                    {issue.symptoms.join(" / ")}
+                  </p>
+                  <p>
+                    <span className="font-bold text-zinc-200">원인</span>{" "}
+                    {issue.causes.join(" / ")}
+                  </p>
+                  <p>
+                    <span className="font-bold text-zinc-200">교체 부품</span>{" "}
+                    {issue.replacementParts.join(", ")}
+                  </p>
+                  <p>
+                    <span className="font-bold text-zinc-200">추가 설명</span>{" "}
+                    {issue.additionalDescription}
+                  </p>
+                </div>
+              </details>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-zinc-500">
+            등록된 대표 정비 이슈가 아직 없습니다. 출고 전 확인 항목을 먼저
+            보시면 됩니다.
+          </p>
+        )}
+      </section>
+    </section>
   );
 }
