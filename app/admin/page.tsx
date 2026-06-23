@@ -18,6 +18,15 @@ type AdminTab =
   | "reports"
   | "notices";
 type AdminRole = "user" | "admin" | "super_admin";
+type DashboardBoardTab =
+  | "traffic"
+  | "views"
+  | "content"
+  | "keywords"
+  | "ai";
+type DashboardViewFilter = "vehicle" | "model" | "review";
+type AiCandidateStatus = "pending" | "reviewing" | "applied" | "excluded";
+type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
 type CommunityCategory =
   | "free"
   | "maintenance"
@@ -97,6 +106,53 @@ interface AdminTrafficStats {
   pathTop: AdminTrafficBreakdownItem[];
   hourlyVisitors: AdminTrafficTimeItem[];
   dailyVisitors: AdminTrafficTimeItem[];
+}
+
+interface AdminDashboardTrafficRow {
+  date: string;
+  visitors: number;
+  views: number;
+  topReferrer: string;
+  pcVisitors: number;
+  mobileVisitors: number;
+  browserOsSummary: string;
+}
+
+interface AdminDashboardViewRanking {
+  type: DashboardViewFilter;
+  rank: number;
+  targetId: string;
+  title: string;
+  modelName: string;
+  viewCount: number;
+  recentViewedAt: string | null;
+  href: string | null;
+}
+
+interface AdminDashboardKeywordRow {
+  keyword: string;
+  mentionCount: number;
+  relatedModels: string[];
+  recentOccurredAt: string | null;
+  aiStatus: AiCandidateStatus;
+}
+
+interface AdminDashboardAiCandidate {
+  candidateKey: string;
+  keyword: string;
+  mentionCount: number;
+  relatedModels: string[];
+  reason: string;
+  source: AiCandidateSource;
+  status: AiCandidateStatus;
+}
+
+interface AdminOperatorDashboardData {
+  totalViews: number;
+  trafficRows: AdminDashboardTrafficRow[];
+  viewRankings: AdminDashboardViewRanking[];
+  keywordRows: AdminDashboardKeywordRow[];
+  aiCandidates: AdminDashboardAiCandidate[];
 }
 
 interface AdminCommunityPost {
@@ -216,6 +272,14 @@ const emptyTrafficStats: AdminTrafficStats = {
   dailyVisitors: [],
 };
 
+const emptyOperatorDashboardData: AdminOperatorDashboardData = {
+  totalViews: 0,
+  trafficRows: [],
+  viewRankings: [],
+  keywordRows: [],
+  aiCandidates: [],
+};
+
 const pageClassName = cn(
   "min-h-screen bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8",
 );
@@ -240,10 +304,26 @@ const dangerButtonClassName = cn(
   "border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20",
 );
 const tableClassName = cn("min-w-full divide-y divide-zinc-800 text-sm");
+const desktopTableClassName = cn(tableClassName, "hidden min-w-[1120px] md:table");
 const tableHeadCellClassName = cn(
   "whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-zinc-500",
 );
 const tableCellClassName = cn("px-3 py-3 align-top text-zinc-200");
+const tableActionCellClassName = cn(tableCellClassName, "min-w-44 text-right");
+const desktopActionGroupClassName = cn("flex flex-wrap justify-end gap-2");
+const mobileListClassName = cn("divide-y divide-zinc-900 md:hidden");
+const mobileCardClassName = cn(
+  "grid min-h-[88px] grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3",
+);
+const mobileCardTitleClassName = cn(
+  "line-clamp-2 break-words text-sm font-black leading-5 text-white",
+);
+const mobileCardMetaClassName = cn(
+  "mt-1 line-clamp-1 break-words text-xs leading-5 text-zinc-500",
+);
+const mobileCardSubMetaClassName = cn(
+  "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400",
+);
 const inputClassName = cn(
   "min-h-10 w-full rounded-lg border border-zinc-800 bg-black px-3 text-sm text-white outline-none transition",
   "placeholder:text-zinc-600 focus:border-red-500",
@@ -271,6 +351,25 @@ const formatOptionalDate = (value: string | null | undefined) =>
 
 const getDisplayValue = (value: string | null | undefined) =>
   value?.trim() ? value : "정보 없음";
+
+const formatCompactId = (value: string | null | undefined, length = 8) =>
+  value?.trim() ? value.slice(0, length) : "정보 없음";
+
+const formatProviderLabel = (value: string | null | undefined) =>
+  getDisplayValue(value).replace(/^oauth_/, "");
+
+const formatReviewVehicleSummary = (review: AdminReview) => {
+  const snapshot = review.vehicle_snapshot;
+  const brand = getJsonString(snapshot, "brand");
+  const model = getJsonString(snapshot, "model");
+  const plateNumber = getJsonString(snapshot, "plateNumber");
+  const year = getJsonString(snapshot, "year");
+  const vehicleName = [brand, model].filter(Boolean).join(" ");
+
+  return [vehicleName || review.vehicle_id, plateNumber, year ? year + "년" : ""]
+    .filter(Boolean)
+    .join(" · ");
+};
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
@@ -353,6 +452,130 @@ const toTrafficTimeItems = (value: Json): AdminTrafficTimeItem[] =>
       }))
     : [];
 
+const dashboardViewFilters: {
+  label: string;
+  value: DashboardViewFilter;
+}[] = [
+  { label: "조회수 TOP 차량", value: "vehicle" },
+  { label: "조회수 TOP 모델", value: "model" },
+  { label: "조회수 TOP 후기", value: "review" },
+];
+
+const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
+  { label: "트래픽", value: "traffic" },
+  { label: "조회수", value: "views" },
+  { label: "콘텐츠", value: "content" },
+  { label: "유입 키워드", value: "keywords" },
+  { label: "AI 반영 후보", value: "ai" },
+];
+
+const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
+  { label: "대기", value: "pending" },
+  { label: "검토중", value: "reviewing" },
+  { label: "반영완료", value: "applied" },
+  { label: "제외", value: "excluded" },
+];
+
+const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
+  if (
+    value === "pending" ||
+    value === "reviewing" ||
+    value === "applied" ||
+    value === "excluded"
+  ) {
+    return value;
+  }
+
+  return "pending";
+};
+
+const normalizeAiCandidateSource = (value: unknown): AiCandidateSource => {
+  if (
+    value === "traffic" ||
+    value === "review" ||
+    value === "keyword" ||
+    value === "mixed"
+  ) {
+    return value;
+  }
+
+  return "mixed";
+};
+
+const normalizeViewFilter = (value: unknown): DashboardViewFilter => {
+  if (value === "vehicle" || value === "model" || value === "review") {
+    return value;
+  }
+
+  return "vehicle";
+};
+
+const toStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .filter(Boolean)
+    : [];
+
+const toOperatorTrafficRows = (
+  value: Json,
+): AdminDashboardTrafficRow[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        date: String(item.date ?? ""),
+        visitors: toNumber(item.visitors),
+        views: toNumber(item.views),
+        topReferrer: String(item.top_referrer ?? "direct"),
+        pcVisitors: toNumber(item.pc_visitors),
+        mobileVisitors: toNumber(item.mobile_visitors),
+        browserOsSummary: String(item.browser_os_summary ?? "기록 없음"),
+      }))
+    : [];
+
+const toOperatorViewRankings = (
+  value: Json,
+): AdminDashboardViewRanking[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        type: normalizeViewFilter(item.type),
+        rank: toNumber(item.rank),
+        targetId: String(item.target_id ?? ""),
+        title: String(item.title ?? "정보 없음"),
+        modelName: String(item.model_name ?? "정보 없음"),
+        viewCount: toNumber(item.view_count),
+        recentViewedAt: toNullableString(item.recent_viewed_at),
+        href: toNullableString(item.href),
+      }))
+    : [];
+
+const toOperatorKeywordRows = (
+  value: Json,
+): AdminDashboardKeywordRow[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        keyword: String(item.keyword ?? ""),
+        mentionCount: toNumber(item.mention_count),
+        relatedModels: toStringArray(item.related_models),
+        recentOccurredAt: toNullableString(item.recent_occurred_at),
+        aiStatus: normalizeAiCandidateStatus(item.ai_status),
+      }))
+    : [];
+
+const toOperatorAiCandidates = (
+  value: Json,
+): AdminDashboardAiCandidate[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        candidateKey: String(item.candidate_key ?? ""),
+        keyword: String(item.keyword ?? ""),
+        mentionCount: toNumber(item.mention_count),
+        relatedModels: toStringArray(item.related_models),
+        reason: String(item.reason ?? ""),
+        source: normalizeAiCandidateSource(item.source),
+        status: normalizeAiCandidateStatus(item.status),
+      }))
+    : [];
+
 export default function AdminPage() {
   const router = useRouter();
   const {
@@ -368,6 +591,12 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats>(emptyStats);
   const [trafficStats, setTrafficStats] =
     useState<AdminTrafficStats>(emptyTrafficStats);
+  const [operatorDashboardData, setOperatorDashboardData] =
+    useState<AdminOperatorDashboardData>(emptyOperatorDashboardData);
+  const [activeDashboardTab, setActiveDashboardTab] =
+    useState<DashboardBoardTab>("traffic");
+  const [dashboardViewFilter, setDashboardViewFilter] =
+    useState<DashboardViewFilter>("vehicle");
   const [posts, setPosts] = useState<AdminCommunityPost[]>([]);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [users, setUsers] = useState<AdminUserProfile[]>([]);
@@ -480,6 +709,7 @@ export default function AdminPage() {
         noticesResult,
         popupNoticesResult,
         trafficStatsResult,
+        operatorDashboardResult,
         verifiedDealerFeatureResult,
       ] = await Promise.all([
         supabase.rpc("admin_get_dashboard_stats"),
@@ -502,6 +732,7 @@ export default function AdminPage() {
           search_text: noticeSearch.trim(),
         }),
         supabase.rpc("admin_get_traffic_stats"),
+        supabase.rpc("admin_get_operator_dashboard_data"),
         supabase.rpc("list_verified_dealer_profiles", {
           target_user_ids: [],
         }),
@@ -520,6 +751,9 @@ export default function AdminPage() {
 
       const nextStats = statsResult.data?.[0];
       const nextTrafficStats = trafficStatsResult.data?.[0];
+      const nextOperatorDashboard = operatorDashboardResult.error
+        ? null
+        : operatorDashboardResult.data?.[0];
 
       setStats({
         comments: Number(nextStats?.comments_count ?? 0),
@@ -557,6 +791,21 @@ export default function AdminPage() {
         ),
         dailyVisitors: toTrafficTimeItems(
           nextTrafficStats?.daily_visitors ?? [],
+        ),
+      });
+      setOperatorDashboardData({
+        totalViews: toNumber(nextOperatorDashboard?.total_views),
+        trafficRows: toOperatorTrafficRows(
+          nextOperatorDashboard?.traffic_rows ?? [],
+        ),
+        viewRankings: toOperatorViewRankings(
+          nextOperatorDashboard?.view_rankings ?? [],
+        ),
+        keywordRows: toOperatorKeywordRows(
+          nextOperatorDashboard?.keyword_rows ?? [],
+        ),
+        aiCandidates: toOperatorAiCandidates(
+          nextOperatorDashboard?.ai_candidates ?? [],
         ),
       });
       setPosts((postsResult.data ?? []) as AdminCommunityPost[]);
@@ -597,6 +846,49 @@ export default function AdminPage() {
   }, [canAccess, loadAdminData]);
 
   const refreshCurrentTab = async () => {
+    await loadAdminData();
+  };
+
+  const updateAiCandidateStatus = async (
+    candidate: AdminDashboardAiCandidate,
+    nextStatus: AiCandidateStatus,
+  ) => {
+    if (!supabase) {
+      return;
+    }
+
+    setActionMessage("");
+    setOperatorDashboardData((current) => ({
+      ...current,
+      aiCandidates: current.aiCandidates.map((item) =>
+        item.candidateKey === candidate.candidateKey
+          ? { ...item, status: nextStatus }
+          : item,
+      ),
+      keywordRows: current.keywordRows.map((item) =>
+        "keyword:" + item.keyword === candidate.candidateKey
+          ? { ...item, aiStatus: nextStatus }
+          : item,
+      ),
+    }));
+
+    const { error } = await supabase.rpc("admin_set_ai_candidate_status", {
+      candidate_key: candidate.candidateKey,
+      candidate_keyword: candidate.keyword,
+      candidate_source: candidate.source,
+      next_status: nextStatus,
+      related_models: candidate.relatedModels,
+    });
+
+    if (error) {
+      setActionMessage(
+        getErrorMessage(error, "AI 후보 상태를 변경하지 못했습니다."),
+      );
+      await loadAdminData();
+      return;
+    }
+
+    setActionMessage("AI 후보 상태를 변경했습니다.");
     await loadAdminData();
   };
 
@@ -1454,6 +1746,16 @@ export default function AdminPage() {
 
         {activeTab === "dashboard" ? (
           <DashboardPanel
+            activeDashboardTab={activeDashboardTab}
+            dashboardViewFilter={dashboardViewFilter}
+            onChangeAiCandidateStatus={(candidate, nextStatus) =>
+              void updateAiCandidateStatus(candidate, nextStatus)
+            }
+            onChangeDashboardTab={setActiveDashboardTab}
+            onChangeViewFilter={setDashboardViewFilter}
+            operatorDashboardData={operatorDashboardData}
+            posts={posts}
+            reports={reports}
             reviews={reviews}
             stats={stats}
             trafficStats={trafficStats}
@@ -1475,7 +1777,60 @@ export default function AdminPage() {
               }
               onUnhide={() => void updatePostsHidden(selectedPosts, false)}
             />
-            <table className={tableClassName}>
+            <div className={mobileListClassName}>
+              {posts.length ? (
+                posts.map((post) => (
+                  <article className={mobileCardClassName} key={post.id}>
+                    <div className="min-w-0">
+                      <div className="flex items-start gap-2">
+                        <SelectionCheckbox
+                          checked={selectedPostIds.includes(post.id)}
+                          label="게시글 선택"
+                          onChange={(checked) =>
+                            setSelectedPostIds((current) =>
+                              checked
+                                ? Array.from(new Set([...current, post.id]))
+                                : current.filter((id) => id !== post.id),
+                            )
+                          }
+                        />
+                        <div className="min-w-0">
+                          <p className={mobileCardTitleClassName}>
+                            {post.title}
+                          </p>
+                          <p className={mobileCardMetaClassName}>
+                            {getCommunityCategoryLabel(post.category)} ·{" "}
+                            {post.author_nickname ?? formatCompactId(post.user_id)} ·{" "}
+                            {formatDate(post.created_at)}
+                          </p>
+                          <p className={mobileCardMetaClassName}>
+                            댓글 {post.comment_count.toLocaleString()} · 좋아요{" "}
+                            {post.like_count.toLocaleString()} · 신고{" "}
+                            {post.report_count.toLocaleString()}
+                          </p>
+                          <div className={mobileCardSubMetaClassName}>
+                            <PostStatusBadges post={post} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <MobileActionDetails>
+                      <PostActionButtons
+                        isSuperAdmin={isSuperAdmin}
+                        post={post}
+                        onDelete={(target) => void deletePost(target)}
+                        onUpdateState={(target, state) =>
+                          void updatePostState(target, state)
+                        }
+                      />
+                    </MobileActionDetails>
+                  </article>
+                ))
+              ) : (
+                <EmptyMobileState message="게시글이 없습니다." />
+              )}
+            </div>
+            <table className={desktopTableClassName}>
               <thead>
                 <tr>
                   <th className={tableHeadCellClassName}>
@@ -1495,7 +1850,9 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>지표</th>
                   <th className={tableHeadCellClassName}>작성일</th>
-                  <th className={tableHeadCellClassName}>관리</th>
+                  <th className={cn(tableHeadCellClassName, "text-right")}>
+                    관리
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-900">
@@ -1540,50 +1897,16 @@ export default function AdminPage() {
                       <td className={tableCellClassName}>
                         {formatDate(post.created_at)}
                       </td>
-                      <td className={tableCellClassName}>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            onClick={() =>
-                              void updatePostState(post, {
-                                next_is_hidden: !post.is_hidden,
-                              })
+                      <td className={tableActionCellClassName}>
+                        <div className={desktopActionGroupClassName}>
+                          <PostActionButtons
+                            isSuperAdmin={isSuperAdmin}
+                            post={post}
+                            onDelete={(target) => void deletePost(target)}
+                            onUpdateState={(target, state) =>
+                              void updatePostState(target, state)
                             }
-                          >
-                            {post.is_hidden ? "숨김해제" : "숨김"}
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            onClick={() =>
-                              void updatePostState(post, {
-                                next_is_notice: !post.is_notice,
-                              })
-                            }
-                          >
-                            {post.is_notice ? "공지해제" : "공지지정"}
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            onClick={() =>
-                              void updatePostState(post, {
-                                next_is_pinned: !post.is_pinned,
-                              })
-                            }
-                          >
-                            {post.is_pinned ? "고정해제" : "상단고정"}
-                          </button>
-                          {isSuperAdmin ? (
-                            <button
-                              type="button"
-                              className={dangerButtonClassName}
-                              onClick={() => void deletePost(post)}
-                            >
-                              영구삭제
-                            </button>
-                          ) : null}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1613,7 +1936,59 @@ export default function AdminPage() {
               }
               onUnhide={() => void updateReviewsHidden(selectedReviews, false)}
             />
-            <table className={tableClassName}>
+            <div className={mobileListClassName}>
+              {reviews.length ? (
+                reviews.map((review) => (
+                  <article className={mobileCardClassName} key={review.id}>
+                    <div className="min-w-0">
+                      <div className="flex items-start gap-2">
+                        <SelectionCheckbox
+                          checked={selectedReviewIds.includes(review.id)}
+                          label="후기 선택"
+                          onChange={(checked) =>
+                            setSelectedReviewIds((current) =>
+                              checked
+                                ? Array.from(new Set([...current, review.id]))
+                                : current.filter((id) => id !== review.id),
+                            )
+                          }
+                        />
+                        <div className="min-w-0">
+                          <p className={mobileCardTitleClassName}>
+                            {review.content}
+                          </p>
+                          <p className={mobileCardMetaClassName}>
+                            {review.author_nickname ??
+                              (review.author_id
+                                ? formatCompactId(review.author_id, 6)
+                                : "익명 사용자")}{" "}
+                            · {formatReviewVehicleSummary(review)} ·{" "}
+                            {formatDate(review.created_at)}
+                          </p>
+                          <div className={mobileCardSubMetaClassName}>
+                            <HiddenStatus isHidden={review.is_hidden} />
+                            <span>신고 {review.report_count.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <MobileActionDetails>
+                      <ReviewActionButtons
+                        isSuperAdmin={isSuperAdmin}
+                        review={review}
+                        onDelete={(target) => void deleteReview(target)}
+                        onToggleHidden={(target) =>
+                          void updateReviewHidden(target)
+                        }
+                      />
+                    </MobileActionDetails>
+                  </article>
+                ))
+              ) : (
+                <EmptyMobileState message="후기가 없습니다." />
+              )}
+            </div>
+            <table className={desktopTableClassName}>
               <thead>
                 <tr>
                   <th className={tableHeadCellClassName}>
@@ -1633,7 +2008,9 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>신고</th>
                   <th className={tableHeadCellClassName}>작성일</th>
-                  <th className={tableHeadCellClassName}>관리</th>
+                  <th className={cn(tableHeadCellClassName, "text-right")}>
+                    관리
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-900">
@@ -1675,24 +2052,16 @@ export default function AdminPage() {
                       <td className={tableCellClassName}>
                         {formatDate(review.created_at)}
                       </td>
-                      <td className={tableCellClassName}>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            onClick={() => void updateReviewHidden(review)}
-                          >
-                            {review.is_hidden ? "숨김해제" : "숨김"}
-                          </button>
-                          {isSuperAdmin ? (
-                            <button
-                              type="button"
-                              className={dangerButtonClassName}
-                              onClick={() => void deleteReview(review)}
-                            >
-                              영구삭제
-                            </button>
-                          ) : null}
+                      <td className={tableActionCellClassName}>
+                        <div className={desktopActionGroupClassName}>
+                          <ReviewActionButtons
+                            isSuperAdmin={isSuperAdmin}
+                            review={review}
+                            onDelete={(target) => void deleteReview(target)}
+                            onToggleHidden={(target) =>
+                              void updateReviewHidden(target)
+                            }
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1707,7 +2076,72 @@ export default function AdminPage() {
 
         {activeTab === "users" ? (
           <AdminTablePanel count={users.length} title="회원 관리">
-            <table className={tableClassName}>
+            <div className={mobileListClassName}>
+              {users.length ? (
+                users.map((account) => (
+                  <article className={mobileCardClassName} key={account.id}>
+                    <div className="min-w-0">
+                      <p className={mobileCardTitleClassName}>
+                        <VerifiedNickname
+                          isVerifiedDealer={account.is_verified_dealer}
+                        >
+                          {account.nickname ?? "닉네임 없음"}
+                        </VerifiedNickname>
+                      </p>
+                      <p className={mobileCardMetaClassName}>
+                        {getDisplayValue(account.email)} ·{" "}
+                        {formatProviderLabel(account.login_provider)} · 가입{" "}
+                        {formatDate(account.created_at)}
+                      </p>
+                      <p className={mobileCardMetaClassName}>
+                        회원 ID {formatCompactId(account.id)} · 최근 로그인{" "}
+                        {formatOptionalDate(account.last_sign_in_at)}
+                      </p>
+                      <div className={mobileCardSubMetaClassName}>
+                        <RoleBadge role={account.role} />
+                        <AccountStatusBadge
+                          isSuspended={account.is_suspended}
+                        />
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-1 text-xs font-bold",
+                            account.is_verified_dealer
+                              ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
+                              : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                          )}
+                        >
+                          딜러 {account.is_verified_dealer ? "ON" : "OFF"}
+                        </span>
+                      </div>
+                    </div>
+                    <MobileActionDetails>
+                      <UserActionButtons
+                        account={account}
+                        isSuperAdmin={isSuperAdmin}
+                        isVerifiedDealerFeatureReady={
+                          isVerifiedDealerFeatureReady
+                        }
+                        onGrantNicknameChangeTicket={(target) =>
+                          void grantNicknameChangeTicket(target)
+                        }
+                        onSetRole={(target, nextRole) =>
+                          void setUserRole(target, nextRole)
+                        }
+                        onSetSuspended={(target) =>
+                          void setUserSuspended(target)
+                        }
+                        onSetVerifiedDealer={(target) =>
+                          void setVerifiedDealer(target)
+                        }
+                      />
+                    </MobileActionDetails>
+                  </article>
+                ))
+              ) : (
+                <EmptyMobileState message="회원이 없습니다." />
+              )}
+            </div>
+            <table className={desktopTableClassName}>
               <thead>
                 <tr>
                   <th className={tableHeadCellClassName}>회원 ID</th>
@@ -1719,7 +2153,9 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>가입일</th>
                   <th className={tableHeadCellClassName}>최근 로그인</th>
-                  <th className={tableHeadCellClassName}>관리</th>
+                  <th className={cn(tableHeadCellClassName, "text-right")}>
+                    관리
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-900">
@@ -1813,56 +2249,27 @@ export default function AdminPage() {
                       <td className={tableCellClassName}>
                         {formatOptionalDate(account.last_sign_in_at)}
                       </td>
-                      <td className={tableCellClassName}>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            disabled={account.role === "super_admin"}
-                            onClick={() => void setUserSuspended(account)}
-                          >
-                            {account.is_suspended ? "정지해제" : "정지"}
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            disabled={!isVerifiedDealerFeatureReady}
-                            onClick={() => void setVerifiedDealer(account)}
-                            title={
+                      <td className={tableActionCellClassName}>
+                        <div className={desktopActionGroupClassName}>
+                          <UserActionButtons
+                            account={account}
+                            isSuperAdmin={isSuperAdmin}
+                            isVerifiedDealerFeatureReady={
                               isVerifiedDealerFeatureReady
-                                ? undefined
-                                : "인증딜러 기능 DB 미적용"
                             }
-                          >
-                            {account.is_verified_dealer
-                              ? "인증딜러 회수"
-                              : "인증딜러 부여"}
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            onClick={() =>
-                              void grantNicknameChangeTicket(account)
+                            onGrantNicknameChangeTicket={(target) =>
+                              void grantNicknameChangeTicket(target)
                             }
-                          >
-                            닉네임 변경권 +1
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            disabled={!isSuperAdmin || account.role !== "user"}
-                            onClick={() => void setUserRole(account, "admin")}
-                          >
-                            관리자 부여
-                          </button>
-                          <button
-                            type="button"
-                            className={actionButtonClassName}
-                            disabled={!isSuperAdmin || account.role !== "admin"}
-                            onClick={() => void setUserRole(account, "user")}
-                          >
-                            관리자 회수
-                          </button>
+                            onSetRole={(target, nextRole) =>
+                              void setUserRole(target, nextRole)
+                            }
+                            onSetSuspended={(target) =>
+                              void setUserSuspended(target)
+                            }
+                            onSetVerifiedDealer={(target) =>
+                              void setVerifiedDealer(target)
+                            }
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1892,7 +2299,66 @@ export default function AdminPage() {
                 void updateReportTargetsHidden(selectedReports, false)
               }
             />
-            <table className={tableClassName}>
+            <div className={mobileListClassName}>
+              {reports.length ? (
+                reports.map((report) => (
+                  <article className={mobileCardClassName} key={report.report_id}>
+                    <div className="min-w-0">
+                      <div className="flex items-start gap-2">
+                        <SelectionCheckbox
+                          checked={selectedReportIds.includes(report.report_id)}
+                          label="신고 선택"
+                          onChange={(checked) =>
+                            setSelectedReportIds((current) =>
+                              checked
+                                ? Array.from(
+                                    new Set([...current, report.report_id]),
+                                  )
+                                : current.filter(
+                                    (id) => id !== report.report_id,
+                                  ),
+                            )
+                          }
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-red-300">
+                            {report.report_type}
+                          </p>
+                          <p className={mobileCardTitleClassName}>
+                            {report.target_title ?? report.target_content}
+                          </p>
+                          <p className={mobileCardMetaClassName}>
+                            {report.reason ?? "사유 없음"} ·{" "}
+                            {report.target_author ?? "작성자 확인 필요"} ·{" "}
+                            {formatDate(report.created_at)}
+                          </p>
+                          <div className={mobileCardSubMetaClassName}>
+                            <HiddenStatus isHidden={report.is_hidden} />
+                            <span>누적 {Number(report.report_count).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {report.target_path ? (
+                      <Link
+                        className={cn(
+                          actionButtonClassName,
+                          "min-h-8 px-2.5 text-[11px]",
+                        )}
+                        href={report.target_path}
+                      >
+                        보기
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-zinc-500">연결 없음</span>
+                    )}
+                  </article>
+                ))
+              ) : (
+                <EmptyMobileState message="신고 내역이 없습니다." />
+              )}
+            </div>
+            <table className={desktopTableClassName}>
               <thead>
                 <tr>
                   <th className={tableHeadCellClassName}>
@@ -2000,13 +2466,48 @@ export default function AdminPage() {
                   공지 작성
                 </button>
               </div>
-              <table className={tableClassName}>
+              <div className={mobileListClassName}>
+                {notices.length ? (
+                  notices.map((notice) => (
+                    <article className={mobileCardClassName} key={notice.id}>
+                      <div className="min-w-0">
+                        <p className={mobileCardTitleClassName}>
+                          {notice.title}
+                        </p>
+                        <p className={mobileCardMetaClassName}>
+                          {notice.content}
+                        </p>
+                        <div className={mobileCardSubMetaClassName}>
+                          <PostStatusBadges post={notice} />
+                          <span>{formatDate(notice.created_at)}</span>
+                        </div>
+                      </div>
+                      <MobileActionDetails>
+                        <NoticeActionButtons
+                          notice={notice}
+                          onDelete={(target) =>
+                            void deleteCommunityNotice(target)
+                          }
+                          onEdit={(target) =>
+                            void upsertCommunityNotice(target)
+                          }
+                        />
+                      </MobileActionDetails>
+                    </article>
+                  ))
+                ) : (
+                  <EmptyMobileState message="공지 내역이 없습니다." />
+                )}
+              </div>
+              <table className={desktopTableClassName}>
                 <thead>
                   <tr>
                     <th className={tableHeadCellClassName}>공지</th>
                     <th className={tableHeadCellClassName}>상태</th>
                     <th className={tableHeadCellClassName}>작성일</th>
-                    <th className={tableHeadCellClassName}>관리</th>
+                    <th className={cn(tableHeadCellClassName, "text-right")}>
+                      관리
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
@@ -2027,22 +2528,17 @@ export default function AdminPage() {
                         <td className={tableCellClassName}>
                           {formatDate(notice.created_at)}
                         </td>
-                        <td className={tableCellClassName}>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className={actionButtonClassName}
-                              onClick={() => void upsertCommunityNotice(notice)}
-                            >
-                              수정
-                            </button>
-                            <button
-                              type="button"
-                              className={dangerButtonClassName}
-                              onClick={() => void deleteCommunityNotice(notice)}
-                            >
-                              삭제
-                            </button>
+                        <td className={tableActionCellClassName}>
+                          <div className={desktopActionGroupClassName}>
+                            <NoticeActionButtons
+                              notice={notice}
+                              onDelete={(target) =>
+                                void deleteCommunityNotice(target)
+                              }
+                              onEdit={(target) =>
+                                void upsertCommunityNotice(target)
+                              }
+                            />
                           </div>
                         </td>
                       </tr>
@@ -2067,13 +2563,45 @@ export default function AdminPage() {
                   팝업공지 작성
                 </button>
               </div>
-              <table className={tableClassName}>
+              <div className={mobileListClassName}>
+                {popupNotices.length ? (
+                  popupNotices.map((notice) => (
+                    <article className={mobileCardClassName} key={notice.id}>
+                      <div className="min-w-0">
+                        <p className={mobileCardTitleClassName}>
+                          {notice.title}
+                        </p>
+                        <p className={mobileCardMetaClassName}>
+                          {notice.content}
+                        </p>
+                        <div className={mobileCardSubMetaClassName}>
+                          <ActiveStatusBadge isActive={notice.is_active} />
+                          <span>{formatDate(notice.created_at)}</span>
+                        </div>
+                      </div>
+                      <MobileActionDetails>
+                        <PopupNoticeActionButtons
+                          notice={notice}
+                          onDelete={(target) => void deletePopupNotice(target)}
+                          onEdit={(target) => void upsertPopupNotice(target)}
+                          onToggle={(target) => void togglePopupNotice(target)}
+                        />
+                      </MobileActionDetails>
+                    </article>
+                  ))
+                ) : (
+                  <EmptyMobileState message="팝업공지 내역이 없습니다." />
+                )}
+              </div>
+              <table className={desktopTableClassName}>
                 <thead>
                   <tr>
                     <th className={tableHeadCellClassName}>팝업</th>
                     <th className={tableHeadCellClassName}>상태</th>
                     <th className={tableHeadCellClassName}>작성일</th>
-                    <th className={tableHeadCellClassName}>관리</th>
+                    <th className={cn(tableHeadCellClassName, "text-right")}>
+                      관리
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
@@ -2099,29 +2627,20 @@ export default function AdminPage() {
                         <td className={tableCellClassName}>
                           {formatDate(notice.created_at)}
                         </td>
-                        <td className={tableCellClassName}>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className={actionButtonClassName}
-                              onClick={() => void togglePopupNotice(notice)}
-                            >
-                              {notice.is_active ? "비활성" : "활성"}
-                            </button>
-                            <button
-                              type="button"
-                              className={actionButtonClassName}
-                              onClick={() => void upsertPopupNotice(notice)}
-                            >
-                              수정
-                            </button>
-                            <button
-                              type="button"
-                              className={dangerButtonClassName}
-                              onClick={() => void deletePopupNotice(notice)}
-                            >
-                              삭제
-                            </button>
+                        <td className={tableActionCellClassName}>
+                          <div className={desktopActionGroupClassName}>
+                            <PopupNoticeActionButtons
+                              notice={notice}
+                              onDelete={(target) =>
+                                void deletePopupNotice(target)
+                              }
+                              onEdit={(target) =>
+                                void upsertPopupNotice(target)
+                              }
+                              onToggle={(target) =>
+                                void togglePopupNotice(target)
+                              }
+                            />
                           </div>
                         </td>
                       </tr>
@@ -2196,148 +2715,120 @@ function SearchBar({
 }
 
 function DashboardPanel({
+  activeDashboardTab,
+  dashboardViewFilter,
+  onChangeAiCandidateStatus,
+  onChangeDashboardTab,
+  onChangeViewFilter,
+  operatorDashboardData,
+  posts,
+  reports,
   reviews,
   stats,
   trafficStats,
 }: {
+  activeDashboardTab: DashboardBoardTab;
+  dashboardViewFilter: DashboardViewFilter;
+  onChangeAiCandidateStatus: (
+    candidate: AdminDashboardAiCandidate,
+    nextStatus: AiCandidateStatus,
+  ) => void;
+  onChangeDashboardTab: (tab: DashboardBoardTab) => void;
+  onChangeViewFilter: (filter: DashboardViewFilter) => void;
+  operatorDashboardData: AdminOperatorDashboardData;
+  posts: AdminCommunityPost[];
+  reports: AdminReport[];
   reviews: AdminReview[];
   stats: AdminStats;
   trafficStats: AdminTrafficStats;
 }) {
-  const reviewsById = new Map(reviews.map((review) => [review.id, review]));
-  const trafficItems = [
+  const summaryItems = [
     { label: "오늘 방문자", value: trafficStats.todayVisitors },
     { label: "7일 방문자", value: trafficStats.sevenDayVisitors },
     { label: "30일 방문자", value: trafficStats.thirtyDayVisitors },
-    { label: "총 방문자", value: trafficStats.totalVisitors },
-    { label: "오늘 후기수", value: trafficStats.todayReviews },
-    { label: "총 후기수", value: trafficStats.totalReviews },
-    { label: "총 회원수", value: trafficStats.totalUsers },
-  ];
-  const contentItems = [
-    { label: "회원수", value: stats.users },
-    { label: "게시글수", value: stats.communityPosts },
-    { label: "후기수", value: stats.reviews },
-    { label: "댓글수", value: stats.comments },
+    { label: "총 조회수", value: operatorDashboardData.totalViews },
+    { label: "총 후기수", value: stats.reviews },
+    { label: "총 게시글수", value: stats.communityPosts },
     { label: "신고수", value: stats.reports },
   ];
+  const filteredRankings = operatorDashboardData.viewRankings.filter(
+    (item) => item.type === dashboardViewFilter,
+  );
+  const recentReviews = reviews.slice(0, 5);
+  const recentPosts = posts.filter((post) => !post.is_notice).slice(0, 5);
 
   return (
     <div className="space-y-4">
       <section className={panelClassName}>
-        <h2 className="text-lg font-black text-white">트래픽 통계</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {trafficItems.map((item) => (
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-white">운영 요약</h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              오늘 확인할 핵심 지표만 표시합니다.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+          {summaryItems.map((item) => (
             <StatCard key={item.label} label={item.label} value={item.value} />
           ))}
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <TrafficBreakdownPanel
-          emptyMessage="기기 통계가 없습니다."
-          items={trafficStats.deviceBreakdown.map((item) => ({
-            ...item,
-            label: formatTrafficLabel(item.label),
-          }))}
-          title="모바일 / PC / 태블릿 비율"
-        />
-        <TrafficBreakdownPanel
-          emptyMessage="브라우저 통계가 없습니다."
-          items={trafficStats.browserBreakdown}
-          title="브라우저별 방문 비율"
-        />
-        <TrafficBreakdownPanel
-          emptyMessage="OS 통계가 없습니다."
-          items={trafficStats.osBreakdown}
-          title="OS별 방문 비율"
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-4">
-        <TrafficBreakdownPanel
-          emptyMessage="유입경로 기록이 없습니다."
-          items={trafficStats.referrerTop.map((item) => ({
-            ...item,
-            label: item.label === "direct" ? "직접 유입" : item.label,
-          }))}
-          title="유입경로 TOP10"
-        />
-        <TrafficBreakdownPanel
-          emptyMessage="접속 페이지 기록이 없습니다."
-          items={trafficStats.pathTop.map((item) => ({
-            ...item,
-            label: item.label === "unknown" ? "알 수 없음" : item.label,
-          }))}
-          title="접속 페이지 TOP10"
-        />
-        <TrafficTimePanel
-          emptyMessage="시간대별 기록이 없습니다."
-          items={trafficStats.hourlyVisitors}
-          title="시간대별 방문자 수"
-        />
-        <TrafficTimePanel
-          emptyMessage="일자별 기록이 없습니다."
-          items={trafficStats.dailyVisitors}
-          title="일자별 방문자 수"
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <TrafficVehicleRankingPanel
-          emptyMessage="차량 조회 기록이 없습니다."
-          items={trafficStats.topVehicles}
-          title="조회수 TOP10 차량"
-        />
-        <TrafficModelRankingPanel
-          emptyMessage="모델 조회 기록이 없습니다."
-          items={trafficStats.topModels}
-          title="조회수 TOP10 모델"
-        />
-        <TrafficRankingPanel
-          emptyMessage="후기 조회 기록이 없습니다."
-          items={trafficStats.topReviews.map((item) => {
-            const review = reviewsById.get(item.review_id);
-            const snapshot = review?.vehicle_snapshot;
-            const manufacturer =
-              item.manufacturer ??
-              (snapshot ? getJsonString(snapshot, "brand") : null);
-            const model =
-              item.model ??
-              (snapshot ? getJsonString(snapshot, "model") : null);
-            const carNumber =
-              item.car_number ??
-              (snapshot ? getJsonString(snapshot, "plateNumber") : null);
-            const year =
-              item.year ?? (snapshot ? getJsonString(snapshot, "year") : null);
-
-            return {
-              id: item.review_id,
-              meta: [
-                year ? year + "년" : "",
-                item.author_nickname ? "작성자 " + item.author_nickname : "",
-                item.content,
-              ]
-                .filter(Boolean)
-                .join(" · "),
-              title: formatTrafficVehicleTitle({
-                carNumber,
-                manufacturer,
-                model,
-              }),
-              viewCount: item.view_count,
-            };
-          })}
-          title="조회수 TOP10 후기"
-        />
-      </div>
-
       <section className={panelClassName}>
-        <h2 className="text-lg font-black text-white">콘텐츠 현황</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {contentItems.map((item) => (
-            <StatCard key={item.label} label={item.label} value={item.value} />
-          ))}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-white">운영 게시판</h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              트래픽, 조회수, 콘텐츠, 키워드, AI 반영 후보를 탭으로 확인합니다.
+            </p>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {dashboardBoardTabs.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                className={cn(
+                  "shrink-0 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                  activeDashboardTab === tab.value &&
+                    "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+                )}
+                onClick={() => onChangeDashboardTab(tab.value)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-lg border border-zinc-900">
+          {activeDashboardTab === "traffic" ? (
+            <DashboardTrafficTable rows={operatorDashboardData.trafficRows} />
+          ) : null}
+          {activeDashboardTab === "views" ? (
+            <DashboardViewsTable
+              filter={dashboardViewFilter}
+              onChangeFilter={onChangeViewFilter}
+              rows={filteredRankings}
+            />
+          ) : null}
+          {activeDashboardTab === "content" ? (
+            <DashboardContentTable
+              posts={recentPosts}
+              reports={reports}
+              reviews={recentReviews}
+              stats={stats}
+            />
+          ) : null}
+          {activeDashboardTab === "keywords" ? (
+            <DashboardKeywordTable rows={operatorDashboardData.keywordRows} />
+          ) : null}
+          {activeDashboardTab === "ai" ? (
+            <DashboardAiCandidateTable
+              candidates={operatorDashboardData.aiCandidates}
+              onChangeStatus={onChangeAiCandidateStatus}
+            />
+          ) : null}
         </div>
       </section>
     </div>
@@ -2346,319 +2837,459 @@ function DashboardPanel({
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-black p-4">
-      <p className="text-xs font-bold text-zinc-500">{label}</p>
-      <p className="mt-2 text-2xl font-black text-white">
+    <div className="rounded-lg border border-zinc-800 bg-black p-3 sm:p-4">
+      <p className="truncate text-xs font-bold text-zinc-500">{label}</p>
+      <p className="mt-2 text-xl font-black text-white sm:text-2xl">
         {value.toLocaleString()}
       </p>
     </div>
   );
 }
 
-function formatTrafficLabel(label: string) {
+function DashboardTrafficTable({
+  rows,
+}: {
+  rows: AdminDashboardTrafficRow[];
+}) {
+  if (!rows.length) {
+    return <DashboardEmptyState message="트래픽 기록이 없습니다." />;
+  }
+
   return (
-    {
-      desktop: "PC",
-      mobile: "모바일",
-      tablet: "태블릿",
-      unknown: "알 수 없음",
-    }[label] ?? label
+    <div className="overflow-x-auto">
+      <table className="min-w-[920px] divide-y divide-zinc-900 text-sm">
+        <thead className="bg-black">
+          <tr>
+            <DashboardHeadCell>날짜</DashboardHeadCell>
+            <DashboardHeadCell>방문자 수</DashboardHeadCell>
+            <DashboardHeadCell>조회수</DashboardHeadCell>
+            <DashboardHeadCell>주요 유입 경로</DashboardHeadCell>
+            <DashboardHeadCell>PC/모바일 비율</DashboardHeadCell>
+            <DashboardHeadCell>브라우저/OS 요약</DashboardHeadCell>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+          {rows.map((row) => (
+            <tr key={row.date}>
+              <DashboardCell strong>{row.date}</DashboardCell>
+              <DashboardCell>{row.visitors.toLocaleString()}</DashboardCell>
+              <DashboardCell>{row.views.toLocaleString()}</DashboardCell>
+              <DashboardCell>{formatReferrerLabel(row.topReferrer)}</DashboardCell>
+              <DashboardCell>{formatDeviceRatio(row)}</DashboardCell>
+              <DashboardCell>{row.browserOsSummary}</DashboardCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function formatTrafficVehicleTitle({
-  carNumber,
-  manufacturer,
-  model,
+function DashboardViewsTable({
+  filter,
+  onChangeFilter,
+  rows,
 }: {
-  carNumber: string | null;
-  manufacturer: string | null;
-  model: string | null;
+  filter: DashboardViewFilter;
+  onChangeFilter: (filter: DashboardViewFilter) => void;
+  rows: AdminDashboardViewRanking[];
 }) {
-  const vehicleName = [manufacturer, model].filter(Boolean).join(" ");
+  return (
+    <div>
+      <div className="flex gap-2 overflow-x-auto border-b border-zinc-900 bg-black p-3">
+        {dashboardViewFilters.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            className={cn(
+              "shrink-0 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+              filter === item.value &&
+                "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+            )}
+            onClick={() => onChangeFilter(item.value)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {rows.length ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-[840px] divide-y divide-zinc-900 text-sm">
+            <thead className="bg-black">
+              <tr>
+                <DashboardHeadCell>순위</DashboardHeadCell>
+                <DashboardHeadCell>
+                  {filter === "vehicle"
+                    ? "차량번호"
+                    : filter === "model"
+                      ? "모델명"
+                      : "후기"}
+                </DashboardHeadCell>
+                <DashboardHeadCell>모델명</DashboardHeadCell>
+                <DashboardHeadCell>조회수</DashboardHeadCell>
+                <DashboardHeadCell>최근 조회일</DashboardHeadCell>
+                <DashboardHeadCell align="right">상세보기</DashboardHeadCell>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+              {rows.map((row) => (
+                <tr key={row.type + row.targetId + row.rank}>
+                  <DashboardCell strong>{row.rank}</DashboardCell>
+                  <DashboardCell strong>{row.title}</DashboardCell>
+                  <DashboardCell>{row.modelName}</DashboardCell>
+                  <DashboardCell>{row.viewCount.toLocaleString()}</DashboardCell>
+                  <DashboardCell>{formatOptionalDate(row.recentViewedAt)}</DashboardCell>
+                  <DashboardCell align="right">
+                    {row.href ? (
+                      <Link className={actionButtonClassName} href={row.href}>
+                        상세보기
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-zinc-600">-</span>
+                    )}
+                  </DashboardCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <DashboardEmptyState message="조회수 기록이 없습니다." />
+      )}
+    </div>
+  );
+}
 
-  if (vehicleName && carNumber) {
-    return vehicleName + " · " + carNumber;
+function DashboardContentTable({
+  posts,
+  reports,
+  reviews,
+  stats,
+}: {
+  posts: AdminCommunityPost[];
+  reports: AdminReport[];
+  reviews: AdminReview[];
+  stats: AdminStats;
+}) {
+  const rows = [
+    {
+      label: "게시글 수",
+      value: stats.communityPosts.toLocaleString(),
+      detail: posts[0]?.title ?? "최근 게시글 없음",
+    },
+    {
+      label: "후기 수",
+      value: stats.reviews.toLocaleString(),
+      detail: reviews[0]?.content ?? "최근 후기 없음",
+    },
+    {
+      label: "댓글 수",
+      value: stats.comments.toLocaleString(),
+      detail: "커뮤니티 댓글 전체",
+    },
+    {
+      label: "신고 수",
+      value: stats.reports.toLocaleString(),
+      detail: reports[0]?.target_title ?? reports[0]?.target_content ?? "신고 없음",
+    },
+  ];
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-[760px] divide-y divide-zinc-900 text-sm">
+        <thead className="bg-black">
+          <tr>
+            <DashboardHeadCell>항목</DashboardHeadCell>
+            <DashboardHeadCell>건수</DashboardHeadCell>
+            <DashboardHeadCell>관리자가 볼 내용</DashboardHeadCell>
+            <DashboardHeadCell>최근 등록/발생</DashboardHeadCell>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <DashboardCell strong>{row.label}</DashboardCell>
+              <DashboardCell>{row.value}</DashboardCell>
+              <DashboardCell>{row.detail}</DashboardCell>
+              <DashboardCell>
+                {row.label === "게시글 수"
+                  ? formatOptionalDate(posts[0]?.created_at)
+                  : row.label === "후기 수"
+                    ? formatOptionalDate(reviews[0]?.created_at)
+                    : row.label === "신고 수"
+                      ? formatOptionalDate(reports[0]?.created_at)
+                      : "-"}
+              </DashboardCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="grid gap-0 border-t border-zinc-900 md:grid-cols-2">
+        <DashboardRecentList
+          emptyMessage="최근 후기가 없습니다."
+          items={reviews.map((review) => ({
+            id: review.id,
+            meta: [review.author_nickname, formatReviewVehicleSummary(review)]
+              .filter(Boolean)
+              .join(" · "),
+            title: review.content,
+          }))}
+          title="최근 등록된 후기"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 게시글이 없습니다."
+          items={posts.map((post) => ({
+            id: post.id,
+            meta: [
+              getCommunityCategoryLabel(post.category),
+              post.author_nickname,
+              formatOptionalDate(post.created_at),
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            title: post.title,
+          }))}
+          title="최근 등록된 게시글"
+        />
+      </div>
+    </div>
+  );
+}
+
+function DashboardKeywordTable({
+  rows,
+}: {
+  rows: AdminDashboardKeywordRow[];
+}) {
+  if (!rows.length) {
+    return (
+      <DashboardEmptyState message="10회 이상 언급된 유입/후기 키워드가 없습니다." />
+    );
   }
 
-  return vehicleName || carNumber || "차량 정보 없음";
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-[900px] divide-y divide-zinc-900 text-sm">
+        <thead className="bg-black">
+          <tr>
+            <DashboardHeadCell>키워드명</DashboardHeadCell>
+            <DashboardHeadCell>언급 횟수</DashboardHeadCell>
+            <DashboardHeadCell>관련 차량/모델</DashboardHeadCell>
+            <DashboardHeadCell>최근 발생일</DashboardHeadCell>
+            <DashboardHeadCell>AI 데이터 반영 여부</DashboardHeadCell>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+          {rows.map((row) => (
+            <tr key={row.keyword}>
+              <DashboardCell strong>{row.keyword}</DashboardCell>
+              <DashboardCell>{row.mentionCount.toLocaleString()}회</DashboardCell>
+              <DashboardCell>{formatModelList(row.relatedModels)}</DashboardCell>
+              <DashboardCell>{formatOptionalDate(row.recentOccurredAt)}</DashboardCell>
+              <DashboardCell>
+                <AiStatusBadge status={row.aiStatus} />
+              </DashboardCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
-function formatTrafficVehicleModel(item: AdminTrafficTopVehicle) {
-  return item.model_detail ?? item.generation ?? item.model ?? "차종 정보 없음";
-}
-
-function formatTrafficVehicleMeta(item: AdminTrafficTopVehicle) {
-  return [
-    item.year ? item.year + "년형" : "",
-    item.fuel_type,
-    formatMileage(item.mileage),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function formatMileage(value: string | null) {
-  if (!value) {
-    return "";
+function DashboardAiCandidateTable({
+  candidates,
+  onChangeStatus,
+}: {
+  candidates: AdminDashboardAiCandidate[];
+  onChangeStatus: (
+    candidate: AdminDashboardAiCandidate,
+    nextStatus: AiCandidateStatus,
+  ) => void;
+}) {
+  if (!candidates.length) {
+    return <DashboardEmptyState message="AI 반영 후보가 없습니다." />;
   }
 
-  const numericValue = Number(value.replace(/[^0-9]/g, ""));
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-[1040px] divide-y divide-zinc-900 text-sm">
+        <thead className="bg-black">
+          <tr>
+            <DashboardHeadCell>후보 키워드</DashboardHeadCell>
+            <DashboardHeadCell>언급 횟수</DashboardHeadCell>
+            <DashboardHeadCell>관련 모델</DashboardHeadCell>
+            <DashboardHeadCell>추천 사유</DashboardHeadCell>
+            <DashboardHeadCell>상태값</DashboardHeadCell>
+            <DashboardHeadCell align="right">상태 변경</DashboardHeadCell>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+          {candidates.map((candidate) => (
+            <tr key={candidate.candidateKey}>
+              <DashboardCell strong>{candidate.keyword}</DashboardCell>
+              <DashboardCell>{candidate.mentionCount.toLocaleString()}회</DashboardCell>
+              <DashboardCell>{formatModelList(candidate.relatedModels)}</DashboardCell>
+              <DashboardCell>{candidate.reason}</DashboardCell>
+              <DashboardCell>
+                <AiStatusBadge status={candidate.status} />
+              </DashboardCell>
+              <DashboardCell align="right">
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {aiCandidateStatuses.map((status) => (
+                    <button
+                      key={status.value}
+                      type="button"
+                      className={cn(
+                        actionButtonClassName,
+                        "min-h-8 px-2 text-[11px]",
+                        candidate.status === status.value &&
+                          "border-red-500 bg-red-500/20 text-red-100",
+                      )}
+                      disabled={candidate.status === status.value}
+                      onClick={() => onChangeStatus(candidate, status.value)}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
+              </DashboardCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-  if (Number.isFinite(numericValue) && numericValue > 0) {
-    return numericValue.toLocaleString() + "km";
+function DashboardRecentList({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: { id: string; meta: string; title: string }[];
+  title: string;
+}) {
+  return (
+    <section className="border-zinc-900 p-4 md:border-r md:last:border-r-0">
+      <h3 className="text-sm font-black text-white">{title}</h3>
+      {items.length ? (
+        <ul className="mt-3 space-y-2">
+          {items.slice(0, 5).map((item) => (
+            <li key={item.id} className="rounded-lg border border-zinc-900 bg-black p-3">
+              <p className="line-clamp-1 text-sm font-bold text-zinc-100">
+                {item.title}
+              </p>
+              <p className="mt-1 line-clamp-1 text-xs text-zinc-500">
+                {item.meta}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-3")}>{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function DashboardHeadCell({
+  align = "left",
+  children,
+}: {
+  align?: "left" | "right";
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className={cn(
+        "whitespace-nowrap px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-500",
+        align === "right" && "text-right",
+      )}
+    >
+      {children}
+    </th>
+  );
+}
+
+function DashboardCell({
+  align = "left",
+  children,
+  strong = false,
+}: {
+  align?: "left" | "right";
+  children: React.ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <td
+      className={cn(
+        "max-w-[24rem] px-3 py-3 align-middle text-zinc-300",
+        align === "right" && "text-right",
+        strong && "font-black text-white",
+      )}
+    >
+      <span className="line-clamp-2 break-words">{children}</span>
+    </td>
+  );
+}
+
+function DashboardEmptyState({ message }: { message: string }) {
+  return <p className={cn(mutedTextClassName, "bg-zinc-950 p-4")}>{message}</p>;
+}
+
+function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
+  const label = aiCandidateStatuses.find((item) => item.value === status)?.label;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-h-7 items-center justify-center rounded-full border px-2.5 text-xs font-black",
+        status === "applied"
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+          : status === "reviewing"
+            ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+            : status === "excluded"
+              ? "border-zinc-600 bg-zinc-900 text-zinc-400"
+              : "border-red-500/40 bg-red-500/10 text-red-100",
+      )}
+    >
+      {label ?? "대기"}
+    </span>
+  );
+}
+
+function formatReferrerLabel(value: string) {
+  if (!value || value === "direct") {
+    return "직접 유입";
   }
 
   return value;
 }
 
-function formatTrafficModelName(item: AdminTrafficTopModel) {
-  const modelName = item.model_name?.trim();
-  const manufacturer = item.manufacturer?.trim();
+function formatDeviceRatio(row: AdminDashboardTrafficRow) {
+  const total = row.pcVisitors + row.mobileVisitors;
 
-  if (!modelName && !manufacturer) {
-    return "모델 정보 없음";
+  if (total <= 0) {
+    return "기록 없음";
   }
 
-  if (!manufacturer || !modelName) {
-    return modelName || manufacturer || "모델 정보 없음";
+  const pcRatio = Math.round((row.pcVisitors / total) * 100);
+  const mobileRatio = Math.round((row.mobileVisitors / total) * 100);
+
+  return `PC ${pcRatio}% · 모바일 ${mobileRatio}%`;
+}
+
+function formatModelList(models: string[]) {
+  const visibleModels = models.filter(Boolean).slice(0, 3);
+
+  if (!visibleModels.length) {
+    return "관련 모델 없음";
   }
 
-  if (modelName.toLowerCase().includes(manufacturer.toLowerCase())) {
-    return modelName;
-  }
-
-  return manufacturer + " " + modelName;
+  return visibleModels.join(", ") + (models.length > 3 ? " 외" : "");
 }
-
-function TrafficBreakdownPanel({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: AdminTrafficBreakdownItem[];
-  title: string;
-}) {
-  const visibleItems = items.filter((item) => item.visitor_count > 0);
-
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      {visibleItems.length ? (
-        <div className="mt-4 space-y-3">
-          {visibleItems.map((item) => (
-            <div key={item.label}>
-              <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                <span className="truncate font-bold text-zinc-200">
-                  {item.label}
-                </span>
-                <span className="shrink-0 font-black text-zinc-100">
-                  {item.visitor_count.toLocaleString()}
-                  {item.percentage !== undefined
-                    ? ` · ${item.percentage.toFixed(1)}%`
-                    : ""}
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div
-                  className="h-full rounded-full bg-red-500"
-                  style={{
-                    width:
-                      Math.max(2, Math.min(item.percentage ?? 0, 100)) + "%",
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
-function TrafficTimePanel({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: AdminTrafficTimeItem[];
-  title: string;
-}) {
-  const maxValue = Math.max(1, ...items.map((item) => item.visitor_count));
-  const hasVisitors = items.some((item) => item.visitor_count > 0);
-
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      {hasVisitors ? (
-        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto pr-1">
-          {items.map((item) => (
-            <div
-              key={item.label}
-              className="grid grid-cols-[5.5rem_1fr_3rem] items-center gap-2 text-xs"
-            >
-              <span className="truncate font-bold text-zinc-500">
-                {item.label}
-              </span>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div
-                  className="h-full rounded-full bg-red-500"
-                  style={{
-                    width:
-                      Math.max(2, (item.visitor_count / maxValue) * 100) + "%",
-                  }}
-                />
-              </div>
-              <span className="text-right font-black text-zinc-100">
-                {item.visitor_count.toLocaleString()}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
-function TrafficVehicleRankingPanel({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: AdminTrafficTopVehicle[];
-  title: string;
-}) {
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      {items.length ? (
-        <ol className="mt-4 space-y-2">
-          {items.map((item, index) => (
-            <li
-              key={item.vehicle_id || index}
-              className="grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-lg border border-zinc-800 bg-black p-3"
-            >
-              <span className="pt-0.5 text-sm font-black text-red-400">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-black text-white">
-                  {item.car_number ?? "차량번호 없음"}
-                </span>
-                <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
-                  {formatTrafficVehicleModel(item)}
-                </span>
-                {formatTrafficVehicleMeta(item) ? (
-                  <span className="mt-1 block truncate text-xs text-zinc-500">
-                    {formatTrafficVehicleMeta(item)}
-                  </span>
-                ) : null}
-              </span>
-              <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
-                조회수 {item.view_count.toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
-function TrafficModelRankingPanel({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: AdminTrafficTopModel[];
-  title: string;
-}) {
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      {items.length ? (
-        <ol className="mt-4 space-y-2">
-          {items.map((item, index) => (
-            <li
-              key={(item.manufacturer ?? "") + (item.model_name ?? "") + index}
-              className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg border border-zinc-800 bg-black p-3"
-            >
-              <span className="text-sm font-black text-red-400">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-white">
-                  {formatTrafficModelName(item)}
-                </span>
-              </span>
-              <span className="text-right text-sm font-black text-zinc-100">
-                조회수 {item.view_count.toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
-function TrafficRankingPanel({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: { id: string; meta: string; title: string; viewCount: number }[];
-  title: string;
-}) {
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      {items.length ? (
-        <ol className="mt-4 space-y-2">
-          {items.map((item, index) => (
-            <li
-              key={item.id || index}
-              className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 rounded-lg border border-zinc-800 bg-black p-3"
-            >
-              <span className="text-sm font-black text-red-400">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-white">
-                  {item.title}
-                </span>
-                {item.meta ? (
-                  <span className="mt-1 block truncate text-xs text-zinc-500">
-                    {item.meta}
-                  </span>
-                ) : null}
-              </span>
-              <span className="text-sm font-black text-zinc-100">
-                조회 {item.viewCount.toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-4")}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
 function AdminTablePanel({
   children,
   count,
@@ -2674,7 +3305,7 @@ function AdminTablePanel({
         <h2 className="text-lg font-black text-white">{title}</h2>
         <p className="text-xs text-zinc-500">{count.toLocaleString()}건 표시</p>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-zinc-900">
+      <div className="overflow-hidden rounded-lg border border-zinc-900 md:overflow-x-auto">
         {children}
       </div>
     </section>
@@ -2739,6 +3370,257 @@ function BulkActionBar({
   );
 }
 
+function MobileActionDetails({ children }: { children: React.ReactNode }) {
+  return (
+    <details className="relative">
+      <summary
+        className={cn(
+          actionButtonClassName,
+          "min-h-8 cursor-pointer list-none px-2.5 text-[11px] [&::-webkit-details-marker]:hidden",
+        )}
+      >
+        관리
+      </summary>
+      <div className="absolute right-0 z-20 mt-2 flex w-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-xl shadow-black/40">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function PostActionButtons({
+  isSuperAdmin,
+  onDelete,
+  onUpdateState,
+  post,
+}: {
+  isSuperAdmin: boolean;
+  onDelete: (post: AdminCommunityPost) => void;
+  onUpdateState: (
+    post: AdminCommunityPost,
+    state: {
+      next_is_hidden?: boolean;
+      next_is_notice?: boolean;
+      next_is_pinned?: boolean;
+    },
+  ) => void;
+  post: AdminCommunityPost;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() =>
+          onUpdateState(post, {
+            next_is_hidden: !post.is_hidden,
+          })
+        }
+      >
+        {post.is_hidden ? "숨김해제" : "숨김"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() =>
+          onUpdateState(post, {
+            next_is_notice: !post.is_notice,
+          })
+        }
+      >
+        {post.is_notice ? "공지해제" : "공지지정"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() =>
+          onUpdateState(post, {
+            next_is_pinned: !post.is_pinned,
+          })
+        }
+      >
+        {post.is_pinned ? "고정해제" : "상단고정"}
+      </button>
+      {isSuperAdmin ? (
+        <button
+          type="button"
+          className={dangerButtonClassName}
+          onClick={() => onDelete(post)}
+        >
+          영구삭제
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+function ReviewActionButtons({
+  isSuperAdmin,
+  onDelete,
+  onToggleHidden,
+  review,
+}: {
+  isSuperAdmin: boolean;
+  onDelete: (review: AdminReview) => void;
+  onToggleHidden: (review: AdminReview) => void;
+  review: AdminReview;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onToggleHidden(review)}
+      >
+        {review.is_hidden ? "숨김해제" : "숨김"}
+      </button>
+      {isSuperAdmin ? (
+        <button
+          type="button"
+          className={dangerButtonClassName}
+          onClick={() => onDelete(review)}
+        >
+          영구삭제
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+function UserActionButtons({
+  account,
+  isSuperAdmin,
+  isVerifiedDealerFeatureReady,
+  onGrantNicknameChangeTicket,
+  onSetRole,
+  onSetSuspended,
+  onSetVerifiedDealer,
+}: {
+  account: AdminUserProfile;
+  isSuperAdmin: boolean;
+  isVerifiedDealerFeatureReady: boolean;
+  onGrantNicknameChangeTicket: (account: AdminUserProfile) => void;
+  onSetRole: (account: AdminUserProfile, nextRole: "user" | "admin") => void;
+  onSetSuspended: (account: AdminUserProfile) => void;
+  onSetVerifiedDealer: (account: AdminUserProfile) => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        disabled={account.role === "super_admin"}
+        onClick={() => onSetSuspended(account)}
+      >
+        {account.is_suspended ? "정지해제" : "정지"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        disabled={!isVerifiedDealerFeatureReady}
+        onClick={() => onSetVerifiedDealer(account)}
+        title={
+          isVerifiedDealerFeatureReady
+            ? undefined
+            : "인증딜러 기능 DB 미적용"
+        }
+      >
+        {account.is_verified_dealer ? "인증딜러 회수" : "인증딜러 부여"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onGrantNicknameChangeTicket(account)}
+      >
+        닉네임 변경권 +1
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        disabled={!isSuperAdmin || account.role !== "user"}
+        onClick={() => onSetRole(account, "admin")}
+      >
+        관리자 부여
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        disabled={!isSuperAdmin || account.role !== "admin"}
+        onClick={() => onSetRole(account, "user")}
+      >
+        관리자 회수
+      </button>
+    </>
+  );
+}
+
+function NoticeActionButtons({
+  notice,
+  onDelete,
+  onEdit,
+}: {
+  notice: AdminCommunityPost;
+  onDelete: (notice: AdminCommunityPost) => void;
+  onEdit: (notice: AdminCommunityPost) => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onEdit(notice)}
+      >
+        수정
+      </button>
+      <button
+        type="button"
+        className={dangerButtonClassName}
+        onClick={() => onDelete(notice)}
+      >
+        삭제
+      </button>
+    </>
+  );
+}
+
+function PopupNoticeActionButtons({
+  notice,
+  onDelete,
+  onEdit,
+  onToggle,
+}: {
+  notice: AdminPopupNotice;
+  onDelete: (notice: AdminPopupNotice) => void;
+  onEdit: (notice: AdminPopupNotice) => void;
+  onToggle: (notice: AdminPopupNotice) => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onToggle(notice)}
+      >
+        {notice.is_active ? "비활성" : "활성"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onEdit(notice)}
+      >
+        수정
+      </button>
+      <button
+        type="button"
+        className={dangerButtonClassName}
+        onClick={() => onDelete(notice)}
+      >
+        삭제
+      </button>
+    </>
+  );
+}
+
 function SelectionCheckbox({
   checked,
   disabled = false,
@@ -2779,6 +3661,10 @@ function EmptyTableRow({
       </td>
     </tr>
   );
+}
+
+function EmptyMobileState({ message }: { message: string }) {
+  return <p className="px-3 py-8 text-center text-sm text-zinc-500">{message}</p>;
 }
 
 function PostStatusBadges({ post }: { post: AdminCommunityPost }) {

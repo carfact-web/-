@@ -641,6 +641,26 @@ export interface Database {
           daily_visitors: Json;
         }[];
       };
+      admin_get_operator_dashboard_data: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          total_views: number;
+          traffic_rows: Json;
+          view_rankings: Json;
+          keyword_rows: Json;
+          ai_candidates: Json;
+        }[];
+      };
+      admin_set_ai_candidate_status: {
+        Args: {
+          candidate_key: string;
+          candidate_keyword: string;
+          candidate_source: string;
+          related_models?: string[];
+          next_status?: string;
+        };
+        Returns: Json;
+      };
       public_get_home_traffic_rankings: {
         Args: Record<PropertyKey, never>;
         Returns: {
