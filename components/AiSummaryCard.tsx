@@ -24,7 +24,7 @@ const sectionTitleClassName = cn(
   "mb-2 text-[13px] font-black tracking-[-0.01em] text-zinc-100",
 );
 const oneLineClassName = cn(
-  "line-clamp-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-[15px] font-bold leading-[1.55] text-red-50 sm:text-base",
+  "rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-[15px] font-bold leading-[1.55] text-red-50 sm:text-base",
 );
 const compactListClassName = cn("grid grid-cols-1 gap-1.5 sm:grid-cols-2");
 const compactItemClassName = cn(

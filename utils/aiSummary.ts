@@ -64,6 +64,14 @@ export interface AiSummaryMaintenanceIssue {
   additionalDescription: string;
 }
 
+interface MaintenanceIssueCategory {
+  key: string;
+  title: string;
+  description: string;
+  causes: string[];
+  pattern: RegExp;
+}
+
 export interface StructuredAiSummary {
   vehicle: AiSummaryVehicleSource;
   oneLineReview: string;
@@ -143,38 +151,38 @@ const getOneLineReview = (
   const vehicleAge = getVehicleAge(vehicle.year ?? "");
 
   if (topKeyword && hasMileage && mileageNumber >= 120000) {
-    return "주행거리가 있는 편이라면 " + topKeyword + " 점검 여부가 차량 상태를 가르는 핵심일 수 있습니다.";
+    return topKeyword + " 관리 여부가 이 차량의 컨디션을 가장 크게 좌우하는 포인트입니다.";
   }
 
   if (topKeyword && hasMileage && mileageNumber >= 80000) {
-    return "8만km를 넘긴 차량은 " + topKeyword + " 언급과 실제 정비 이력을 같이 보는 게 좋습니다.";
+    return topKeyword + " 이력이 있느냐에 따라 체감 상태가 크게 갈리는 차량입니다.";
   }
 
   if (topKeyword) {
-    return "후기에서 " + topKeyword + " 이야기가 많아, 이 부분만 먼저 확인해도 판단이 빨라집니다.";
+    return topKeyword + " 언급이 많은 만큼, 이 부분이 이 차량을 보는 첫 기준입니다.";
   }
 
   if (hasMileage && mileageNumber >= 120000) {
-    return "10만km 이상이라면 소모품보다 누적 정비 이력이 차량 상태를 더 잘 보여줍니다.";
+    return "누적 정비 이력이 차량 컨디션을 가장 크게 좌우하는 구간입니다.";
   }
 
   if (vehicle.fuelType === "전기") {
-    return "전기차는 배터리 상태와 충전 이력만 먼저 봐도 구매 판단이 훨씬 쉬워집니다.";
+    return "배터리 상태와 충전 이력이 차량 가치를 좌우하는 전기차입니다.";
   }
 
   if (vehicle.fuelType === "디젤") {
-    return "디젤 차량은 DPF와 인젝터 관리 이력을 먼저 확인하는 게 좋습니다.";
+    return "DPF와 인젝터 관리 이력이 컨디션을 좌우하는 디젤 차량입니다.";
   }
 
   if (vehicleAge !== null && vehicleAge >= 8) {
-    return "연식이 있는 차량은 주행거리보다 누유와 하체 상태가 더 중요할 때가 많습니다.";
+    return "연식보다 누유와 하체 관리 상태가 더 크게 보이는 차량입니다.";
   }
 
   if (hasMileage && mileageNumber < 50000) {
-    return "주행거리는 낮은 편이지만 사고 이력과 기본 소모품 상태는 꼭 따로 보세요.";
+    return "낮은 주행거리보다 사고 이력과 기본 관리 상태가 더 중요한 차량입니다.";
   }
 
-  return getVehicleTitle(vehicle) + "은 연식, 주행거리, 정비 이력을 함께 보면 핵심이 빠르게 보입니다.";
+  return getVehicleTitle(vehicle) + "은 정비 이력의 균형이 전체 인상을 결정하는 차량입니다.";
 };
 
 const getPreDeliveryChecks = (
@@ -216,55 +224,110 @@ const getPreDeliveryChecks = (
   return checkPoints.slice(0, MAX_PRE_DELIVERY_CHECK_COUNT);
 };
 
-const getMaintenanceIssueDescription = (title: string, mileage: string) => {
+const maintenanceIssueCategories: MaintenanceIssueCategory[] = [
+  {
+    key: "cooling",
+    title: "냉각계통 점검",
+    description: "냉각수 감소와 과열 이력 확인",
+    causes: ["냉각계통 노후", "가스켓 또는 하우징 열화"],
+    pattern: /냉각|서모스탯|워터펌프/,
+  },
+  {
+    key: "ignition",
+    title: "점화계통 점검",
+    description: "시동, 공회전, 가속 떨림 확인",
+    causes: ["점화 플러그/코일 노후", "실화 코드 또는 커넥터 문제"],
+    pattern: /점화코일|점화플러그|점화/,
+  },
+  {
+    key: "suspension",
+    title: "하체 소음 점검",
+    description: "요철 주행 소음과 유격 확인",
+    causes: ["고무 부싱 마모", "하체 부품 유격"],
+    pattern: /하체|부싱|로어암|스태빌|활대|링크|베어링|쇼크|등속/,
+  },
+  {
+    key: "transmission",
+    title: "미션변속 점검",
+    description: "시운전에서 변속 충격 확인",
+    causes: ["변속기 오일 관리 부족", "밸브바디 또는 마운트 노후"],
+    pattern: /변속|미션|DCT|DSG|CVT|PDK/,
+  },
+  {
+    key: "turbo",
+    title: "터보계통 점검",
+    description: "가속 시 출력과 터보 소음 확인",
+    causes: ["터보차저 노후", "흡기 라인 누설"],
+    pattern: /터보|부스트|웨이스트게이트/,
+  },
+  {
+    key: "electrical",
+    title: "전장/배터리 점검",
+    description: "경고등과 실내 전장 작동 확인",
+    causes: ["배터리 전압 저하", "커넥터 또는 모듈 오류"],
+    pattern: /배터리|전장|디스플레이|BCM|모니터|헤드유닛/,
+  },
+  {
+    key: "engine",
+    title: "엔진 상태 점검",
+    description: "누유, 떨림, 출력 저하 확인",
+    causes: ["엔진오일 관리 부족", "흡배기 또는 연소계통 노후"],
+    pattern: /엔진|누유|오일|실화|인젝터|EGR|DPF/,
+  },
+];
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
+
+const getMaintenanceIssueCategory = (title: string): MaintenanceIssueCategory =>
+  maintenanceIssueCategories.find((category) => category.pattern.test(title)) ?? {
+    key: title,
+    title,
+    description: "현장 점검 때 확인",
+    causes: ["연식과 주행거리 누적", "소모품 교체 주기 지연"],
+    pattern: new RegExp(escapeRegExp(title)),
+  };
+
+const getMaintenanceIssueDescription = (
+  category: MaintenanceIssueCategory,
+  mileage: string,
+) => {
   const mileageNumber = Number(mileage);
   const isHighMileage = Number.isFinite(mileageNumber) && mileageNumber >= 100000;
 
-  if (/냉각|서모스탯|워터펌프/.test(title)) {
-    return isHighMileage ? "10만km 이상이면 먼저 확인" : "냉각수 감소 흔적 확인";
+  if (category.key === "cooling" && isHighMileage) {
+    return "10만km 이상이면 먼저 확인";
   }
 
-  if (/변속|미션/.test(title)) {
-    return "시운전에서 변속 충격 확인";
-  }
-
-  if (/하체|부싱|링크|베어링/.test(title)) {
-    return "요철 주행 소음 확인";
-  }
-
-  if (/점화|엔진|터보/.test(title)) {
-    return "가속과 공회전 상태 확인";
-  }
-
-  if (/배터리|전장|디스플레이|BCM/.test(title)) {
-    return "경고등과 전장 작동 확인";
-  }
-
-  return isHighMileage ? "주행거리 누적 차량 우선 확인" : "현장 점검 때 확인";
+  return category.description;
 };
 
-const getMaintenanceIssueCauses = (title: string) => {
-  if (/냉각|서모스탯|워터펌프/.test(title)) {
-    return ["냉각계통 노후", "가스켓 또는 하우징 열화"];
+const addUniqueValues = (target: string[], values: string[]) => {
+  values.forEach((value) => {
+    if (!target.includes(value)) {
+      target.push(value);
+    }
+  });
+};
+
+const getMergedRepairCost = (costs: string[]) => {
+  const values = costs.flatMap((cost) =>
+    Array.from(cost.matchAll(/(\d+)\s*만/g)).map((match) => Number(match[1])),
+  );
+
+  if (values.length === 0) {
+    return costs[0] ?? "현장 확인";
   }
 
-  if (/변속|미션/.test(title)) {
-    return ["변속기 오일 관리 부족", "밸브바디 또는 마운트 노후"];
-  }
+  return Math.min(...values) + "만~" + Math.max(...values) + "만원";
+};
 
-  if (/하체|부싱|링크|베어링/.test(title)) {
-    return ["고무 부싱 마모", "하체 부품 유격"];
-  }
+const getMaintenanceIssueCategoryOrder = (key: string) => {
+  const index = maintenanceIssueCategories.findIndex(
+    (category) => category.key === key,
+  );
 
-  if (/점화|엔진|터보/.test(title)) {
-    return ["점화계통 노후", "흡배기 또는 터보 계통 관리 부족"];
-  }
-
-  if (/배터리|전장|디스플레이|BCM/.test(title)) {
-    return ["배터리 전압 저하", "커넥터 또는 모듈 오류"];
-  }
-
-  return ["연식과 주행거리 누적", "소모품 교체 주기 지연"];
+  return index === -1 ? maintenanceIssueCategories.length : index;
 };
 
 const getMaintenanceIssues = (
@@ -279,19 +342,50 @@ const getMaintenanceIssues = (
     options.generation,
   );
 
-  return (
-    inspectionProfile?.checkItems
-      .slice(0, MAX_MAINTENANCE_ISSUE_COUNT)
-      .map((item) => ({
-        title: item.title,
-        description: getMaintenanceIssueDescription(item.title, mileage),
-        estimatedRepairCost: item.estimatedRepairCost,
-        symptoms: item.symptoms,
-        causes: getMaintenanceIssueCauses(item.title),
-        replacementParts: item.relatedParts,
-        additionalDescription: item.aiSummary,
-      })) ?? []
-  );
+  const groupedIssues = new Map<
+    string,
+    {
+      category: MaintenanceIssueCategory;
+      symptoms: string[];
+      replacementParts: string[];
+      descriptions: string[];
+      repairCosts: string[];
+    }
+  >();
+
+  inspectionProfile?.checkItems.forEach((item) => {
+    const category = getMaintenanceIssueCategory(item.title);
+    const group = groupedIssues.get(category.key) ?? {
+      category,
+      symptoms: [],
+      replacementParts: [],
+      descriptions: [],
+      repairCosts: [],
+    };
+
+    addUniqueValues(group.symptoms, item.symptoms);
+    addUniqueValues(group.replacementParts, item.relatedParts);
+    addUniqueValues(group.descriptions, [item.aiSummary]);
+    addUniqueValues(group.repairCosts, [item.estimatedRepairCost]);
+    groupedIssues.set(category.key, group);
+  });
+
+  return Array.from(groupedIssues.values())
+    .sort(
+      (left, right) =>
+        getMaintenanceIssueCategoryOrder(left.category.key) -
+        getMaintenanceIssueCategoryOrder(right.category.key),
+    )
+    .slice(0, MAX_MAINTENANCE_ISSUE_COUNT)
+    .map((group) => ({
+      title: group.category.title,
+      description: getMaintenanceIssueDescription(group.category, mileage),
+      estimatedRepairCost: getMergedRepairCost(group.repairCosts),
+      symptoms: group.symptoms.slice(0, 4),
+      causes: group.category.causes,
+      replacementParts: group.replacementParts.slice(0, 6),
+      additionalDescription: group.descriptions[0] ?? group.category.description,
+    }));
 };
 
 const matchesModel = (rule: ModelIssueRule | EvCheckRule, model: string) => {
