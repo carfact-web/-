@@ -188,7 +188,7 @@ export function AiSummaryCard({
                     {issue.replacementParts.join(", ")}
                   </p>
                   <p>
-                    <span className="font-bold text-zinc-200">추가 설명</span>{" "}
+                    <span className="font-bold text-zinc-200">추가 참고</span>{" "}
                     {issue.additionalDescription}
                   </p>
                 </div>

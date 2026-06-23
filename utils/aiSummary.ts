@@ -128,7 +128,7 @@ const getVehicleTitle = (vehicle: AiSummaryVehicleSource) =>
   ]
     .filter(Boolean)
     .join(" ")
-    .trim() || "이 차량";
+    .trim() || "이 차";
 
 const getVehicleAge = (year: string) => {
   const yearNumber = Number(year);
@@ -138,6 +138,38 @@ const getVehicleAge = (year: string) => {
   }
 
   return new Date().getFullYear() - yearNumber;
+};
+
+const getKeywordOneLineReview = (keyword: string) => {
+  if (/냉각|워터펌프|서모스탯/.test(keyword)) {
+    return "냉각계통 관리 이력만 봐도 이 차의 컨디션을 어느 정도 짐작할 수 있습니다. 냉각수 보충이나 워터펌프 수리 이력을 한번 봐주세요.";
+  }
+
+  if (/미션|변속|DCT|클러치|울컥/.test(keyword)) {
+    return "저속에서 울컥거린다면 미션이 보내는 신호일 수도 있습니다. 시험주행에서 변속감을 꼭 느껴보세요.";
+  }
+
+  if (/하체|부싱|로어암|소음|베어링/.test(keyword)) {
+    return "하체 소음은 작은 잡소리처럼 보여도 관리 상태를 꽤 솔직하게 보여줍니다. 요철 구간에서 소리를 한번 들어보세요.";
+  }
+
+  if (/점화|엔진 떨림|실화|공회전/.test(keyword)) {
+    return "시동과 공회전이 매끄러운지만 봐도 엔진 컨디션이 어느 정도 드러납니다. 점화계통 정비 이력이 있으면 더 안심입니다.";
+  }
+
+  if (/터보|부스트/.test(keyword)) {
+    return "터보차는 가속할 때 힘이 자연스럽게 붙는지가 핵심입니다. 출력 저하나 휘파람 소리는 그냥 넘기지 마세요.";
+  }
+
+  if (/누유|오일/.test(keyword)) {
+    return "누유 흔적은 이 차가 어떻게 관리됐는지 보여주는 빠른 단서입니다. 리프트 점검에서 하부를 꼭 봐주세요.";
+  }
+
+  if (/배터리|전장|방전/.test(keyword)) {
+    return "전장과 배터리는 멀쩡할 땐 티가 안 나도 한번 꼬이면 꽤 번거롭습니다. 경고등과 시동 전압을 먼저 봐주세요.";
+  }
+
+  return keyword + " 이야기가 많이 나오는 차입니다. 그 부분부터 보면 판단이 훨씬 빨라집니다.";
 };
 
 const getOneLineReview = (
@@ -150,39 +182,35 @@ const getOneLineReview = (
   const topKeyword = reviewKeywords[0]?.label;
   const vehicleAge = getVehicleAge(vehicle.year ?? "");
 
-  if (topKeyword && hasMileage && mileageNumber >= 120000) {
-    return topKeyword + " 관리 여부가 이 차량의 컨디션을 가장 크게 좌우하는 포인트입니다.";
-  }
-
-  if (topKeyword && hasMileage && mileageNumber >= 80000) {
-    return topKeyword + " 이력이 있느냐에 따라 체감 상태가 크게 갈리는 차량입니다.";
-  }
-
   if (topKeyword) {
-    return topKeyword + " 언급이 많은 만큼, 이 부분이 이 차량을 보는 첫 기준입니다.";
+    return getKeywordOneLineReview(topKeyword);
   }
 
   if (hasMileage && mileageNumber >= 120000) {
-    return "누적 정비 이력이 차량 컨디션을 가장 크게 좌우하는 구간입니다.";
+    return "주행거리가 쌓인 차는 정비 이력이 곧 컨디션입니다. 기록이 깔끔하면 오히려 믿고 볼 만합니다.";
   }
 
   if (vehicle.fuelType === "전기") {
-    return "배터리 상태와 충전 이력이 차량 가치를 좌우하는 전기차입니다.";
+    return "전기차는 배터리 상태가 차값만큼 중요합니다. SOH와 충전 이력부터 먼저 봐주세요.";
   }
 
   if (vehicle.fuelType === "디젤") {
-    return "DPF와 인젝터 관리 이력이 컨디션을 좌우하는 디젤 차량입니다.";
+    return "DPF와 EGR 관리 상태가 유지비를 크게 좌우하는 차량입니다. 관련 정비 이력이 있으면 오히려 안심할 수 있습니다.";
   }
 
   if (vehicleAge !== null && vehicleAge >= 8) {
-    return "연식보다 누유와 하체 관리 상태가 더 크게 보이는 차량입니다.";
+    return "연식이 있는 차는 겉모습보다 하부와 누유 흔적이 더 많은 걸 말해줍니다. 리프트 점검은 꼭 챙겨보세요.";
   }
 
   if (hasMileage && mileageNumber < 50000) {
-    return "낮은 주행거리보다 사고 이력과 기본 관리 상태가 더 중요한 차량입니다.";
+    return "주행거리가 낮아도 무조건 안심할 차는 아닙니다. 사고 이력과 소모품 상태를 같이 봐주세요.";
   }
 
-  return getVehicleTitle(vehicle) + "은 정비 이력의 균형이 전체 인상을 결정하는 차량입니다.";
+  const vehicleTitle = getVehicleTitle(vehicle);
+
+  return vehicleTitle === "이 차"
+    ? "기본 관리 이력이 첫인상을 좌우하는 차입니다. 정비 기록이 깔끔하면 훨씬 편하게 볼 수 있습니다."
+    : vehicleTitle + "는 기본 관리 이력이 첫인상을 좌우하는 차입니다. 정비 기록이 깔끔하면 훨씬 편하게 볼 수 있습니다.";
 };
 
 const getPreDeliveryChecks = (
