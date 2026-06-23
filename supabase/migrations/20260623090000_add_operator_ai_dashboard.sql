@@ -163,7 +163,7 @@ begin
   vehicle_rankings as (
     select
       'vehicle'::text as ranking_type,
-      row_number() over (order by count(view.id) desc, max(view.created_at) desc, view.vehicle_id)::integer as rank,
+      row_number() over (order by count(view.id) desc, max(view.created_at) desc, vehicle.id)::integer as rank,
       vehicle.id::text as target_id,
       coalesce(nullif(vehicle.car_number, ''), '차량번호 없음') as title,
       coalesce(nullif(master.model_detail, ''), nullif(vehicle.generation, ''), nullif(vehicle.model, ''), '차종 정보 없음') as model_name,
@@ -191,18 +191,18 @@ begin
     where view.vehicle_id is not null
       and view.review_id is null
     group by vehicle.id, vehicle.car_number, vehicle.generation, vehicle.model, master.model_detail
-    order by count(view.id) desc, max(view.created_at) desc, view.vehicle_id
+    order by count(view.id) desc, max(view.created_at) desc, vehicle.id
     limit 10
   ),
   model_rankings as (
     select
       'model'::text as ranking_type,
-      row_number() over (order by count(view.id) desc, max(view.created_at) desc, model_label)::integer as rank,
+      row_number() over (order by count(id) desc, max(created_at) desc, model_label)::integer as rank,
       model_label as target_id,
       model_label as title,
       model_label as model_name,
-      count(view.id)::bigint as view_count,
-      max(view.created_at) as recent_viewed_at,
+      count(id)::bigint as view_count,
+      max(created_at) as recent_viewed_at,
       null::text as href
     from (
       select
@@ -234,9 +234,9 @@ begin
   review_rankings as (
     select
       'review'::text as ranking_type,
-      row_number() over (order by count(view.id) desc, max(view.created_at) desc, view.review_id)::integer as rank,
+      row_number() over (order by count(view.id) desc, max(view.created_at) desc, review.id)::integer as rank,
       review.id::text as target_id,
-      coalesce(nullif(review.title, ''), left(regexp_replace(review.content, '\\s+', ' ', 'g'), 40), '후기') as title,
+      coalesce(left(regexp_replace(review.content, '\\s+', ' ', 'g'), 40), '후기') as title,
       coalesce(
         nullif(review.vehicle_snapshot ->> 'model', ''),
         nullif(review.vehicle_snapshot ->> 'generation', ''),
@@ -252,7 +252,7 @@ begin
     join public.reviews as review on review.id = view.review_id
     where view.review_id is not null
     group by review.id
-    order by count(view.id) desc, max(view.created_at) desc, view.review_id
+    order by count(view.id) desc, max(view.created_at) desc, review.id
     limit 10
   ),
   review_keyword_source as (
