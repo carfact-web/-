@@ -117,7 +117,11 @@ const topRankingButtonClassName = cn(
   "hover:-translate-y-0.5 hover:border-[#FF4D4F]/35 hover:bg-white/[0.10] hover:text-[#FF8085] active:scale-[0.98]",
 );
 const topRankingRankBadgeClassName = cn(
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-base font-black text-[#FF5B62] shadow-[0_8px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-9 md:w-9 md:text-lg",
+  "flex h-8 w-8 shrink-0 items-center justify-center self-center justify-self-center rounded-lg border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-center text-base font-black text-[#FF5B62] shadow-[0_8px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-9 md:w-9 md:text-lg",
+);
+const topRankingPreviewRankBadgeClassName = cn(
+  topRankingRankBadgeClassName,
+  "row-span-2 md:row-span-1",
 );
 const topRankingTitleClassName = cn(
   "block truncate text-sm font-black tracking-normal text-white md:text-base",
@@ -1457,7 +1461,7 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             const href = getTopVehicleHref(vehicle);
             const content = (
               <>
-                <span className={topRankingRankBadgeClassName}>
+                <span className={topRankingPreviewRankBadgeClassName}>
                   {index + 1}
                 </span>
                 <span className="min-w-0">
@@ -1582,7 +1586,7 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
               key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
               className={topRankingItemClassName}
             >
-              <span className={topRankingRankBadgeClassName}>
+              <span className={topRankingPreviewRankBadgeClassName}>
                 {index + 1}
               </span>
               <span className="min-w-0">
