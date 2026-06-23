@@ -28,7 +28,7 @@ export const vehicleKnowledge: VehicleKnowledge[] = [
     engineCode: "세타",
     checkPoints: [
       "현대 세타/GDI 계열은 엔진오일 감소, 냉간 소음, 노킹, 누유 여부를 확인해보세요.",
-      "엔진 관련 리콜, 보증 연장, 쇼트엔진 교체 이력이 있는지 확인하는 것이 좋습니다.",
+      "엔진 관련 리콜, 보증 연장, 쇼트엔진 교체 이력이 있는지 한번 봐주세요.",
     ],
     warningMessage: "세타엔진 계열은 단순 소모품 관리뿐 아니라 리콜/보증 정비 이력 확인이 중요합니다.",
   },
@@ -38,7 +38,7 @@ export const vehicleKnowledge: VehicleKnowledge[] = [
     engineCode: "세타",
     checkPoints: [
       "기아 세타/GDI 계열은 엔진오일 감소, 엔진 소음, 노킹과 누유 이력을 확인해보세요.",
-      "리콜 대상 여부, 보증 연장, 엔진 교체 또는 관련 정비 내역을 확인하는 것이 좋습니다.",
+      "리콜 대상 여부, 보증 연장, 엔진 교체 또는 관련 정비 내역을 챙겨보세요.",
     ],
     warningMessage: "세타엔진 적용 가능 차량은 오일 관리 이력과 제조사 보증/리콜 이력을 함께 확인해야 합니다.",
   },

@@ -102,7 +102,7 @@ export const vehicleInspectionProfiles: VehicleInspectionProfile[] = [
         importance: "중",
         estimatedRepairCost: "20만~45만원",
         aiSummary:
-          "정차 또는 저속에서 팬 소음이 크면 냉각팬 모터와 팬 슈라우드 체결 상태를 확인하는 것이 좋습니다.",
+          "정차 또는 저속에서 팬 소음이 크면 냉각팬 모터와 팬 슈라우드 체결 상태를 한번 봐주세요.",
       },
       {
         title: "서모스탯 하우징 누수",
@@ -222,7 +222,7 @@ export const vehicleInspectionProfiles: VehicleInspectionProfile[] = [
         importance: "중",
         estimatedRepairCost: "20만~60만원",
         aiSummary:
-          "하체에서는 로어암 부싱 갈라짐, 유격, 방지턱 통과 소음을 중점적으로 확인하는 것이 좋습니다.",
+          "하체에서는 로어암 부싱 갈라짐, 유격, 방지턱 통과 소음을 중점적으로 봐주세요.",
       },
       {
         title: "스태빌라이저 링크 소음",

@@ -62,7 +62,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "현대",
     model: "그랜저",
-    message: "그랜저는 전자식 파킹브레이크, 전동시트, 공조 장치 등 전장품 작동 상태를 확인하는 것이 좋습니다.",
+    message: "그랜저는 전자식 파킹브레이크, 전동시트, 공조 장치 작동 상태를 먼저 봐주세요.",
   },
   {
     brand: "현대",
@@ -77,7 +77,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "기아",
     model: "K5",
-    message: "K5는 MDPS 조향 소음, 핸들 유격, 하체 잡소리 여부를 시운전에서 확인하는 것이 좋습니다.",
+    message: "K5는 시운전에서 MDPS 조향 소음, 핸들 유격, 하체 잡소리를 느껴보세요.",
   },
   {
     brand: "기아",
@@ -97,7 +97,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "기아",
     model: "K8",
-    message: "K8 하이브리드는 저속 변속감, 회생제동 이질감, 배터리 관련 경고등 이력을 확인하는 것이 좋습니다.",
+    message: "K8 하이브리드는 저속 변속감, 회생제동 이질감, 배터리 경고등 이력을 먼저 봐주세요.",
   },
   {
     brand: "기아",
@@ -112,7 +112,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "기아",
     model: "스포티지",
-    message: "스포티지는 하체 부싱, 쇼크업소버, 실내 잡소리 여부를 확인하는 것이 좋습니다.",
+    message: "스포티지는 하체 부싱, 쇼크업소버, 실내 잡소리를 한번 들어보세요.",
   },
   {
     brand: "기아",
@@ -122,7 +122,7 @@ export const modelIssues: ModelIssueRule[] = [
   {
     brand: "기아",
     model: "쏘렌토",
-    message: "쏘렌토는 DCT 또는 자동변속기 변속 충격, 저속 울컥거림 여부를 시운전에서 확인하는 것이 좋습니다.",
+    message: "쏘렌토는 시운전에서 DCT 또는 자동변속기 변속 충격, 저속 울컥거림을 꼭 느껴보세요.",
   },
   {
     brand: "기아",
@@ -154,7 +154,7 @@ export const defaultModelIssues: ModelIssueRule[] = [
   },
   {
     brand: "벤츠",
-    message: "벤츠는 에어매틱 적용 여부, 냉각수 누수, 오일 누유, 전장 경고등 이력을 확인하는 것이 좋습니다.",
+    message: "벤츠는 에어매틱 적용 여부, 냉각수 누수, 오일 누유, 전장 경고등 이력을 먼저 봐주세요.",
   },
   {
     brand: "쉐보레",
@@ -170,7 +170,7 @@ export const defaultModelIssues: ModelIssueRule[] = [
   },
   {
     brand: "KG모빌리티",
-    message: "KG모빌리티는 전장 경고등, 변속 충격, 하체 부싱과 보증 정비 이력을 확인하는 것이 좋습니다.",
+    message: "KG모빌리티는 전장 경고등, 변속 충격, 하체 부싱과 보증 정비 이력을 챙겨보세요.",
   },
   {
     brand: "폭스바겐",
@@ -339,6 +339,6 @@ export const evCheckRules: EvCheckRule[] = [
       "EX30",
       "리프",
     ],
-    message: "전기차는 구동모터 소음, 감속기 오일 누유, OBC/충전 관련 경고등 이력을 확인하는 것이 좋습니다.",
+    message: "전기차는 구동모터 소음, 감속기 오일 누유, OBC/충전 경고등 이력을 먼저 봐주세요.",
   },
 ];
