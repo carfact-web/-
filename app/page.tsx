@@ -45,7 +45,7 @@ const pageClassName = cn(
 );
 const shellClassName = cn("mx-auto flex w-full max-w-3xl flex-col gap-6 sm:gap-8");
 const headerClassName = cn(
-  "border-b border-zinc-800/80 pb-1.5",
+  "sticky top-0 z-40 -mx-4 border-b border-zinc-800/80 bg-[#08090b]/95 px-4 pb-1.5 pt-2 shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md sm:-mx-6 sm:px-6 sm:pt-3",
 );
 const headerTopClassName = cn("flex min-h-11 items-center justify-between gap-3");
 const homeLogoClassName = cn(
@@ -140,7 +140,7 @@ const authButtonClassName = cn(
   "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-[0.98]",
 );
 const noticeTickerClassName = cn(
-  "mt-1 block min-w-0 truncate text-sm font-bold text-white transition",
+  "mt-1 block min-w-0 overflow-hidden truncate whitespace-nowrap text-sm font-bold text-white transition",
   "hover:text-white",
 );
 const heroCopyFrameClassName = cn("relative h-20 overflow-hidden sm:h-32");
