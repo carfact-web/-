@@ -52,7 +52,7 @@ const homeLogoClassName = cn(
   "inline-flex h-10 items-center sm:h-11",
 );
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
+  "rounded-lg border border-white/[0.08] bg-[linear-gradient(180deg,#101217_0%,#090a0d_100%)] p-4 shadow-[0_22px_60px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.05)] sm:p-5",
 );
 const plateInputFrameClassName = cn(
   "plate-input-frame",
@@ -70,15 +70,15 @@ const formMessageClassName = cn(
 );
 const recentSectionClassName = cn("w-full max-w-3xl min-w-0");
 const recentCardClassName = cn(
-  "block w-full max-w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 p-3 transition sm:p-4",
-  "hover:border-zinc-700 hover:bg-zinc-900",
+  "block w-full max-w-full overflow-hidden rounded-lg border border-white/[0.08] bg-[linear-gradient(180deg,#111318_0%,#090a0d_100%)] p-3 shadow-[0_14px_34px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-200 sm:p-4",
+  "hover:border-white/[0.14] hover:-translate-y-0.5 hover:bg-zinc-900 hover:shadow-[0_20px_44px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)]",
 );
 const recentMetaClassName = cn(
-  "mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-zinc-500 sm:mt-2 sm:gap-x-2 sm:gap-y-1 sm:text-xs",
+  "mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-medium leading-snug text-zinc-500 sm:mt-2 sm:gap-x-2 sm:gap-y-1 sm:text-xs",
 );
 const recentCarouselButtonClassName = cn(
-  "hidden h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-lg font-black text-zinc-200 transition sm:inline-flex",
-  "hover:border-zinc-500 hover:bg-zinc-900 hover:text-white active:scale-95",
+  "hidden h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-lg font-black text-zinc-300 shadow-[0_10px_24px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition sm:inline-flex",
+  "hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.09] hover:text-white active:scale-95",
 );
 const recentCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
@@ -101,20 +101,32 @@ const recentBadgeStackClassName = cn(
   "flex max-w-[45%] shrink-0 flex-col items-end gap-1 sm:max-w-none sm:gap-1.5",
 );
 const recentViewBadgeClassName = cn(
-  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-bold leading-tight text-zinc-200 sm:px-2.5 sm:py-1 sm:text-xs",
+  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full border border-white/[0.06] bg-black/25 px-2 py-0.5 text-[11px] font-semibold leading-tight text-zinc-400 sm:px-2.5 sm:py-1 sm:text-xs",
 );
 const recentStatusBadgeClassName = cn(
-  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full bg-[#FF3B30]/15 px-2 py-0.5 text-[11px] font-bold leading-tight text-[#FF7A73] sm:px-2.5 sm:py-1 sm:text-xs",
+  "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full border border-[#FF3B30]/20 bg-[#FF3B30]/10 px-2 py-0.5 text-[11px] font-bold leading-tight text-[#FF8A84] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2.5 sm:py-1 sm:text-xs",
 );
 const topRankingCardClassName = cn(
-  "flex h-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 md:p-5",
+  "flex h-full flex-col rounded-lg border border-white/[0.09] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.09),transparent_34%),linear-gradient(180deg,#17191d_0%,#101114_52%,#090a0c_100%)] p-4 shadow-[0_26px_70px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.04),inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-200 md:p-5 md:hover:-translate-y-[3px] md:hover:border-white/[0.14]",
 );
 const topRankingItemClassName = cn(
-  "grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-1.5 rounded-lg border border-zinc-800 bg-black p-2 md:grid-cols-[2rem_1fr_auto] md:gap-3 md:p-3",
+  "grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-2 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.6rem_1fr_auto] md:gap-3 md:p-3",
 );
 const topRankingButtonClassName = cn(
-  "shrink-0 whitespace-nowrap rounded-full border border-[#FF4D4F]/70 px-2.5 py-1.5 text-[11px] font-black leading-none text-[#FF4D4F] transition sm:px-3 sm:text-xs",
-  "hover:border-[#FF4D4F] hover:bg-[#FF4D4F]/[0.08] hover:text-[#FF6B6D] active:scale-[0.98]",
+  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.10] bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-black leading-none text-[#FF6970] shadow-[0_10px_22px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur transition sm:px-3 sm:text-xs",
+  "hover:-translate-y-0.5 hover:border-[#FF4D4F]/35 hover:bg-white/[0.10] hover:text-[#FF8085] active:scale-[0.98]",
+);
+const topRankingRankBadgeClassName = cn(
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-base font-black text-[#FF5B62] shadow-[0_8px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-9 md:w-9 md:text-lg",
+);
+const topRankingTitleClassName = cn(
+  "block truncate text-sm font-black tracking-normal text-white md:text-base",
+);
+const topRankingSubTextClassName = cn(
+  "mt-0.5 block truncate text-xs font-semibold text-zinc-300 md:text-sm",
+);
+const topRankingViewClassName = cn(
+  "col-start-2 mt-0.5 text-[11px] font-semibold text-zinc-500 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm",
 );
 const topRankingCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
@@ -1194,13 +1206,13 @@ export default function Home() {
                           >
                             <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
                               <div className="min-w-0 flex-1 pr-1 sm:pr-2">
-                                <p className="truncate text-sm font-black text-white sm:text-base">
+                                <p className="truncate text-sm font-black tracking-normal text-white sm:text-base">
                                   {maskPlateNumber(fact.carNumber)}
                                 </p>
                                 <p className="truncate text-sm font-bold text-zinc-100 sm:text-base">
                                   {vehicleTitle || "차종 정보 없음"}
                                 </p>
-                                <p className="mt-0.5 truncate text-xs text-zinc-400 sm:mt-1 sm:text-sm">
+                                <p className="mt-0.5 truncate text-xs font-medium text-zinc-500 sm:mt-1 sm:text-sm">
                                   {yearRange}
                                 </p>
                               </div>
@@ -1216,7 +1228,7 @@ export default function Home() {
                               </div>
                             </div>
 
-                            <p className="mt-1.5 overflow-hidden whitespace-pre-line break-words text-xs leading-[1.55] text-zinc-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:mt-2 sm:text-sm sm:leading-[1.7] sm:[-webkit-line-clamp:3]">
+                            <p className="mt-1.5 overflow-hidden whitespace-pre-line break-words text-xs font-medium leading-[1.55] text-zinc-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:mt-2 sm:text-sm sm:leading-[1.7] sm:[-webkit-line-clamp:3]">
                               {fact.content}
                             </p>
 
@@ -1445,20 +1457,20 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             const href = getTopVehicleHref(vehicle);
             const content = (
               <>
-                <span className="pt-0.5 text-xs font-black text-red-400 md:text-sm">
+                <span className={topRankingRankBadgeClassName}>
                   {index + 1}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-black text-white md:text-sm">
+                  <span className={topRankingTitleClassName}>
                     {maskPlateNumber(vehicle.carNumber ?? "")}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] font-bold text-zinc-100 md:text-sm">
+                  <span className={topRankingSubTextClassName}>
                     {[vehicle.manufacturer, vehicle.model]
                       .filter(Boolean)
                       .join(" ") || "차량 정보 없음"}
                   </span>
                 </span>
-                <span className="col-start-2 mt-0.5 text-[10px] font-black text-zinc-100 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm">
+                <span className={topRankingViewClassName}>
                   조회 {vehicle.viewCount.toLocaleString()}
                 </span>
               </>
@@ -1471,7 +1483,7 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                     href={href}
                     className={cn(
                       topRankingItemClassName,
-                      "cursor-pointer transition hover:border-[#FF4D4F]/60 hover:bg-zinc-950 active:scale-[0.99]",
+                      "cursor-pointer transition duration-200 hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 hover:shadow-[0_16px_32px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] active:scale-[0.99]",
                     )}
                   >
                     {content}
@@ -1496,23 +1508,23 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
               const href = getTopVehicleHref(vehicle);
               const content = (
                 <>
-                  <span className="pt-0.5 text-sm font-black text-red-400">
+                  <span className={topRankingRankBadgeClassName}>
                     {index + 1}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-black text-white">
+                    <span className={topRankingTitleClassName}>
                       {maskPlateNumber(vehicle.carNumber ?? "")}
                     </span>
-                    <span className="mt-1 block truncate text-sm font-bold text-zinc-100">
+                    <span className={topRankingSubTextClassName}>
                       {[vehicle.manufacturer, vehicle.model]
                         .filter(Boolean)
                         .join(" ") || "차종 정보 없음"}
                     </span>
-                    <span className="mt-1 block truncate text-xs text-zinc-500">
+                    <span className="mt-1 block truncate text-xs font-medium text-zinc-500">
                       {formatTopVehicleModel(vehicle)}
                     </span>
                   </span>
-                  <span className="pt-0.5 text-right text-sm font-black text-zinc-100">
+                  <span className="pt-0.5 text-right text-sm font-semibold text-zinc-500">
                     조회 {vehicle.viewCount.toLocaleString()}
                   </span>
                 </>
@@ -1523,12 +1535,12 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                   {href ? (
                     <Link
                       href={href}
-                      className="grid cursor-pointer grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3 transition hover:border-[#FF4D4F]/60 hover:bg-zinc-950 active:scale-[0.99]"
+                      className="grid cursor-pointer grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 active:scale-[0.99]"
                     >
                       {content}
                     </Link>
                   ) : (
-                    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3">
+                    <div className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]">
                       {content}
                     </div>
                   )}
@@ -1570,15 +1582,15 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
               key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
               className={topRankingItemClassName}
             >
-              <span className="text-xs font-black text-red-400 md:text-sm">
+              <span className={topRankingRankBadgeClassName}>
                 {index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-xs font-bold text-white md:text-sm">
+                <span className={topRankingTitleClassName}>
                   {formatTopModelName(model)}
                 </span>
               </span>
-              <span className="col-start-2 mt-0.5 text-[10px] font-black text-zinc-100 md:col-start-auto md:mt-0 md:text-right md:text-sm">
+              <span className={topRankingViewClassName}>
                 조회 {model.viewCount.toLocaleString()}
               </span>
             </li>
@@ -1596,15 +1608,15 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             {topModels.map((model, index) => (
               <li
                 key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
-                className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-3 rounded-lg border border-zinc-800 bg-black p-3"
+                className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]"
               >
-                <span className="text-sm font-black text-red-400">
+                <span className={topRankingRankBadgeClassName}>
                   {index + 1}
                 </span>
-                <span className="min-w-0 truncate text-sm font-bold text-white">
+                <span className={topRankingTitleClassName}>
                   {formatTopModelName(model)}
                 </span>
-                <span className="text-right text-sm font-black text-zinc-100">
+                <span className="text-right text-sm font-semibold text-zinc-500">
                   조회 {model.viewCount.toLocaleString()}
                 </span>
               </li>
@@ -1645,22 +1657,22 @@ function TopRankingModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 sm:items-center sm:justify-center"
+      className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:justify-center"
       role="presentation"
       onClick={onClose}
     >
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black"
+        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border border-white/[0.09] bg-[linear-gradient(180deg,#15171c,#090a0d)] shadow-[0_28px_80px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.07)]"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-4 py-3">
           <h2 className="text-lg font-black text-white">{title}</h2>
           <button
             type="button"
-            className="rounded-full border border-zinc-700 px-3 py-1 text-xs font-black text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-900 hover:text-white"
+            className="rounded-full border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-xs font-black text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:border-white/20 hover:bg-white/[0.10] hover:text-white"
             onClick={onClose}
           >
             닫기
