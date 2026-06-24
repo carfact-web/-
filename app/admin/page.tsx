@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CommunityPostBody } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
-import { getCommunityCategoryLabel } from "@/lib/communityCategories";
+import {
+  communityCategories,
+  getCommunityCategoryLabel,
+} from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
@@ -14,6 +18,10 @@ import {
   normalizeVehicleIssueKeyword,
 } from "@/utils/vehicleIssueKeywords";
 import type { Json } from "@/types/supabase";
+import type {
+  CommunityBoardFilter,
+  CommunityImageAttachment,
+} from "@/types/community";
 
 type AdminTab =
   | "dashboard"
@@ -369,6 +377,21 @@ const paginationButtonClassName = cn(
 const activePaginationButtonClassName = cn(
   "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
 );
+const categoryFilterButtonClassName = cn(
+  "whitespace-nowrap rounded-lg border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-300 transition",
+  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+);
+const activeCategoryFilterButtonClassName = cn(
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+);
+const adminPostCategoryTabs = [
+  { label: "전체", value: "all" },
+  { label: "공지사항", value: "notice" },
+  ...communityCategories.filter(
+    (category) => category.value !== "all" && category.value !== "notice",
+  ),
+] satisfies Array<{ label: string; value: CommunityBoardFilter }>;
+const adminPostsPerPage = 10;
 const adminReviewsPerPage = 10;
 
 const formatDate = (value: string) => {
@@ -411,6 +434,44 @@ const formatReviewVehicleSummary = (review: AdminReview) => {
     .filter(Boolean)
     .join(" · ");
 };
+
+const getPostCategoryLabel = (post: AdminCommunityPost) =>
+  post.is_notice ? "공지사항" : getCommunityCategoryLabel(post.category);
+
+const getCommunityPostImages = (
+  value: Json,
+): CommunityImageAttachment[] =>
+  Array.isArray(value) ? (value as unknown as CommunityImageAttachment[]) : [];
+
+const getPostAuthorProfile = (
+  post: AdminCommunityPost,
+  users: AdminUserProfile[],
+) => users.find((account) => account.id === post.user_id) ?? null;
+
+const getPostAuthorRoleLabel = (
+  post: AdminCommunityPost,
+  users: AdminUserProfile[],
+) => {
+  const author = getPostAuthorProfile(post, users);
+
+  if (author?.role === "super_admin" || author?.role === "admin") {
+    return "admin";
+  }
+
+  if (author?.is_verified_dealer) {
+    return "dealer";
+  }
+
+  return null;
+};
+
+const getPostAuthorDisplayName = (
+  post: AdminCommunityPost,
+  users: AdminUserProfile[],
+) =>
+  post.author_nickname ??
+  getPostAuthorProfile(post, users)?.nickname ??
+  formatCompactId(post.user_id);
 
 const maskAdminPlateNumber = (plateNumber: string | null | undefined) => {
   const normalizedPlateNumber = plateNumber?.replace(/\s+/g, "").trim() ?? "";
@@ -838,6 +899,10 @@ export default function AdminPage() {
   const [notices, setNotices] = useState<AdminCommunityPost[]>([]);
   const [popupNotices, setPopupNotices] = useState<AdminPopupNotice[]>([]);
   const [postSearch, setPostSearch] = useState("");
+  const [postCategoryFilter, setPostCategoryFilter] =
+    useState<CommunityBoardFilter>("all");
+  const [postPage, setPostPage] = useState(1);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewPage, setReviewPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
@@ -860,6 +925,47 @@ export default function AdminPage() {
   const selectedPosts = useMemo(
     () => posts.filter((post) => selectedPostIds.includes(post.id)),
     [posts, selectedPostIds],
+  );
+  const visiblePosts = useMemo(
+    () =>
+      posts
+        .filter((post) => {
+          if (postCategoryFilter === "all") {
+            return true;
+          }
+
+          if (postCategoryFilter === "notice") {
+            return post.is_notice;
+          }
+
+          return !post.is_notice && post.category === postCategoryFilter;
+        })
+        .sort(
+          (left, right) =>
+            Date.parse(right.created_at) - Date.parse(left.created_at),
+        ),
+    [postCategoryFilter, posts],
+  );
+  const totalPostPages = Math.max(
+    1,
+    Math.ceil(visiblePosts.length / adminPostsPerPage),
+  );
+  const currentPostPage = Math.min(postPage, totalPostPages);
+  const paginatedPosts = useMemo(
+    () =>
+      visiblePosts.slice(
+        (currentPostPage - 1) * adminPostsPerPage,
+        currentPostPage * adminPostsPerPage,
+      ),
+    [currentPostPage, visiblePosts],
+  );
+  const selectedVisiblePosts = useMemo(
+    () => paginatedPosts.filter((post) => selectedPostIds.includes(post.id)),
+    [paginatedPosts, selectedPostIds],
+  );
+  const selectedPost = useMemo(
+    () => posts.find((post) => post.id === selectedPostId) ?? null,
+    [posts, selectedPostId],
   );
   const selectedReviews = useMemo(
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
@@ -899,7 +1005,8 @@ export default function AdminPage() {
     [reports, selectedReportIds],
   );
   const allPostsSelected =
-    posts.length > 0 && selectedPosts.length === posts.length;
+    paginatedPosts.length > 0 &&
+    selectedVisiblePosts.length === paginatedPosts.length;
   const allReviewsSelected =
     paginatedReviews.length > 0 &&
     selectedVisibleReviews.length === paginatedReviews.length;
@@ -2045,7 +2152,10 @@ export default function AdminPage() {
             activeTab={activeTab}
             searchValue={activeSearch}
             setNoticeSearch={setNoticeSearch}
-            setPostSearch={setPostSearch}
+            setPostSearch={(value) => {
+              setPostPage(1);
+              setPostSearch(value);
+            }}
             setReportSearch={setReportSearch}
             setReviewSearch={(value) => {
               setReviewPage(1);
@@ -2088,7 +2198,26 @@ export default function AdminPage() {
         ) : null}
 
         {activeTab === "posts" ? (
-          <AdminTablePanel count={posts.length} title="게시글 관리">
+          <AdminTablePanel count={visiblePosts.length} title="게시글 관리">
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {adminPostCategoryTabs.map((category) => (
+                <button
+                  key={category.value}
+                  type="button"
+                  className={cn(
+                    categoryFilterButtonClassName,
+                    postCategoryFilter === category.value &&
+                      activeCategoryFilterButtonClassName,
+                  )}
+                  onClick={() => {
+                    setPostCategoryFilter(category.value);
+                    setPostPage(1);
+                  }}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
             <BulkActionBar
               selectedCount={selectedPosts.length}
               hasVisibleSelection={selectedPosts.some(
@@ -2103,8 +2232,11 @@ export default function AdminPage() {
               onUnhide={() => void updatePostsHidden(selectedPosts, false)}
             />
             <div className={mobileListClassName}>
-              {posts.length ? (
-                posts.map((post) => (
+              {paginatedPosts.length ? (
+                paginatedPosts.map((post) => {
+                  const authorRoleLabel = getPostAuthorRoleLabel(post, users);
+
+                  return (
                   <article className={mobileCardClassName} key={post.id}>
                     <div className="min-w-0">
                       <div className="flex items-start gap-2">
@@ -2120,12 +2252,20 @@ export default function AdminPage() {
                           }
                         />
                         <div className="min-w-0">
-                          <p className={mobileCardTitleClassName}>
+                          <button
+                            type="button"
+                            className={cn(
+                              mobileCardTitleClassName,
+                              "block text-left hover:text-red-100",
+                            )}
+                            onClick={() => setSelectedPostId(post.id)}
+                          >
                             {post.title}
-                          </p>
+                          </button>
                           <p className={mobileCardMetaClassName}>
-                            {getCommunityCategoryLabel(post.category)} ·{" "}
-                            {post.author_nickname ?? formatCompactId(post.user_id)} ·{" "}
+                            {getPostCategoryLabel(post)} ·{" "}
+                            {getPostAuthorDisplayName(post, users)}
+                            {authorRoleLabel ? " " + authorRoleLabel : ""} ·{" "}
                             {formatDate(post.created_at)}
                           </p>
                           <p className={mobileCardMetaClassName}>
@@ -2150,7 +2290,8 @@ export default function AdminPage() {
                       />
                     </MobileActionDetails>
                   </article>
-                ))
+                  );
+                })
               ) : (
                 <EmptyMobileState message="게시글이 없습니다." />
               )}
@@ -2161,19 +2302,30 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>
                     <SelectionCheckbox
                       checked={allPostsSelected}
-                      disabled={!posts.length}
-                      label="게시글 전체 선택"
-                      onChange={(checked) =>
-                        setSelectedPostIds(
-                          checked ? posts.map((post) => post.id) : [],
-                        )
-                      }
+                      disabled={!paginatedPosts.length}
+                      label="현재 페이지 게시글 전체 선택"
+                      onChange={(checked) => {
+                        const visiblePostIds = paginatedPosts.map(
+                          (post) => post.id,
+                        );
+
+                        setSelectedPostIds((current) =>
+                          checked
+                            ? Array.from(new Set([...current, ...visiblePostIds]))
+                            : current.filter(
+                                (id) => !visiblePostIds.includes(id),
+                              ),
+                        );
+                      }}
                     />
                   </th>
                   <th className={tableHeadCellClassName}>제목</th>
                   <th className={tableHeadCellClassName}>분류</th>
+                  <th className={tableHeadCellClassName}>작성자</th>
                   <th className={tableHeadCellClassName}>상태</th>
-                  <th className={tableHeadCellClassName}>지표</th>
+                  <th className={tableHeadCellClassName}>신고</th>
+                  <th className={tableHeadCellClassName}>댓글</th>
+                  <th className={tableHeadCellClassName}>좋아요</th>
                   <th className={tableHeadCellClassName}>작성일</th>
                   <th className={cn(tableHeadCellClassName, "text-right")}>
                     관리
@@ -2181,8 +2333,11 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-900">
-                {posts.length ? (
-                  posts.map((post) => (
+                {paginatedPosts.length ? (
+                  paginatedPosts.map((post) => {
+                    const authorRoleLabel = getPostAuthorRoleLabel(post, users);
+
+                    return (
                     <tr key={post.id}>
                       <td className={tableCellClassName}>
                         <SelectionCheckbox
@@ -2198,28 +2353,48 @@ export default function AdminPage() {
                         />
                       </td>
                       <td className={tableCellClassName}>
-                        <p className="max-w-sm font-bold text-white">
+                        <button
+                          type="button"
+                          className="block max-w-sm truncate text-left text-sm font-bold text-white hover:text-red-100"
+                          onClick={() => setSelectedPostId(post.id)}
+                        >
                           {post.title}
-                        </p>
-                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
-                          {post.content}
-                        </p>
-                        <p className="mt-2 text-xs text-zinc-500">
-                          작성자: {post.author_nickname ?? post.user_id}
-                        </p>
+                        </button>
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-sm")}>
+                        {getPostCategoryLabel(post)}
                       </td>
                       <td className={tableCellClassName}>
-                        {getCommunityCategoryLabel(post.category)}
+                        <div className="flex max-w-40 items-center gap-1.5">
+                          <VerifiedNickname
+                            className="max-w-28"
+                            isVerifiedDealer={
+                              getPostAuthorProfile(post, users)
+                                ?.is_verified_dealer ?? false
+                            }
+                          >
+                            {getPostAuthorDisplayName(post, users)}
+                          </VerifiedNickname>
+                          {authorRoleLabel ? (
+                            <span className="shrink-0 rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
+                              {authorRoleLabel}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap")}>
                         <PostStatusBadges post={post} />
                       </td>
-                      <td className={tableCellClassName}>
-                        신고 {post.report_count.toLocaleString()} / 댓글{" "}
-                        {post.comment_count.toLocaleString()} / 좋아요{" "}
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-sm font-bold")}>
+                        {post.report_count.toLocaleString()}
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-sm font-bold")}>
+                        {post.comment_count.toLocaleString()}
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-sm font-bold")}>
                         {post.like_count.toLocaleString()}
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                         {formatDate(post.created_at)}
                       </td>
                       <td className={tableActionCellClassName}>
@@ -2235,12 +2410,55 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 ) : (
-                  <EmptyTableRow colSpan={7} message="게시글이 없습니다." />
+                  <EmptyTableRow colSpan={10} message="게시글이 없습니다." />
                 )}
               </tbody>
             </table>
+            {totalPostPages > 1 ? (
+              <nav
+                className="mt-4 flex flex-wrap items-center justify-center gap-2"
+                aria-label="게시글 관리 페이지"
+              >
+                <button
+                  type="button"
+                  className={paginationButtonClassName}
+                  disabled={currentPostPage <= 1}
+                  onClick={() => setPostPage(currentPostPage - 1)}
+                >
+                  ◀
+                </button>
+                {getAdminPaginationPages(totalPostPages, currentPostPage).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      className={cn(
+                        paginationButtonClassName,
+                        currentPostPage === page &&
+                          activePaginationButtonClassName,
+                      )}
+                      onClick={() => setPostPage(page)}
+                      aria-current={
+                        currentPostPage === page ? "page" : undefined
+                      }
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  className={paginationButtonClassName}
+                  disabled={currentPostPage >= totalPostPages}
+                  onClick={() => setPostPage(currentPostPage + 1)}
+                >
+                  ▶
+                </button>
+              </nav>
+            ) : null}
           </AdminTablePanel>
         ) : null}
 
@@ -3068,6 +3286,90 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </AdminTablePanel>
+          </div>
+        ) : null}
+
+        {selectedPost ? (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-post-detail-title"
+            onClick={() => setSelectedPostId(null)}
+          >
+            <section
+              className="w-full max-w-3xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-red-300">
+                    {getPostCategoryLabel(selectedPost)}
+                  </p>
+                  <h2
+                    id="admin-post-detail-title"
+                    className="mt-1 break-words text-xl font-black text-white"
+                  >
+                    {selectedPost.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  onClick={() => setSelectedPostId(null)}
+                  aria-label="게시글 상세 닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4 px-4 py-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5">
+                    <VerifiedNickname
+                      isVerifiedDealer={
+                        getPostAuthorProfile(selectedPost, users)
+                          ?.is_verified_dealer ?? false
+                      }
+                    >
+                      {getPostAuthorDisplayName(selectedPost, users)}
+                    </VerifiedNickname>
+                    {getPostAuthorRoleLabel(selectedPost, users) ? (
+                      <span className="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
+                        {getPostAuthorRoleLabel(selectedPost, users)}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span>{formatDate(selectedPost.created_at)}</span>
+                  <span>신고 {selectedPost.report_count.toLocaleString()}</span>
+                  <span>댓글 {selectedPost.comment_count.toLocaleString()}</span>
+                  <span>좋아요 {selectedPost.like_count.toLocaleString()}</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <PostStatusBadges post={selectedPost} />
+                </div>
+
+                <CommunityPostBody
+                  content={selectedPost.content}
+                  images={getCommunityPostImages(selectedPost.images)}
+                />
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                  <PostActionButtons
+                    isSuperAdmin={isSuperAdmin}
+                    post={selectedPost}
+                    onDelete={(target) => {
+                      setSelectedPostId(null);
+                      void deletePost(target);
+                    }}
+                    onUpdateState={(target, state) =>
+                      void updatePostState(target, state)
+                    }
+                  />
+                </div>
+              </div>
+            </section>
           </div>
         ) : null}
       </div>
