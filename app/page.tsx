@@ -4,7 +4,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
@@ -164,8 +171,10 @@ interface RecentFact {
 const recentReviewsSnapshotEventName = "recent-reviews-snapshot";
 const reviewStorageKeyPrefix = getReviewStorageKey("");
 const recentReviewsPerSlide = 3;
-const recentReviewSlideIntervalMs = 5000;
-const recentReviewSwipeThresholdPx = 48;
+const recentReviewMaxPages = 5;
+const recentReviewPreviewLimit = recentReviewsPerSlide * recentReviewMaxPages;
+const recentReviewSlideIntervalMs = 10000;
+const recentReviewFadeHalfDurationMs = 140;
 const communityGuidePreviewCount = 8;
 const communityGuideSwipeThresholdPx = 42;
 const heroCopyIntervalMs = 3500;
@@ -333,9 +342,17 @@ const formatTopModelName = (
 
 const chunkRecentFacts = (facts: RecentFact[]) => {
   const chunks: RecentFact[][] = [];
+  const previewFacts = facts
+    .slice()
+    .sort((left, right) => getRecentFactTime(right) - getRecentFactTime(left))
+    .slice(0, recentReviewPreviewLimit);
 
-  for (let index = 0; index < facts.length; index += recentReviewsPerSlide) {
-    chunks.push(facts.slice(index, index + recentReviewsPerSlide));
+  for (
+    let index = 0;
+    index < previewFacts.length;
+    index += recentReviewsPerSlide
+  ) {
+    chunks.push(previewFacts.slice(index, index + recentReviewsPerSlide));
   }
 
   return chunks;
@@ -496,6 +513,8 @@ export default function Home() {
   const [recentSlideIndex, setRecentSlideIndex] = useState(0);
   const [topRankingSlideIndex, setTopRankingSlideIndex] = useState(0);
   const [guideSlideIndex, setGuideSlideIndex] = useState(0);
+  const [isRecentAutoPaused, setIsRecentAutoPaused] = useState(false);
+  const [isRecentFading, setIsRecentFading] = useState(false);
   const [guideAnimationDirection, setGuideAnimationDirection] =
     useState<GuideCarouselDirection | null>(null);
   const [isGuideAnimating, setIsGuideAnimating] = useState(false);
@@ -504,10 +523,10 @@ export default function Home() {
     number | null
   >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
-  const recentTouchStartX = useRef<number | null>(null);
   const guideTouchStartX = useRef<number | null>(null);
+  const recentFadeTimeoutRef = useRef<number | null>(null);
   const guideAnimationTimeoutRef = useRef<number | null>(null);
-  const recentSlideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const recentSlideRef = useRef<HTMLDivElement | null>(null);
   const topRankingCardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
   const [guidePosts, setGuidePosts] = useState<CommunityPost[]>([]);
@@ -526,7 +545,13 @@ export default function Home() {
     [recentReviewsSnapshot],
   );
   const recentFacts = useMemo(
-    () => (isSupabaseConfigured ? (remoteRecentFacts ?? []) : localRecentFacts),
+    () =>
+      (isSupabaseConfigured ? (remoteRecentFacts ?? []) : localRecentFacts)
+        .slice()
+        .sort(
+          (left, right) => getRecentFactTime(right) - getRecentFactTime(left),
+        )
+        .slice(0, recentReviewPreviewLimit),
     [localRecentFacts, remoteRecentFacts],
   );
   const recentFactPages = useMemo(
@@ -573,17 +598,47 @@ export default function Home() {
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
   const showPlateValidationError = hasCarNumberInput && !isCarNumberValid;
-  const goToPreviousRecentSlide = () => {
-    setRecentSlideIndex((currentIndex) =>
-      recentPageCount > 0
-        ? (currentIndex - 1 + recentPageCount) % recentPageCount
-        : 0,
+  const startRecentFadeTransition = useCallback(
+    (getNextIndex: (currentIndex: number) => number) => {
+      if (recentPageCount < 2 || isRecentFading) {
+        return;
+      }
+
+      if (recentFadeTimeoutRef.current !== null) {
+        window.clearTimeout(recentFadeTimeoutRef.current);
+      }
+
+      setIsRecentFading(true);
+      recentFadeTimeoutRef.current = window.setTimeout(() => {
+        setRecentSlideIndex((currentIndex) => {
+          const normalizedCurrentIndex = Math.min(
+            currentIndex,
+            recentPageCount - 1,
+          );
+
+          return getNextIndex(normalizedCurrentIndex);
+        });
+
+        window.requestAnimationFrame(() => {
+          setIsRecentFading(false);
+        });
+        recentFadeTimeoutRef.current = null;
+      }, recentReviewFadeHalfDurationMs);
+    },
+    [isRecentFading, recentPageCount],
+  );
+  const goToPreviousRecentSlide = useCallback(() => {
+    startRecentFadeTransition((currentIndex) =>
+      (currentIndex - 1 + recentPageCount) % recentPageCount,
     );
-  };
-  const goToNextRecentSlide = () => {
-    setRecentSlideIndex((currentIndex) =>
-      recentPageCount > 0 ? (currentIndex + 1) % recentPageCount : 0,
+  }, [recentPageCount, startRecentFadeTransition]);
+  const goToNextRecentSlide = useCallback(() => {
+    startRecentFadeTransition((currentIndex) =>
+      (currentIndex + 1) % recentPageCount,
     );
+  }, [recentPageCount, startRecentFadeTransition]);
+  const goToRecentSlide = (nextIndex: number) => {
+    startRecentFadeTransition(() => nextIndex);
   };
   const scrollToTopRankingSlide = (nextIndex: number) => {
     const normalizedIndex = (nextIndex + 2) % 2;
@@ -671,29 +726,11 @@ export default function Home() {
 
     setGuideSlideIndex(normalizedIndex);
   };
-  const handleRecentTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    recentTouchStartX.current = event.touches[0]?.clientX ?? null;
+  const pauseRecentAutoRotation = () => {
+    setIsRecentAutoPaused(true);
   };
-  const handleRecentTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    const startX = recentTouchStartX.current;
-    recentTouchStartX.current = null;
-
-    if (startX === null || recentPageCount < 2) {
-      return;
-    }
-
-    const endX = event.changedTouches[0]?.clientX ?? startX;
-    const deltaX = endX - startX;
-
-    if (Math.abs(deltaX) < recentReviewSwipeThresholdPx) {
-      return;
-    }
-
-    if (deltaX < 0) {
-      goToNextRecentSlide();
-    } else {
-      goToPreviousRecentSlide();
-    }
+  const resumeRecentAutoRotation = () => {
+    setIsRecentAutoPaused(false);
   };
   const handleGuideTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     guideTouchStartX.current = event.touches[0]?.clientX ?? null;
@@ -732,6 +769,10 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
+      if (recentFadeTimeoutRef.current !== null) {
+        window.clearTimeout(recentFadeTimeoutRef.current);
+      }
+
       if (guideAnimationTimeoutRef.current !== null) {
         window.clearTimeout(guideAnimationTimeoutRef.current);
       }
@@ -739,22 +780,24 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (recentPageCount < 2) {
+    if (recentPageCount < 2 || isRecentAutoPaused) {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      setRecentSlideIndex(
-        (currentIndex) => (currentIndex + 1) % recentPageCount,
-      );
+    const timeoutId = window.setTimeout(() => {
+      goToNextRecentSlide();
     }, recentReviewSlideIntervalMs);
 
-    return () => window.clearInterval(intervalId);
-  }, [recentPageCount]);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeRecentSlideIndex,
+    goToNextRecentSlide,
+    isRecentAutoPaused,
+    recentPageCount,
+  ]);
 
   useEffect(() => {
-    recentSlideRefs.current.length = recentFactPages.length;
-    const activeSlide = recentSlideRefs.current[activeRecentSlideIndex];
+    const activeSlide = recentSlideRef.current;
 
     if (!activeSlide) {
       setRecentCarouselHeight(null);
@@ -794,7 +837,7 @@ export default function Home() {
       };
     }
 
-    fetchRecentSupabaseReviews(20)
+    fetchRecentSupabaseReviews(recentReviewPreviewLimit)
       .then((reviews) => {
         if (!isActive || reviews === null) {
           return;
@@ -1156,12 +1199,17 @@ export default function Home() {
               아직 등록된 차량 이야기가 없습니다.
             </div>
           ) : (
-            <div className="w-full max-w-full min-w-0 overflow-hidden">
+            <div
+              className="w-full max-w-full min-w-0 overflow-hidden"
+              onMouseEnter={pauseRecentAutoRotation}
+              onMouseLeave={resumeRecentAutoRotation}
+              onTouchStart={pauseRecentAutoRotation}
+              onTouchEnd={resumeRecentAutoRotation}
+              onTouchCancel={resumeRecentAutoRotation}
+            >
               <div
                 className="w-full max-w-full overflow-hidden transition-[height] duration-300 ease-out"
                 data-testid="recent-reviews-carousel"
-                onTouchStart={handleRecentTouchStart}
-                onTouchEnd={handleRecentTouchEnd}
                 style={
                   recentCarouselHeight === null
                     ? undefined
@@ -1169,21 +1217,14 @@ export default function Home() {
                 }
               >
                 <div
-                  className="flex w-full min-w-0 items-start transition-transform duration-500 ease-out"
-                  style={{
-                    transform: `translateX(-${activeRecentSlideIndex * 100}%)`,
-                  }}
+                  ref={recentSlideRef}
+                  className={cn(
+                    "w-full min-w-0 space-y-2.5 transition-opacity duration-[140ms] ease-out sm:space-y-3",
+                    isRecentFading ? "opacity-0" : "opacity-100",
+                  )}
                 >
-                  {recentFactPages.map((page, pageIndex) => (
-                    <div
-                      key={pageIndex}
-                      ref={(element) => {
-                        recentSlideRefs.current[pageIndex] = element;
-                      }}
-                      className="w-full min-w-full max-w-full flex-none self-start space-y-2.5 sm:space-y-3"
-                      aria-hidden={pageIndex !== activeRecentSlideIndex}
-                    >
-                      {page.map((fact) => {
+                  {(recentFactPages[activeRecentSlideIndex] ?? []).map(
+                    (fact) => {
                         const vehicleTitle = fact.vehicle
                           ? [
                               fact.vehicle.brand,
@@ -1251,9 +1292,8 @@ export default function Home() {
                             </div>
                           </Link>
                         );
-                      })}
-                    </div>
-                  ))}
+                    },
+                  )}
                 </div>
               </div>
 
@@ -1270,7 +1310,11 @@ export default function Home() {
                         recentCarouselDotClassName,
                         index === activeRecentSlideIndex && "w-6 bg-[#FF3B30]",
                       )}
-                      onClick={() => setRecentSlideIndex(index)}
+                      onClick={() => {
+                        if (index !== activeRecentSlideIndex) {
+                          goToRecentSlide(index);
+                        }
+                      }}
                       aria-label={`${index + 1}번째 후기 묶음 보기`}
                       aria-current={index === activeRecentSlideIndex}
                     />
