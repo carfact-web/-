@@ -465,7 +465,7 @@ export const fetchCommunityPosts = async (category: CommunityBoardFilter) => {
   if (category === "notice") {
     query = query.eq("is_notice", true);
   } else if (category !== "all") {
-    query = query.eq("category", category);
+    query = query.eq("category", category).eq("is_notice", false);
   }
 
   const { data: posts, error } = await query;

@@ -706,7 +706,7 @@ export default function CommunityPage() {
         if (
           category !== "all" &&
           category !== "notice" &&
-          current.category !== category
+          (current.isNotice || current.category !== category)
         ) {
           return null;
         }
