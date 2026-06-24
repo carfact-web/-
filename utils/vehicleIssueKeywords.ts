@@ -49,6 +49,12 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     inspectionTitle: "하체 소음 확인",
   },
   {
+    label: "하체",
+    aliases: ["하체", "언더바디"],
+    relatedParts: ["하체 부싱", "로어암", "스태빌라이저 링크", "쇼크업소버"],
+    inspectionTitle: "하체 상태 확인",
+  },
+  {
     label: "잡소리",
     aliases: ["잡소리", "잡 소리", "딸깍", "덜그럭"],
     relatedParts: ["하체 부싱", "내장재", "체결부"],

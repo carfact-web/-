@@ -25,6 +25,22 @@ interface AiCandidateRequest {
 const jsonError = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
+};
+
 const getBearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   const match = /^Bearer\s+(.+)$/i.exec(authorization);
@@ -270,9 +286,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ statuses: data ?? [] });
   } catch (error) {
     return jsonError(
-      error instanceof Error
-        ? error.message
-        : "AI 추천 상태를 불러오지 못했습니다.",
+      getApiErrorMessage(error, "AI 추천 상태를 불러오지 못했습니다."),
       500,
     );
   }
@@ -336,9 +350,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ applied, status });
   } catch (error) {
     return jsonError(
-      error instanceof Error
-        ? error.message
-        : "AI 추천 상태를 변경하지 못했습니다.",
+      getApiErrorMessage(error, "AI 추천 상태를 변경하지 못했습니다."),
       500,
     );
   }
