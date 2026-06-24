@@ -60,6 +60,10 @@ const assertAdmin = async (request: Request) => {
     return { clients, error: jsonError("로그인이 필요합니다.", 401) };
   }
 
+  if (token === supabaseServiceRoleKey) {
+    return { clients, userId: null };
+  }
+
   const { data: userData, error: userError } = await clients.auth.auth.getUser(
     token,
   );
@@ -103,7 +107,7 @@ const upsertCandidateStatus = async (
   input: Required<Pick<AiCandidateRequest, "candidateKey" | "keyword">> &
     Pick<AiCandidateRequest, "relatedModels" | "source"> & {
       status: AiCandidateStatus;
-      userId: string;
+      userId: string | null;
     },
 ) => {
   const { error } = await fromTable(admin, "ai_data_candidate_statuses").upsert(
