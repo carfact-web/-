@@ -9,6 +9,7 @@ import {
   communityCategories,
   getCommunityCategoryLabel,
 } from "@/lib/communityCategories";
+import { getCommunityImagePublicUrl } from "@/lib/communityImages";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
@@ -438,10 +439,89 @@ const formatReviewVehicleSummary = (review: AdminReview) => {
 const getPostCategoryLabel = (post: AdminCommunityPost) =>
   post.is_notice ? "공지사항" : getCommunityCategoryLabel(post.category);
 
+const isCommunityImageRecord = (
+  value: unknown,
+): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 const getCommunityPostImages = (
   value: Json,
 ): CommunityImageAttachment[] =>
-  Array.isArray(value) ? (value as unknown as CommunityImageAttachment[]) : [];
+  Array.isArray(value)
+    ? (value as unknown[])
+        .map<CommunityImageAttachment | null>((storedImage, index) => {
+          let image = storedImage;
+
+          if (typeof image === "string") {
+            const trimmedImage = image.trim();
+
+            if (trimmedImage.startsWith("{")) {
+              try {
+                const parsedImage = JSON.parse(trimmedImage);
+
+                if (isCommunityImageRecord(parsedImage)) {
+                  image = parsedImage;
+                }
+              } catch {
+                image = storedImage;
+              }
+            }
+
+            if (typeof image === "string") {
+              const imageType: CommunityImageAttachment["type"] = image
+                .toLowerCase()
+                .endsWith(".webp")
+                ? "image/webp"
+                : image.toLowerCase().endsWith(".png")
+                  ? "image/png"
+                  : "image/jpeg";
+
+              return {
+                id: image,
+                name: "커뮤니티 이미지",
+                path: /^https?:\/\//.test(image) ? undefined : image,
+                size: 0,
+                type: imageType,
+                url: getCommunityImagePublicUrl(image),
+              };
+            }
+          }
+
+          if (!isCommunityImageRecord(image)) {
+            return null;
+          }
+
+          const rawPath =
+            typeof image.path === "string"
+              ? image.path
+              : typeof image.key === "string"
+                ? image.key
+                : undefined;
+          const path = rawPath?.replace(/^community-images\//, "");
+          const url =
+            path !== undefined
+              ? getCommunityImagePublicUrl(path)
+              : typeof image.url === "string" && image.url
+                ? image.url
+                : typeof image.publicUrl === "string" && image.publicUrl
+                  ? image.publicUrl
+                  : undefined;
+          const imageType: CommunityImageAttachment["type"] =
+            image.type === "image/png" || image.type === "image/webp"
+              ? image.type
+              : "image/jpeg";
+
+          return {
+            id: String(image.id ?? url ?? path ?? index),
+            name: String(image.name ?? "커뮤니티 이미지"),
+            path,
+            size: typeof image.size === "number" ? image.size : 0,
+            type: imageType,
+            url,
+          };
+        })
+        .filter((image): image is CommunityImageAttachment => Boolean(image))
+    : [];
 
 const getPostAuthorProfile = (
   post: AdminCommunityPost,
