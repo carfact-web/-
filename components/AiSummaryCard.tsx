@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/utils/cn";
 import type { StructuredAiSummary } from "@/utils/aiSummary";
 
@@ -34,6 +37,10 @@ const issueListClassName = cn("space-y-2");
 const issueClassName = cn(
   "rounded-xl border border-white/[0.07] bg-[linear-gradient(180deg,rgba(18,20,25,0.86),rgba(5,6,8,0.72))] px-3.5 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-200 md:hover:-translate-y-0.5 md:hover:border-white/[0.12]",
 );
+const issueToggleButtonClassName = cn(
+  "mt-3 inline-flex w-full items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm font-black text-zinc-200 transition hover:border-white/[0.14] hover:bg-white/[0.07] active:scale-[0.99]",
+);
+const defaultVisibleMaintenanceIssueCount = 3;
 
 const formatMileage = (mileage?: string) => {
   if (!mileage) {
@@ -67,6 +74,9 @@ export function AiSummaryCard({
   title = "카팩트 AI 요약",
   emptyMessage = "차량 정보를 입력하면 AI 요약이 표시됩니다.",
 }: AiSummaryCardProps) {
+  const [showAllMaintenanceIssues, setShowAllMaintenanceIssues] =
+    useState(false);
+
   if (!analysis) {
     return (
       <section className={cardClassName}>
@@ -99,6 +109,13 @@ export function AiSummaryCard({
   ]
     .filter(Boolean)
     .join(" ");
+  const hiddenMaintenanceIssueCount = Math.max(
+    analysis.maintenanceIssues.length - defaultVisibleMaintenanceIssueCount,
+    0,
+  );
+  const visibleMaintenanceIssues = showAllMaintenanceIssues
+    ? analysis.maintenanceIssues
+    : analysis.maintenanceIssues.slice(0, defaultVisibleMaintenanceIssueCount);
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -137,68 +154,43 @@ export function AiSummaryCard({
         )}
       </section>
 
-      <section className={sectionClassName}>
-        <h3 className={sectionTitleClassName}>⭐ 출고 전 꼭 확인</h3>
-        <ul className={compactListClassName}>
-          {analysis.preDeliveryChecks.map((checkPoint) => (
-            <li key={checkPoint} className={compactItemClassName}>
-              <span className="text-red-300">✔</span>
-              <span className="line-clamp-1">{checkPoint}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       <section className="border-t border-zinc-800/80 pt-3">
         <h3 className={sectionTitleClassName}>🚨 자주 발생하는 정비 이슈</h3>
         {analysis.maintenanceIssues.length > 0 ? (
-          <div className={issueListClassName}>
-            {analysis.maintenanceIssues.map((issue) => (
-              <details key={issue.title} className={issueClassName}>
-                <summary className="cursor-pointer list-none">
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="line-clamp-1 text-sm font-black text-white">
-                        {issue.title}
-                      </h4>
-                      <p className="mt-1 line-clamp-1 text-sm font-semibold text-zinc-400">
-                        {issue.description}
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-red-100">
-                        💰 예상수리비 {issue.estimatedRepairCost}
-                      </p>
-                    </div>
-                    <span className="shrink-0 pt-0.5 text-xs font-bold text-zinc-500">
-                      ▼ 자세히 보기
-                    </span>
-                  </div>
-                </summary>
-
-                <div className="mt-3 space-y-2 border-t border-zinc-800 pt-3 text-xs leading-5 text-zinc-400">
-                  <p>
-                    <span className="font-bold text-zinc-200">주요 증상</span>{" "}
-                    {issue.symptoms.join(" / ")}
+          <div>
+            <div className={issueListClassName}>
+              {visibleMaintenanceIssues.map((issue, index) => (
+                <article key={issue.title + index} className={issueClassName}>
+                  <h4 className="line-clamp-1 text-sm font-black text-white">
+                    {issue.title}
+                  </h4>
+                  <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-zinc-400">
+                    {issue.description}
                   </p>
-                  <p>
-                    <span className="font-bold text-zinc-200">원인</span>{" "}
-                    {issue.causes.join(" / ")}
+                  <p className="mt-1 text-xs font-bold text-red-100">
+                    💰 예상수리비 {issue.estimatedRepairCost}
                   </p>
-                  <p>
-                    <span className="font-bold text-zinc-200">교체 부품</span>{" "}
-                    {issue.replacementParts.join(", ")}
-                  </p>
-                  <p>
-                    <span className="font-bold text-zinc-200">추가 참고</span>{" "}
-                    {issue.additionalDescription}
-                  </p>
-                </div>
-              </details>
-            ))}
+                </article>
+              ))}
+            </div>
+            {hiddenMaintenanceIssueCount > 0 ? (
+              <button
+                type="button"
+                className={issueToggleButtonClassName}
+                onClick={() =>
+                  setShowAllMaintenanceIssues((currentValue) => !currentValue)
+                }
+                aria-expanded={showAllMaintenanceIssues}
+              >
+                {showAllMaintenanceIssues
+                  ? "▲ 접기"
+                  : "▼ 더보기 (" + hiddenMaintenanceIssueCount + ")"}
+              </button>
+            ) : null}
           </div>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
-            등록된 대표 정비 이슈가 아직 없습니다. 출고 전 확인 항목을 먼저
-            보시면 됩니다.
+            등록된 대표 정비 이슈가 아직 없습니다.
           </p>
         )}
       </section>
