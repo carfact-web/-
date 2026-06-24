@@ -411,6 +411,10 @@ const getCommunityTextEditorSelectionOffsets = (editor: HTMLElement) => {
   };
 };
 
+type CommunityTextEditorSelectionOffsets = ReturnType<
+  typeof getCommunityTextEditorSelectionOffsets
+>;
+
 const replaceCommunityTextEditorContent = (
   editor: HTMLElement,
   content: string,
@@ -530,6 +534,10 @@ export default function CommunityPage() {
   const writeTitleEditorRef = useRef<HTMLDivElement | null>(null);
   const writeContentEditorRef = useRef<HTMLDivElement | null>(null);
   const writeContentSelectionRangeRef = useRef<Range | null>(null);
+  const writeTitleSelectionOffsetsRef =
+    useRef<CommunityTextEditorSelectionOffsets>(null);
+  const writeContentSelectionOffsetsRef =
+    useRef<CommunityTextEditorSelectionOffsets>(null);
   const [writeEditorResetKey, setWriteEditorResetKey] = useState(0);
 
   const activeCategoryLabel = useMemo(
@@ -968,6 +976,30 @@ export default function CommunityPage() {
     replaceCommunityTextEditorContent(writeTitleEditorRef.current, writeTitle);
   }, [isAdmin, isWriting, writeEditorResetKey]);
 
+  const saveWriteEditorSelectionOffsets = (
+    editor: HTMLElement | null,
+    selectionOffsetsRef: { current: CommunityTextEditorSelectionOffsets },
+  ) => {
+    if (!editor) {
+      return;
+    }
+
+    const selectionOffsets = getCommunityTextEditorSelectionOffsets(editor);
+
+    if (!selectionOffsets) {
+      return;
+    }
+
+    selectionOffsetsRef.current = selectionOffsets;
+  };
+
+  const saveWriteTitleSelectionOffsets = () => {
+    saveWriteEditorSelectionOffsets(
+      writeTitleEditorRef.current,
+      writeTitleSelectionOffsetsRef,
+    );
+  };
+
   const saveWriteContentSelectionRange = () => {
     const editor = writeContentEditorRef.current;
     const selection = window.getSelection();
@@ -982,6 +1014,8 @@ export default function CommunityPage() {
       return;
     }
 
+    writeContentSelectionOffsetsRef.current =
+      getCommunityTextEditorSelectionOffsets(editor);
     writeContentSelectionRangeRef.current = range.cloneRange();
   };
 
@@ -1025,6 +1059,7 @@ export default function CommunityPage() {
     }
 
     setWriteTitle(serializeCommunityTextEditor(editor));
+    saveWriteTitleSelectionOffsets();
     setMessage("");
   };
 
@@ -1032,6 +1067,7 @@ export default function CommunityPage() {
     editor: HTMLElement | null,
     currentContent: string,
     setContent: (content: string) => void,
+    selectionOffsetsRef: { current: CommunityTextEditorSelectionOffsets },
     color: CommunityTextColor,
     emptySelectionMessage: string,
   ) => {
@@ -1039,9 +1075,7 @@ export default function CommunityPage() {
       return;
     }
 
-    const selectionOffsets = editor
-      ? getCommunityTextEditorSelectionOffsets(editor)
-      : null;
+    const selectionOffsets = selectionOffsetsRef.current;
 
     if (
       !editor ||
@@ -1074,6 +1108,7 @@ export default function CommunityPage() {
       writeTitleEditorRef.current,
       writeTitle,
       setWriteTitle,
+      writeTitleSelectionOffsetsRef,
       color,
       "제목에서 색상을 적용할 문장을 선택해주세요.",
     );
@@ -1084,6 +1119,7 @@ export default function CommunityPage() {
       writeContentEditorRef.current,
       writeContent,
       setWriteContent,
+      writeContentSelectionOffsetsRef,
       color,
       "본문에서 색상을 적용할 문장을 선택해주세요.",
     );
@@ -1844,7 +1880,11 @@ export default function CommunityPage() {
                     role="textbox"
                     aria-label="제목"
                     suppressContentEditableWarning
+                    onClick={saveWriteTitleSelectionOffsets}
+                    onFocus={saveWriteTitleSelectionOffsets}
                     onInput={syncWriteTitleFromEditor}
+                    onKeyUp={saveWriteTitleSelectionOffsets}
+                    onMouseUp={saveWriteTitleSelectionOffsets}
                     onBlur={syncWriteTitleFromEditor}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
@@ -1913,7 +1953,10 @@ export default function CommunityPage() {
                             key={option.value}
                             type="button"
                             className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-xs font-bold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-900 focus:border-red-400 focus:outline-none"
-                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              saveWriteTitleSelectionOffsets();
+                            }}
                             onClick={() => applyWriteTitleColor(option.value)}
                             aria-label={colorUi.label + " 제목 색상 적용"}
                             title={colorUi.label}
@@ -1966,7 +2009,10 @@ export default function CommunityPage() {
                             key={option.value}
                             type="button"
                             className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-xs font-bold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-900 focus:border-red-400 focus:outline-none"
-                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              saveWriteContentSelectionRange();
+                            }}
                             onClick={() => applyWriteTextColor(option.value)}
                             aria-label={colorUi.label + " 글씨 색상 적용"}
                             title={colorUi.label}
