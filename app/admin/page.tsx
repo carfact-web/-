@@ -983,6 +983,10 @@ export default function AdminPage() {
     useState<CommunityBoardFilter>("all");
   const [postPage, setPostPage] = useState(1);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const [selectedPopupNoticeId, setSelectedPopupNoticeId] = useState<
+    string | null
+  >(null);
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewPage, setReviewPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
@@ -994,6 +998,10 @@ export default function AdminPage() {
     useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
+  const [selectedNoticeIds, setSelectedNoticeIds] = useState<string[]>([]);
+  const [selectedPopupNoticeIds, setSelectedPopupNoticeIds] = useState<
+    string[]
+  >([]);
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
   const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
 
@@ -1047,6 +1055,16 @@ export default function AdminPage() {
     () => posts.find((post) => post.id === selectedPostId) ?? null,
     [posts, selectedPostId],
   );
+  const selectedNotice = useMemo(
+    () => notices.find((notice) => notice.id === selectedNoticeId) ?? null,
+    [notices, selectedNoticeId],
+  );
+  const selectedPopupNotice = useMemo(
+    () =>
+      popupNotices.find((notice) => notice.id === selectedPopupNoticeId) ??
+      null,
+    [popupNotices, selectedPopupNoticeId],
+  );
   const selectedReviews = useMemo(
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
     [reviews, selectedReviewIds],
@@ -1087,6 +1105,14 @@ export default function AdminPage() {
   const allPostsSelected =
     paginatedPosts.length > 0 &&
     selectedVisiblePosts.length === paginatedPosts.length;
+  const allNoticesSelected =
+    notices.length > 0 &&
+    notices.every((notice) => selectedNoticeIds.includes(notice.id));
+  const allPopupNoticesSelected =
+    popupNotices.length > 0 &&
+    popupNotices.every((notice) =>
+      selectedPopupNoticeIds.includes(notice.id),
+    );
   const allReviewsSelected =
     paginatedReviews.length > 0 &&
     selectedVisibleReviews.length === paginatedReviews.length;
@@ -1300,6 +1326,8 @@ export default function AdminPage() {
       );
       setPopupNotices((popupNoticesResult.data ?? []) as AdminPopupNotice[]);
       setSelectedPostIds([]);
+      setSelectedNoticeIds([]);
+      setSelectedPopupNoticeIds([]);
       setSelectedReviewIds([]);
       setSelectedReportIds([]);
     } catch (error) {
@@ -3183,12 +3211,16 @@ export default function AdminPage() {
                   notices.map((notice) => (
                     <article className={mobileCardClassName} key={notice.id}>
                       <div className="min-w-0">
-                        <p className={mobileCardTitleClassName}>
+                        <button
+                          type="button"
+                          className={cn(
+                            mobileCardTitleClassName,
+                            "block text-left hover:text-red-100",
+                          )}
+                          onClick={() => setSelectedNoticeId(notice.id)}
+                        >
                           {notice.title}
-                        </p>
-                        <p className={mobileCardMetaClassName}>
-                          {notice.content}
-                        </p>
+                        </button>
                         <div className={mobileCardSubMetaClassName}>
                           <PostStatusBadges post={notice} />
                           <span>{formatDate(notice.created_at)}</span>
@@ -3214,7 +3246,19 @@ export default function AdminPage() {
               <table className={desktopTableClassName}>
                 <thead>
                   <tr>
-                    <th className={tableHeadCellClassName}>공지</th>
+                    <th className={tableHeadCellClassName}>
+                      <SelectionCheckbox
+                        checked={allNoticesSelected}
+                        disabled={!notices.length}
+                        label="공지 전체 선택"
+                        onChange={(checked) =>
+                          setSelectedNoticeIds(
+                            checked ? notices.map((notice) => notice.id) : [],
+                          )
+                        }
+                      />
+                    </th>
+                    <th className={tableHeadCellClassName}>공지 제목</th>
                     <th className={tableHeadCellClassName}>상태</th>
                     <th className={tableHeadCellClassName}>작성일</th>
                     <th className={cn(tableHeadCellClassName, "text-right")}>
@@ -3227,20 +3271,34 @@ export default function AdminPage() {
                     notices.map((notice) => (
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
-                          <p className="max-w-sm font-bold text-white">
-                            {notice.title}
-                          </p>
-                          <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
-                            {notice.content}
-                          </p>
+                          <SelectionCheckbox
+                            checked={selectedNoticeIds.includes(notice.id)}
+                            label="공지 선택"
+                            onChange={(checked) =>
+                              setSelectedNoticeIds((current) =>
+                                checked
+                                  ? Array.from(new Set([...current, notice.id]))
+                                  : current.filter((id) => id !== notice.id),
+                              )
+                            }
+                          />
                         </td>
                         <td className={tableCellClassName}>
+                          <button
+                            type="button"
+                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-white hover:text-red-100"
+                            onClick={() => setSelectedNoticeId(notice.id)}
+                          >
+                            {notice.title}
+                          </button>
+                        </td>
+                        <td className={cn(tableCellClassName, "min-w-48 whitespace-nowrap")}>
                           <PostStatusBadges post={notice} />
                         </td>
-                        <td className={tableCellClassName}>
+                        <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                           {formatDate(notice.created_at)}
                         </td>
-                        <td className={tableActionCellClassName}>
+                        <td className={cn(tableCellClassName, "min-w-32 text-right")}>
                           <div className={desktopActionGroupClassName}>
                             <NoticeActionButtons
                               notice={notice}
@@ -3257,7 +3315,7 @@ export default function AdminPage() {
                     ))
                   ) : (
                     <EmptyTableRow
-                      colSpan={4}
+                      colSpan={5}
                       message="공지 내역이 없습니다."
                     />
                   )}
@@ -3280,12 +3338,16 @@ export default function AdminPage() {
                   popupNotices.map((notice) => (
                     <article className={mobileCardClassName} key={notice.id}>
                       <div className="min-w-0">
-                        <p className={mobileCardTitleClassName}>
+                        <button
+                          type="button"
+                          className={cn(
+                            mobileCardTitleClassName,
+                            "block text-left hover:text-red-100",
+                          )}
+                          onClick={() => setSelectedPopupNoticeId(notice.id)}
+                        >
                           {notice.title}
-                        </p>
-                        <p className={mobileCardMetaClassName}>
-                          {notice.content}
-                        </p>
+                        </button>
                         <div className={mobileCardSubMetaClassName}>
                           <ActiveStatusBadge isActive={notice.is_active} />
                           <span>{formatDate(notice.created_at)}</span>
@@ -3308,7 +3370,21 @@ export default function AdminPage() {
               <table className={desktopTableClassName}>
                 <thead>
                   <tr>
-                    <th className={tableHeadCellClassName}>팝업</th>
+                    <th className={tableHeadCellClassName}>
+                      <SelectionCheckbox
+                        checked={allPopupNoticesSelected}
+                        disabled={!popupNotices.length}
+                        label="팝업공지 전체 선택"
+                        onChange={(checked) =>
+                          setSelectedPopupNoticeIds(
+                            checked
+                              ? popupNotices.map((notice) => notice.id)
+                              : [],
+                          )
+                        }
+                      />
+                    </th>
+                    <th className={tableHeadCellClassName}>팝업 제목</th>
                     <th className={tableHeadCellClassName}>상태</th>
                     <th className={tableHeadCellClassName}>작성일</th>
                     <th className={cn(tableHeadCellClassName, "text-right")}>
@@ -3321,25 +3397,34 @@ export default function AdminPage() {
                     popupNotices.map((notice) => (
                       <tr key={notice.id}>
                         <td className={tableCellClassName}>
-                          <p className="max-w-sm font-bold text-white">
-                            {notice.title}
-                          </p>
-                          <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
-                            {notice.content}
-                          </p>
-                          {notice.link_url ? (
-                            <p className="mt-2 break-all text-xs text-zinc-500">
-                              {notice.link_url}
-                            </p>
-                          ) : null}
+                          <SelectionCheckbox
+                            checked={selectedPopupNoticeIds.includes(notice.id)}
+                            label="팝업공지 선택"
+                            onChange={(checked) =>
+                              setSelectedPopupNoticeIds((current) =>
+                                checked
+                                  ? Array.from(new Set([...current, notice.id]))
+                                  : current.filter((id) => id !== notice.id),
+                              )
+                            }
+                          />
                         </td>
                         <td className={tableCellClassName}>
+                          <button
+                            type="button"
+                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-white hover:text-red-100"
+                            onClick={() => setSelectedPopupNoticeId(notice.id)}
+                          >
+                            {notice.title}
+                          </button>
+                        </td>
+                        <td className={cn(tableCellClassName, "min-w-28 whitespace-nowrap")}>
                           <ActiveStatusBadge isActive={notice.is_active} />
                         </td>
-                        <td className={tableCellClassName}>
+                        <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                           {formatDate(notice.created_at)}
                         </td>
-                        <td className={tableActionCellClassName}>
+                        <td className={cn(tableCellClassName, "min-w-48 text-right")}>
                           <div className={desktopActionGroupClassName}>
                             <PopupNoticeActionButtons
                               notice={notice}
@@ -3359,13 +3444,139 @@ export default function AdminPage() {
                     ))
                   ) : (
                     <EmptyTableRow
-                      colSpan={4}
+                      colSpan={5}
                       message="팝업공지 내역이 없습니다."
                     />
                   )}
                 </tbody>
               </table>
             </AdminTablePanel>
+          </div>
+        ) : null}
+
+        {selectedNotice ? (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-notice-detail-title"
+            onClick={() => setSelectedNoticeId(null)}
+          >
+            <section
+              className="w-full max-w-3xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-red-300">공지</p>
+                  <h2
+                    id="admin-notice-detail-title"
+                    className="mt-1 break-words text-xl font-black text-white"
+                  >
+                    {selectedNotice.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  onClick={() => setSelectedNoticeId(null)}
+                  aria-label="공지 상세 닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4 px-4 py-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-zinc-400">
+                  <span>{formatDate(selectedNotice.created_at)}</span>
+                  <PostStatusBadges post={selectedNotice} />
+                </div>
+
+                <CommunityPostBody
+                  content={selectedNotice.content}
+                  images={getCommunityPostImages(selectedNotice.images)}
+                />
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                  <NoticeActionButtons
+                    notice={selectedNotice}
+                    onDelete={(target) => {
+                      setSelectedNoticeId(null);
+                      void deleteCommunityNotice(target);
+                    }}
+                    onEdit={(target) => void upsertCommunityNotice(target)}
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {selectedPopupNotice ? (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-popup-notice-detail-title"
+            onClick={() => setSelectedPopupNoticeId(null)}
+          >
+            <section
+              className="w-full max-w-2xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-red-300">팝업공지</p>
+                  <h2
+                    id="admin-popup-notice-detail-title"
+                    className="mt-1 break-words text-xl font-black text-white"
+                  >
+                    {selectedPopupNotice.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  onClick={() => setSelectedPopupNoticeId(null)}
+                  aria-label="팝업공지 상세 닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4 px-4 py-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-zinc-400">
+                  <span>{formatDate(selectedPopupNotice.created_at)}</span>
+                  <ActiveStatusBadge isActive={selectedPopupNotice.is_active} />
+                  {selectedPopupNotice.link_url ? (
+                    <a
+                      className="break-all text-red-300 hover:text-red-200"
+                      href={selectedPopupNotice.link_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {selectedPopupNotice.link_url}
+                    </a>
+                  ) : null}
+                </div>
+
+                <p className="whitespace-pre-wrap break-words text-base leading-[1.75] text-zinc-200">
+                  {selectedPopupNotice.content}
+                </p>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                  <PopupNoticeActionButtons
+                    notice={selectedPopupNotice}
+                    onDelete={(target) => {
+                      setSelectedPopupNoticeId(null);
+                      void deletePopupNotice(target);
+                    }}
+                    onEdit={(target) => void upsertPopupNotice(target)}
+                    onToggle={(target) => void togglePopupNotice(target)}
+                  />
+                </div>
+              </div>
+            </section>
           </div>
         ) : null}
 
@@ -4875,14 +5086,14 @@ function EmptyMobileState({ message }: { message: string }) {
 
 function PostStatusBadges({ post }: { post: AdminCommunityPost }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-nowrap gap-1.5 whitespace-nowrap">
       {post.is_notice ? (
-        <span className="rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
+        <span className="shrink-0 rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
           공지
         </span>
       ) : null}
       {post.is_pinned ? (
-        <span className="rounded-full bg-amber-500 px-2 py-1 text-xs font-bold text-black">
+        <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-xs font-bold text-black">
           상단고정
         </span>
       ) : null}
@@ -4893,11 +5104,11 @@ function PostStatusBadges({ post }: { post: AdminCommunityPost }) {
 
 function HiddenStatus({ isHidden }: { isHidden: boolean }) {
   return isHidden ? (
-    <span className="rounded-full bg-zinc-700 px-2 py-1 text-xs font-bold text-zinc-200">
+    <span className="shrink-0 rounded-full bg-zinc-700 px-2 py-1 text-xs font-bold text-zinc-200">
       숨김
     </span>
   ) : (
-    <span className="rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
+    <span className="shrink-0 rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
       노출
     </span>
   );
@@ -4937,11 +5148,11 @@ function AccountStatusBadge({ isSuspended }: { isSuspended: boolean }) {
 
 function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
   return isActive ? (
-    <span className="rounded-full bg-green-500/15 px-2 py-1 text-xs font-bold text-green-200">
+    <span className="shrink-0 whitespace-nowrap rounded-full bg-green-500/15 px-2 py-1 text-xs font-bold text-green-200">
       활성
     </span>
   ) : (
-    <span className="rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
+    <span className="shrink-0 whitespace-nowrap rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
       비활성
     </span>
   );
