@@ -42,7 +42,13 @@ import {
 import { filterValidReviews } from "@/utils/reviewValidation";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import { getCommunityPreviewText } from "@/utils/communityRichContent";
-import type { FormEvent, ReactNode, TouchEvent, UIEvent } from "react";
+import type {
+  FormEvent,
+  MouseEvent,
+  ReactNode,
+  TouchEvent,
+  UIEvent,
+} from "react";
 import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
@@ -175,6 +181,7 @@ const recentReviewMaxPages = 5;
 const recentReviewPreviewLimit = recentReviewsPerSlide * recentReviewMaxPages;
 const recentReviewSlideIntervalMs = 10000;
 const recentReviewFadeHalfDurationMs = 140;
+const recentReviewSwipeThresholdPx = 48;
 const communityGuidePreviewCount = 8;
 const communityGuideSwipeThresholdPx = 42;
 const heroCopyIntervalMs = 3500;
@@ -524,6 +531,9 @@ export default function Home() {
   >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
   const guideTouchStartX = useRef<number | null>(null);
+  const recentTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const recentTouchSuppressClickRef = useRef(false);
+  const recentTouchSuppressClickTimeoutRef = useRef<number | null>(null);
   const recentFadeTimeoutRef = useRef<number | null>(null);
   const guideAnimationTimeoutRef = useRef<number | null>(null);
   const recentSlideRef = useRef<HTMLDivElement | null>(null);
@@ -732,6 +742,73 @@ export default function Home() {
   const resumeRecentAutoRotation = () => {
     setIsRecentAutoPaused(false);
   };
+  const handleRecentTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+
+    recentTouchStartRef.current = touch
+      ? { x: touch.clientX, y: touch.clientY }
+      : null;
+    pauseRecentAutoRotation();
+  };
+  const resetRecentTouchState = () => {
+    recentTouchStartRef.current = null;
+    resumeRecentAutoRotation();
+  };
+  const handleRecentTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startPoint = recentTouchStartRef.current;
+    resetRecentTouchState();
+
+    if (!startPoint || recentPageCount < 2) {
+      return;
+    }
+
+    const endTouch = event.changedTouches[0];
+
+    if (!endTouch) {
+      return;
+    }
+
+    const deltaX = endTouch.clientX - startPoint.x;
+    const deltaY = endTouch.clientY - startPoint.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (
+      absDeltaX < recentReviewSwipeThresholdPx ||
+      absDeltaX <= absDeltaY * 1.2
+    ) {
+      return;
+    }
+
+    recentTouchSuppressClickRef.current = true;
+
+    if (recentTouchSuppressClickTimeoutRef.current !== null) {
+      window.clearTimeout(recentTouchSuppressClickTimeoutRef.current);
+    }
+
+    recentTouchSuppressClickTimeoutRef.current = window.setTimeout(() => {
+      recentTouchSuppressClickRef.current = false;
+      recentTouchSuppressClickTimeoutRef.current = null;
+    }, 350);
+
+    if (deltaX < 0) {
+      goToNextRecentSlide();
+    } else {
+      goToPreviousRecentSlide();
+    }
+  };
+  const handleRecentTouchCancel = () => {
+    resetRecentTouchState();
+  };
+  const handleRecentClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (!recentTouchSuppressClickRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    recentTouchSuppressClickRef.current = false;
+  };
   const handleGuideTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     guideTouchStartX.current = event.touches[0]?.clientX ?? null;
   };
@@ -771,6 +848,10 @@ export default function Home() {
     return () => {
       if (recentFadeTimeoutRef.current !== null) {
         window.clearTimeout(recentFadeTimeoutRef.current);
+      }
+
+      if (recentTouchSuppressClickTimeoutRef.current !== null) {
+        window.clearTimeout(recentTouchSuppressClickTimeoutRef.current);
       }
 
       if (guideAnimationTimeoutRef.current !== null) {
@@ -1200,12 +1281,13 @@ export default function Home() {
             </div>
           ) : (
             <div
-              className="w-full max-w-full min-w-0 overflow-hidden"
+              className="w-full max-w-full min-w-0 overflow-hidden touch-pan-y"
               onMouseEnter={pauseRecentAutoRotation}
               onMouseLeave={resumeRecentAutoRotation}
-              onTouchStart={pauseRecentAutoRotation}
-              onTouchEnd={resumeRecentAutoRotation}
-              onTouchCancel={resumeRecentAutoRotation}
+              onTouchStart={handleRecentTouchStart}
+              onTouchEnd={handleRecentTouchEnd}
+              onTouchCancel={handleRecentTouchCancel}
+              onClickCapture={handleRecentClickCapture}
             >
               <div
                 className="w-full max-w-full overflow-hidden transition-[height] duration-300 ease-out"
