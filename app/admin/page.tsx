@@ -326,7 +326,7 @@ const activeTabButtonClassName = cn(
   "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
 );
 const actionButtonClassName = cn(
-  "inline-flex min-h-9 items-center justify-center rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-bold text-zinc-100 transition",
+  "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs font-bold text-zinc-100 transition",
   "hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50",
 );
 const dangerButtonClassName = cn(
@@ -334,13 +334,13 @@ const dangerButtonClassName = cn(
   "border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20",
 );
 const tableClassName = cn("min-w-full divide-y divide-zinc-800 text-sm");
-const desktopTableClassName = cn(tableClassName, "hidden min-w-[1120px] md:table");
+const desktopTableClassName = cn(tableClassName, "hidden min-w-[1180px] md:table");
 const tableHeadCellClassName = cn(
   "whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-zinc-500",
 );
 const tableCellClassName = cn("px-3 py-3 align-top text-zinc-200");
-const tableActionCellClassName = cn(tableCellClassName, "min-w-44 text-right");
-const desktopActionGroupClassName = cn("flex flex-wrap justify-end gap-2");
+const tableActionCellClassName = cn(tableCellClassName, "min-w-[24rem] text-right");
+const desktopActionGroupClassName = cn("flex flex-nowrap justify-end gap-1.5");
 const mobileListClassName = cn("divide-y divide-zinc-900 md:hidden");
 const mobileCardClassName = cn(
   "grid min-h-[88px] grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3",
@@ -370,10 +370,13 @@ const formatDate = (value: string) => {
     return value;
   }
 
-  return date.toLocaleString("ko-KR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return year + "." + month + "." + day + " " + hours + ":" + minutes;
 };
 
 const formatOptionalDate = (value: string | null | undefined) =>
@@ -2328,9 +2331,16 @@ export default function AdminPage() {
                         {formatDate(account.created_at)}
                       </p>
                       <p className={mobileCardMetaClassName}>
-                        회원 ID {formatCompactId(account.id)} · 최근 로그인{" "}
-                        {formatOptionalDate(account.last_sign_in_at)}
+                        최근 로그인 {formatOptionalDate(account.last_sign_in_at)}
                       </p>
+                      <details className="mt-1 text-xs text-zinc-500">
+                        <summary className="cursor-pointer select-none text-zinc-400">
+                          회원 ID 보기
+                        </summary>
+                        <div className="mt-1 break-all font-mono text-[11px] leading-relaxed">
+                          {account.id}
+                        </div>
+                      </details>
                       <div className={mobileCardSubMetaClassName}>
                         <RoleBadge role={account.role} />
                         <AccountStatusBadge
@@ -2378,15 +2388,14 @@ export default function AdminPage() {
             <table className={desktopTableClassName}>
               <thead>
                 <tr>
-                  <th className={tableHeadCellClassName}>회원 ID</th>
                   <th className={tableHeadCellClassName}>닉네임</th>
                   <th className={tableHeadCellClassName}>로그인 정보</th>
                   <th className={tableHeadCellClassName}>변경권</th>
                   <th className={tableHeadCellClassName}>Role</th>
                   <th className={tableHeadCellClassName}>인증딜러</th>
-                  <th className={tableHeadCellClassName}>상태</th>
-                  <th className={tableHeadCellClassName}>가입일</th>
-                  <th className={tableHeadCellClassName}>최근 로그인</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-16")}>상태</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-36")}>가입일</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-36")}>최근 로그인</th>
                   <th className={cn(tableHeadCellClassName, "text-right")}>
                     관리
                   </th>
@@ -2397,52 +2406,38 @@ export default function AdminPage() {
                   users.map((account) => (
                     <tr key={account.id}>
                       <td className={tableCellClassName}>
-                        <span className="font-mono text-xs text-zinc-400">
-                          {account.id}
-                        </span>
+                        <div className="min-w-32">
+                          <details className="group">
+                            <summary className="cursor-pointer list-none">
+                              <span className="inline-flex items-center gap-1.5">
+                                <VerifiedNickname
+                                  isVerifiedDealer={account.is_verified_dealer}
+                                >
+                                  {account.nickname ?? "닉네임 없음"}
+                                </VerifiedNickname>
+                                <span className="text-[10px] font-bold text-zinc-600 group-open:hidden">
+                                  ID
+                                </span>
+                                <span className="hidden text-[10px] font-bold text-zinc-600 group-open:inline">
+                                  접기
+                                </span>
+                              </span>
+                            </summary>
+                            <div className="mt-1 max-w-48 break-all font-mono text-[11px] leading-relaxed text-zinc-500">
+                              {account.id}
+                            </div>
+                          </details>
+                        </div>
                       </td>
                       <td className={tableCellClassName}>
-                        <VerifiedNickname
-                          isVerifiedDealer={account.is_verified_dealer}
-                        >
-                          {account.nickname ?? "닉네임 없음"}
-                        </VerifiedNickname>
-                      </td>
-                      <td className={tableCellClassName}>
-                        <div className="flex min-w-64 gap-3">
-                          {account.provider_avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={account.provider_avatar_url}
-                              alt=""
-                              referrerPolicy="no-referrer"
-                              className="h-10 w-10 shrink-0 rounded-full border border-zinc-800 bg-zinc-900 object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-xs font-bold text-zinc-500">
-                              없음
-                            </div>
-                          )}
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-bold text-red-200">
-                                {getDisplayValue(account.login_provider)}
-                              </span>
-                              <span className="text-xs text-zinc-400">
-                                {getDisplayValue(account.provider_profile_name)}
-                              </span>
-                            </div>
-                            <div className="break-all text-xs text-zinc-300">
+                        <div className="min-w-56 max-w-72">
+                          <div className="flex items-center gap-2">
+                            <span className="shrink-0 rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-bold text-red-200">
+                              {formatProviderLabel(account.login_provider)}
+                            </span>
+                            <span className="min-w-0 truncate text-xs text-zinc-300">
                               {getDisplayValue(account.email)}
-                            </div>
-                            <details className="text-xs text-zinc-500">
-                              <summary className="cursor-pointer select-none text-zinc-400">
-                                제공자 상세
-                              </summary>
-                              <div className="mt-1 max-w-72 break-all font-mono text-[11px] leading-relaxed text-zinc-500">
-                                {getDisplayValue(account.provider_user_id)}
-                              </div>
-                            </details>
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -2472,15 +2467,15 @@ export default function AdminPage() {
                               : "OFF"}
                         </span>
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap")}>
                         <AccountStatusBadge
                           isSuspended={account.is_suspended}
                         />
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                         {formatDate(account.created_at)}
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                         {formatOptionalDate(account.last_sign_in_at)}
                       </td>
                       <td className={tableActionCellClassName}>
@@ -2509,7 +2504,7 @@ export default function AdminPage() {
                     </tr>
                   ))
                 ) : (
-                  <EmptyTableRow colSpan={10} message="회원이 없습니다." />
+                  <EmptyTableRow colSpan={9} message="회원이 없습니다." />
                 )}
               </tbody>
             </table>
@@ -4169,14 +4164,14 @@ function UserActionButtons({
             : "인증딜러 기능 DB 미적용"
         }
       >
-        {account.is_verified_dealer ? "인증딜러 회수" : "인증딜러 부여"}
+        {account.is_verified_dealer ? "딜러 회수" : "인증딜러"}
       </button>
       <button
         type="button"
         className={actionButtonClassName}
         onClick={() => onGrantNicknameChangeTicket(account)}
       >
-        닉네임 변경권 +1
+        닉네임 변경
       </button>
       <button
         type="button"
@@ -4363,11 +4358,11 @@ function RoleBadge({ role }: { role: AdminRole }) {
 
 function AccountStatusBadge({ isSuspended }: { isSuspended: boolean }) {
   return isSuspended ? (
-    <span className="rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-200">
+    <span className="inline-flex whitespace-nowrap rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-200">
       정지
     </span>
   ) : (
-    <span className="rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-300">
+    <span className="inline-flex whitespace-nowrap rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-300">
       정상
     </span>
   );
