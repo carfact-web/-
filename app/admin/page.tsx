@@ -362,6 +362,14 @@ const checkboxClassName = cn(
   "h-4 w-4 rounded border-zinc-700 bg-black text-red-500",
   "focus:ring-2 focus:ring-red-500/40 focus:ring-offset-0",
 );
+const paginationButtonClassName = cn(
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-zinc-800 px-2 text-xs font-bold text-zinc-300 transition",
+  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
+);
+const activePaginationButtonClassName = cn(
+  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+);
+const adminReviewsPerPage = 10;
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -402,6 +410,53 @@ const formatReviewVehicleSummary = (review: AdminReview) => {
   return [vehicleName || review.vehicle_id, plateNumber, year ? year + "년" : ""]
     .filter(Boolean)
     .join(" · ");
+};
+
+const maskAdminPlateNumber = (plateNumber: string | null | undefined) => {
+  const normalizedPlateNumber = plateNumber?.replace(/\s+/g, "").trim() ?? "";
+
+  if (normalizedPlateNumber.length <= 3) {
+    return normalizedPlateNumber || "차량번호 없음";
+  }
+
+  return normalizedPlateNumber.slice(0, -3) + "XXX";
+};
+
+const getReviewPlateNumber = (review: AdminReview) =>
+  getJsonString(review.vehicle_snapshot, "plateNumber");
+
+const getReviewVehicleModel = (review: AdminReview) => {
+  const snapshot = review.vehicle_snapshot;
+  const brand = getJsonString(snapshot, "brand");
+  const model = getJsonString(snapshot, "model");
+  const generation = getJsonString(snapshot, "generation");
+
+  return [brand, generation || model].filter(Boolean).join(" ") || "차량 정보 없음";
+};
+
+const getReviewDetailHref = (review: AdminReview) => {
+  const plateNumber = getReviewPlateNumber(review);
+
+  return plateNumber ? "/car/" + encodeURIComponent(plateNumber) : null;
+};
+
+const getAdminPaginationPages = (totalPages: number, currentPage: number) => {
+  const maxVisiblePages = 5;
+
+  if (totalPages <= maxVisiblePages) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const halfWindow = Math.floor(maxVisiblePages / 2);
+  const startPage = Math.min(
+    Math.max(1, currentPage - halfWindow),
+    totalPages - maxVisiblePages + 1,
+  );
+
+  return Array.from(
+    { length: maxVisiblePages },
+    (_, index) => startPage + index,
+  );
 };
 
 const getErrorMessage = (error: unknown, fallback: string) =>
@@ -784,6 +839,7 @@ export default function AdminPage() {
   const [popupNotices, setPopupNotices] = useState<AdminPopupNotice[]>([]);
   const [postSearch, setPostSearch] = useState("");
   const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewPage, setReviewPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
   const [reportSearch, setReportSearch] = useState("");
   const [noticeSearch, setNoticeSearch] = useState("");
@@ -809,6 +865,34 @@ export default function AdminPage() {
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
     [reviews, selectedReviewIds],
   );
+  const sortedReviews = useMemo(
+    () =>
+      reviews
+        .slice()
+        .sort(
+          (left, right) =>
+            Date.parse(right.created_at) - Date.parse(left.created_at),
+        ),
+    [reviews],
+  );
+  const totalReviewPages = Math.max(
+    1,
+    Math.ceil(sortedReviews.length / adminReviewsPerPage),
+  );
+  const currentReviewPage = Math.min(reviewPage, totalReviewPages);
+  const paginatedReviews = useMemo(
+    () =>
+      sortedReviews.slice(
+        (currentReviewPage - 1) * adminReviewsPerPage,
+        currentReviewPage * adminReviewsPerPage,
+      ),
+    [currentReviewPage, sortedReviews],
+  );
+  const selectedVisibleReviews = useMemo(
+    () =>
+      paginatedReviews.filter((review) => selectedReviewIds.includes(review.id)),
+    [paginatedReviews, selectedReviewIds],
+  );
   const selectedReports = useMemo(
     () =>
       reports.filter((report) => selectedReportIds.includes(report.report_id)),
@@ -817,7 +901,8 @@ export default function AdminPage() {
   const allPostsSelected =
     posts.length > 0 && selectedPosts.length === posts.length;
   const allReviewsSelected =
-    reviews.length > 0 && selectedReviews.length === reviews.length;
+    paginatedReviews.length > 0 &&
+    selectedVisibleReviews.length === paginatedReviews.length;
   const allReportsSelected =
     reports.length > 0 && selectedReports.length === reports.length;
   const sessionAccessToken = session?.access_token ?? "";
@@ -1962,7 +2047,10 @@ export default function AdminPage() {
             setNoticeSearch={setNoticeSearch}
             setPostSearch={setPostSearch}
             setReportSearch={setReportSearch}
-            setReviewSearch={setReviewSearch}
+            setReviewSearch={(value) => {
+              setReviewPage(1);
+              setReviewSearch(value);
+            }}
             setUserSearch={setUserSearch}
           />
         ) : null}
@@ -2174,8 +2262,10 @@ export default function AdminPage() {
               onUnhide={() => void updateReviewsHidden(selectedReviews, false)}
             />
             <div className={mobileListClassName}>
-              {reviews.length ? (
-                reviews.map((review) => (
+              {paginatedReviews.length ? (
+                paginatedReviews.map((review) => {
+                  const reviewDetailHref = getReviewDetailHref(review);
+                  return (
                   <article className={mobileCardClassName} key={review.id}>
                     <div className="min-w-0">
                       <div className="flex items-start gap-2">
@@ -2191,16 +2281,33 @@ export default function AdminPage() {
                           }
                         />
                         <div className="min-w-0">
-                          <p className={mobileCardTitleClassName}>
-                            {review.content}
+                          <p className="text-xs font-black text-red-100">
+                            {maskAdminPlateNumber(getReviewPlateNumber(review))}
                           </p>
+                          <p className={mobileCardMetaClassName}>
+                            {getReviewVehicleModel(review)}
+                          </p>
+                          {reviewDetailHref ? (
+                            <Link
+                              href={reviewDetailHref}
+                              className={cn(
+                                mobileCardTitleClassName,
+                                "mt-1 block hover:text-red-100",
+                              )}
+                            >
+                              {review.content}
+                            </Link>
+                          ) : (
+                            <p className={cn(mobileCardTitleClassName, "mt-1")}>
+                              {review.content}
+                            </p>
+                          )}
                           <p className={mobileCardMetaClassName}>
                             {review.author_nickname ??
                               (review.author_id
                                 ? formatCompactId(review.author_id, 6)
                                 : "익명 사용자")}{" "}
-                            · {formatReviewVehicleSummary(review)} ·{" "}
-                            {formatDate(review.created_at)}
+                            · {formatDate(review.created_at)}
                           </p>
                           <div className={mobileCardSubMetaClassName}>
                             <HiddenStatus isHidden={review.is_hidden} />
@@ -2220,7 +2327,8 @@ export default function AdminPage() {
                       />
                     </MobileActionDetails>
                   </article>
-                ))
+                  );
+                })
               ) : (
                 <EmptyMobileState message="후기가 없습니다." />
               )}
@@ -2231,16 +2339,28 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>
                     <SelectionCheckbox
                       checked={allReviewsSelected}
-                      disabled={!reviews.length}
-                      label="후기 전체 선택"
-                      onChange={(checked) =>
-                        setSelectedReviewIds(
-                          checked ? reviews.map((review) => review.id) : [],
-                        )
-                      }
+                      disabled={!paginatedReviews.length}
+                      label="현재 페이지 후기 전체 선택"
+                      onChange={(checked) => {
+                        const visibleReviewIds = paginatedReviews.map(
+                          (review) => review.id,
+                        );
+
+                        setSelectedReviewIds((current) =>
+                          checked
+                            ? Array.from(
+                                new Set([...current, ...visibleReviewIds]),
+                              )
+                            : current.filter(
+                                (id) => !visibleReviewIds.includes(id),
+                              ),
+                        );
+                      }}
                     />
                   </th>
-                  <th className={tableHeadCellClassName}>내용</th>
+                  <th className={tableHeadCellClassName}>차량번호</th>
+                  <th className={tableHeadCellClassName}>차량 모델</th>
+                  <th className={tableHeadCellClassName}>후기 내용</th>
                   <th className={tableHeadCellClassName}>작성자</th>
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>신고</th>
@@ -2251,8 +2371,10 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-900">
-                {reviews.length ? (
-                  reviews.map((review) => (
+                {paginatedReviews.length ? (
+                  paginatedReviews.map((review) => {
+                    const reviewDetailHref = getReviewDetailHref(review);
+                    return (
                     <tr key={review.id}>
                       <td className={tableCellClassName}>
                         <SelectionCheckbox
@@ -2267,29 +2389,46 @@ export default function AdminPage() {
                           }
                         />
                       </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs font-bold text-zinc-100")}>
+                        {maskAdminPlateNumber(getReviewPlateNumber(review))}
+                      </td>
                       <td className={tableCellClassName}>
-                        <p className="max-w-lg whitespace-pre-wrap break-words leading-[1.7] text-white">
-                          {review.content}
-                        </p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          차량 ID: {review.vehicle_id}
+                        <p className="max-w-52 truncate text-sm font-semibold text-zinc-200">
+                          {getReviewVehicleModel(review)}
                         </p>
                       </td>
                       <td className={tableCellClassName}>
-                        {review.author_nickname ??
-                          review.author_id ??
-                          "익명 사용자"}
+                        {reviewDetailHref ? (
+                          <Link
+                            href={reviewDetailHref}
+                            className="block max-w-[30rem] truncate text-sm leading-5 text-white hover:text-red-100"
+                          >
+                            {review.content}
+                          </Link>
+                        ) : (
+                          <p className="max-w-[30rem] truncate text-sm leading-5 text-white">
+                            {review.content}
+                          </p>
+                        )}
                       </td>
                       <td className={tableCellClassName}>
+                        <span className="block max-w-32 truncate text-sm">
+                          {review.author_nickname ??
+                            (review.author_id
+                              ? formatCompactId(review.author_id, 8)
+                              : "익명 사용자")}
+                        </span>
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap")}>
                         <HiddenStatus isHidden={review.is_hidden} />
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-sm font-bold")}>
                         {review.report_count.toLocaleString()}
                       </td>
-                      <td className={tableCellClassName}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
                         {formatDate(review.created_at)}
                       </td>
-                      <td className={tableActionCellClassName}>
+                      <td className={cn(tableCellClassName, "min-w-36 text-right")}>
                         <div className={desktopActionGroupClassName}>
                           <ReviewActionButtons
                             isSuperAdmin={isSuperAdmin}
@@ -2302,12 +2441,58 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 ) : (
-                  <EmptyTableRow colSpan={7} message="후기가 없습니다." />
+                  <EmptyTableRow colSpan={9} message="후기가 없습니다." />
                 )}
               </tbody>
             </table>
+            {totalReviewPages > 1 ? (
+              <nav
+                className="mt-4 flex flex-wrap items-center justify-center gap-2"
+                aria-label="후기 관리 페이지"
+              >
+                <button
+                  type="button"
+                  className={paginationButtonClassName}
+                  disabled={currentReviewPage <= 1}
+                  onClick={() => setReviewPage(currentReviewPage - 1)}
+                >
+                  ◀
+                </button>
+                {getAdminPaginationPages(
+                  totalReviewPages,
+                  currentReviewPage,
+                ).map((page) => {
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      className={cn(
+                        paginationButtonClassName,
+                        currentReviewPage === page &&
+                          activePaginationButtonClassName,
+                      )}
+                      onClick={() => setReviewPage(page)}
+                      aria-current={
+                        currentReviewPage === page ? "page" : undefined
+                      }
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className={paginationButtonClassName}
+                  disabled={currentReviewPage >= totalReviewPages}
+                  onClick={() => setReviewPage(currentReviewPage + 1)}
+                >
+                  ▶
+                </button>
+              </nav>
+            ) : null}
           </AdminTablePanel>
         ) : null}
 
