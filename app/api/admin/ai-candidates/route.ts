@@ -220,25 +220,6 @@ const applyCandidateToVehicleInspectionDb = async (
     }
   }
 
-  const { data: existingItems, error: itemReadError } = await fromTable(
-    admin,
-    "vehicle_inspection_items",
-  )
-    .select("display_order")
-    .eq("profile_id", profileId);
-
-  if (itemReadError) {
-    throw itemReadError;
-  }
-
-  const nextDisplayOrder =
-    Math.max(
-      0,
-      ...(existingItems ?? []).map((item: { display_order?: unknown }) =>
-        Number(item.display_order ?? 0),
-      ),
-    ) +
-    1;
   const { error: itemError } = await fromTable(admin, "vehicle_inspection_items")
     .upsert(
       {
@@ -252,7 +233,7 @@ const applyCandidateToVehicleInspectionDb = async (
         importance: "중",
         estimated_repair_cost: "현장 확인",
         ai_summary: `최근 후기 본문에서 '${input.keyword}' 언급이 반복됩니다. 출고 전 ${inspectionTitle}을 우선 확인해보세요.`,
-        display_order: nextDisplayOrder,
+        display_order: 0,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "profile_id,title" },

@@ -730,6 +730,10 @@ const addCheckPointsFromMessage = (checkPoints: string[], message: string) => {
     addUniqueCheckPoint(checkPoints, "냉각수 보조탱크 및 호스 상태");
   }
 
+  if (/누수|물샘/.test(message)) {
+    addUniqueCheckPoint(checkPoints, "누수 흔적 확인");
+  }
+
   if (/미션|변속|변속기|DCT|DSG|S트로닉|CVT|PDK|울컥/.test(message)) {
     addUniqueCheckPoint(checkPoints, "변속 충격 및 저속 울컥거림");
   }
