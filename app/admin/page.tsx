@@ -25,7 +25,7 @@ type DashboardBoardTab =
   | "keywords"
   | "ai";
 type DashboardViewFilter = "vehicle" | "model" | "review";
-type AiCandidateStatus = "pending" | "reviewing" | "applied" | "excluded";
+type AiCandidateStatus = "reviewing" | "applied" | "excluded";
 type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
 type CommunityCategory =
   | "free"
@@ -145,6 +145,13 @@ interface AdminDashboardAiCandidate {
   reason: string;
   source: AiCandidateSource;
   status: AiCandidateStatus;
+  suggestedUpdates: string[];
+  evidence: {
+    keywordMentionCount: number | null;
+    recentGrowthRate: number | null;
+    reviewCount: number | null;
+    viewCount: number | null;
+  };
 }
 
 interface AdminOperatorDashboardData {
@@ -392,6 +399,9 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
+const toNullableNumber = (value: unknown) =>
+  value === null || value === undefined || value === "" ? null : toNumber(value);
+
 const toTrafficTopVehicles = (value: Json): AdminTrafficTopVehicle[] =>
   Array.isArray(value)
     ? (value as unknown[]).filter(isRecord).map((item) => ({
@@ -466,11 +476,10 @@ const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
   { label: "조회수", value: "views" },
   { label: "콘텐츠", value: "content" },
   { label: "유입 키워드", value: "keywords" },
-  { label: "AI 반영 후보", value: "ai" },
+  { label: "AI DB 업데이트 추천", value: "ai" },
 ];
 
 const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
-  { label: "대기", value: "pending" },
   { label: "검토중", value: "reviewing" },
   { label: "반영완료", value: "applied" },
   { label: "제외", value: "excluded" },
@@ -478,7 +487,6 @@ const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
 
 const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
   if (
-    value === "pending" ||
     value === "reviewing" ||
     value === "applied" ||
     value === "excluded"
@@ -486,7 +494,7 @@ const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
     return value;
   }
 
-  return "pending";
+  return "reviewing";
 };
 
 const normalizeAiCandidateSource = (value: unknown): AiCandidateSource => {
@@ -565,15 +573,30 @@ const toOperatorAiCandidates = (
   value: Json,
 ): AdminDashboardAiCandidate[] =>
   Array.isArray(value)
-    ? (value as unknown[]).filter(isRecord).map((item) => ({
-        candidateKey: String(item.candidate_key ?? ""),
-        keyword: String(item.keyword ?? ""),
-        mentionCount: toNumber(item.mention_count),
-        relatedModels: toStringArray(item.related_models),
-        reason: String(item.reason ?? ""),
-        source: normalizeAiCandidateSource(item.source),
-        status: normalizeAiCandidateStatus(item.status),
-      }))
+    ? (value as unknown[]).filter(isRecord).map((item) => {
+        const evidence = isRecord(item.evidence) ? item.evidence : {};
+
+        return {
+          candidateKey: String(item.candidate_key ?? ""),
+          keyword: String(item.keyword ?? ""),
+          mentionCount: toNumber(item.mention_count),
+          relatedModels: toStringArray(item.related_models),
+          reason: String(item.reason ?? ""),
+          source: normalizeAiCandidateSource(item.source),
+          status: normalizeAiCandidateStatus(item.status),
+          suggestedUpdates: toStringArray(item.suggested_updates),
+          evidence: {
+            keywordMentionCount: toNullableNumber(
+              evidence.keyword_mention_count ?? item.keyword_mention_count,
+            ),
+            recentGrowthRate: toNullableNumber(
+              evidence.recent_growth_rate ?? item.recent_growth_rate,
+            ),
+            reviewCount: toNullableNumber(evidence.review_count ?? item.review_count),
+            viewCount: toNullableNumber(evidence.view_count ?? item.view_count),
+          },
+        };
+      })
     : [];
 
 export default function AdminPage() {
@@ -2780,7 +2803,7 @@ function DashboardPanel({
           <div>
             <h2 className="text-lg font-black text-white">운영 게시판</h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
-              트래픽, 조회수, 콘텐츠, 키워드, AI 반영 후보를 탭으로 확인합니다.
+              트래픽, 조회수, 콘텐츠, 키워드, AI DB 업데이트 추천을 탭으로 확인합니다.
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -2827,6 +2850,7 @@ function DashboardPanel({
             <DashboardAiCandidateTable
               candidates={operatorDashboardData.aiCandidates}
               onChangeStatus={onChangeAiCandidateStatus}
+              reviews={reviews}
             />
           ) : null}
         </div>
@@ -3100,64 +3124,141 @@ function DashboardKeywordTable({
 function DashboardAiCandidateTable({
   candidates,
   onChangeStatus,
+  reviews,
 }: {
   candidates: AdminDashboardAiCandidate[];
   onChangeStatus: (
     candidate: AdminDashboardAiCandidate,
     nextStatus: AiCandidateStatus,
   ) => void;
+  reviews: AdminReview[];
 }) {
   if (!candidates.length) {
-    return <DashboardEmptyState message="AI 반영 후보가 없습니다." />;
+    return <DashboardEmptyState message="AI DB 업데이트 추천이 없습니다." />;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-[1040px] divide-y divide-zinc-900 text-sm">
-        <thead className="bg-black">
-          <tr>
-            <DashboardHeadCell>후보 키워드</DashboardHeadCell>
-            <DashboardHeadCell>언급 횟수</DashboardHeadCell>
-            <DashboardHeadCell>관련 모델</DashboardHeadCell>
-            <DashboardHeadCell>추천 사유</DashboardHeadCell>
-            <DashboardHeadCell>상태값</DashboardHeadCell>
-            <DashboardHeadCell align="right">상태 변경</DashboardHeadCell>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
-          {candidates.map((candidate) => (
-            <tr key={candidate.candidateKey}>
-              <DashboardCell strong>{candidate.keyword}</DashboardCell>
-              <DashboardCell>{candidate.mentionCount.toLocaleString()}회</DashboardCell>
-              <DashboardCell>{formatModelList(candidate.relatedModels)}</DashboardCell>
-              <DashboardCell>{candidate.reason}</DashboardCell>
-              <DashboardCell>
+    <div className="divide-y divide-zinc-900 bg-zinc-950">
+      <div className="bg-black px-4 py-3">
+        <h3 className="text-sm font-black text-white">AI DB 업데이트 추천</h3>
+        <p className="mt-1 text-xs font-medium text-zinc-500">
+          후기 데이터와 조회 신호에서 반복 패턴을 찾고, 관리자는 반영 여부만 결정합니다.
+        </p>
+      </div>
+      {candidates.map((candidate) => {
+        const evidence = getAiCandidateEvidence(candidate, reviews);
+        const reasonItems = getAiCandidateReasonItems(candidate, reviews);
+        const suggestedUpdates = getAiCandidateSuggestedUpdates(candidate);
+
+        return (
+          <article
+            key={candidate.candidateKey}
+            className="grid gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_260px]"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-black text-red-100">
+                  {getAiSourceLabel(candidate.source)}
+                </span>
                 <AiStatusBadge status={candidate.status} />
-              </DashboardCell>
-              <DashboardCell align="right">
-                <div className="flex flex-wrap justify-end gap-1.5">
-                  {aiCandidateStatuses.map((status) => (
-                    <button
-                      key={status.value}
-                      type="button"
-                      className={cn(
-                        actionButtonClassName,
-                        "min-h-8 px-2 text-[11px]",
-                        candidate.status === status.value &&
-                          "border-red-500 bg-red-500/20 text-red-100",
-                      )}
-                      disabled={candidate.status === status.value}
-                      onClick={() => onChangeStatus(candidate, status.value)}
-                    >
-                      {status.label}
-                    </button>
+              </div>
+              <h4 className="mt-3 break-words text-lg font-black leading-snug text-white">
+                {getAiCandidateTarget(candidate)}
+              </h4>
+              <p className="mt-1 text-xs font-bold text-zinc-500">
+                추천 키워드: {candidate.keyword || "정보 없음"} · 관련 모델:{" "}
+                {formatModelList(candidate.relatedModels)}
+              </p>
+
+              <div className="mt-4">
+                <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                  추천 내용
+                </p>
+                <ul className="mt-2 space-y-1.5 text-sm font-medium leading-6 text-zinc-200">
+                  {suggestedUpdates.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                      <span>{item}</span>
+                    </li>
                   ))}
-                </div>
-              </DashboardCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                </ul>
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                추천 사유
+              </p>
+              <ul className="mt-2 space-y-1.5 text-sm leading-6 text-zinc-300">
+                {reasonItems.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <AiEvidenceMetric
+                  label="후기 수"
+                  value={formatAiEvidenceValue(evidence.reviewCount, "건")}
+                />
+                <AiEvidenceMetric
+                  label="키워드 언급"
+                  value={formatAiEvidenceValue(
+                    evidence.keywordMentionCount,
+                    "회",
+                  )}
+                />
+                <AiEvidenceMetric
+                  label="조회수"
+                  value={formatAiEvidenceValue(evidence.viewCount, "회")}
+                />
+                <AiEvidenceMetric
+                  label="최근 증가율"
+                  value={formatAiEvidenceValue(evidence.recentGrowthRate, "%")}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 lg:items-end">
+              <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                상태 변경
+              </p>
+              <div className="flex flex-wrap gap-1.5 lg:justify-end">
+                {aiCandidateStatuses.map((status) => (
+                  <button
+                    key={status.value}
+                    type="button"
+                    className={cn(
+                      actionButtonClassName,
+                      "min-h-9 px-2.5 text-[11px]",
+                      candidate.status === status.value &&
+                        "border-red-500 bg-red-500/20 text-red-100",
+                    )}
+                    disabled={candidate.status === status.value}
+                    onClick={() => onChangeStatus(candidate, status.value)}
+                  >
+                    {status.label}
+                  </button>
+                ))}
+              </div>
+              <p className="max-w-64 text-xs leading-5 text-zinc-500 lg:text-right">
+                AI 추천은 자동 생성되며, 관리자는 검토 후 반영완료 또는 제외만 결정합니다.
+              </p>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function AiEvidenceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-black px-3 py-2">
+      <p className="text-[11px] font-bold text-zinc-500">{label}</p>
+      <p className="mt-1 truncate text-sm font-black text-white">{value}</p>
     </div>
   );
 }
@@ -3240,22 +3341,25 @@ function DashboardEmptyState({ message }: { message: string }) {
 }
 
 function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
-  const label = aiCandidateStatuses.find((item) => item.value === status)?.label;
+  const effectiveStatus = status;
+  const label = aiCandidateStatuses.find(
+    (item) => item.value === effectiveStatus,
+  )?.label;
 
   return (
     <span
       className={cn(
         "inline-flex min-h-7 items-center justify-center rounded-full border px-2.5 text-xs font-black",
-        status === "applied"
+        effectiveStatus === "applied"
           ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-          : status === "reviewing"
+          : effectiveStatus === "reviewing"
             ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-            : status === "excluded"
+            : effectiveStatus === "excluded"
               ? "border-zinc-600 bg-zinc-900 text-zinc-400"
               : "border-red-500/40 bg-red-500/10 text-red-100",
       )}
     >
-      {label ?? "대기"}
+      {label ?? "검토중"}
     </span>
   );
 }
@@ -3290,6 +3394,191 @@ function formatModelList(models: string[]) {
 
   return visibleModels.join(", ") + (models.length > 3 ? " 외" : "");
 }
+
+function getAiCandidateTarget(candidate: AdminDashboardAiCandidate) {
+  return candidate.relatedModels[0] || candidate.keyword || "추천 대상 없음";
+}
+
+function getAiSourceLabel(source: AiCandidateSource) {
+  if (source === "traffic") return "조회수 기반";
+  if (source === "review") return "후기 기반";
+  if (source === "keyword") return "키워드 기반";
+
+  return "복합 신호";
+}
+
+function getReviewVehicleText(review: AdminReview) {
+  return [
+    getJsonString(review.vehicle_snapshot, "brand"),
+    getJsonString(review.vehicle_snapshot, "model"),
+    getJsonString(review.vehicle_snapshot, "generation"),
+    getJsonString(review.vehicle_snapshot, "modelDetail"),
+    getJsonString(review.vehicle_snapshot, "year"),
+    review.content,
+    ...(Array.isArray(review.tags) ? review.tags : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getAiCandidateReviewMetrics(
+  candidate: AdminDashboardAiCandidate,
+  reviews: AdminReview[],
+) {
+  const now = Date.now();
+  const recentStart = now - 30 * 24 * 60 * 60 * 1000;
+  const previousStart = now - 60 * 24 * 60 * 60 * 1000;
+  const keyword = candidate.keyword.trim().toLowerCase();
+  const relatedModels = candidate.relatedModels
+    .map((model) => model.trim().toLowerCase())
+    .filter(Boolean);
+  const matchesCandidate = (review: AdminReview) => {
+    const reviewText = getReviewVehicleText(review);
+
+    return (
+      (keyword.length >= 2 && reviewText.includes(keyword)) ||
+      relatedModels.some((model) => reviewText.includes(model))
+    );
+  };
+  const matchedReviews = reviews.filter(matchesCandidate);
+  const recentReviews = matchedReviews.filter((review) => {
+    const createdAt = Date.parse(review.created_at);
+
+    return !Number.isNaN(createdAt) && createdAt >= recentStart;
+  });
+  const previousReviews = matchedReviews.filter((review) => {
+    const createdAt = Date.parse(review.created_at);
+
+    return (
+      !Number.isNaN(createdAt) &&
+      createdAt >= previousStart &&
+      createdAt < recentStart
+    );
+  });
+  const keywordMentionCount = keyword
+    ? recentReviews.reduce((count, review) => {
+        const reviewText = getReviewVehicleText(review);
+        const pattern = new RegExp(
+          keyword.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&"),
+          "g",
+        );
+
+        return count + (reviewText.match(pattern)?.length ?? 0);
+      }, 0)
+    : 0;
+  const recentGrowthRate =
+    previousReviews.length > 0
+      ? Math.round(
+          ((recentReviews.length - previousReviews.length) /
+            previousReviews.length) *
+            100,
+        )
+      : recentReviews.length > 0
+        ? 100
+        : null;
+
+  return {
+    keywordMentionCount,
+    recentGrowthRate,
+    reviewCount: recentReviews.length,
+  };
+}
+
+function getAiCandidateEvidence(
+  candidate: AdminDashboardAiCandidate,
+  reviews: AdminReview[],
+) {
+  const reviewMetrics = getAiCandidateReviewMetrics(candidate, reviews);
+  const keywordMentionCount =
+    candidate.evidence.keywordMentionCount ??
+    (reviewMetrics.keywordMentionCount > 0
+      ? reviewMetrics.keywordMentionCount
+      : candidate.source === "keyword"
+        ? candidate.mentionCount
+        : null);
+  const reviewCount =
+    candidate.evidence.reviewCount ??
+    (reviewMetrics.reviewCount > 0 ? reviewMetrics.reviewCount : null);
+  const viewCount =
+    candidate.evidence.viewCount ??
+    (candidate.source === "traffic" ? candidate.mentionCount : null);
+  const recentGrowthRate =
+    candidate.evidence.recentGrowthRate ?? reviewMetrics.recentGrowthRate;
+
+  return {
+    keywordMentionCount,
+    recentGrowthRate,
+    reviewCount,
+    viewCount,
+  };
+}
+
+function getAiCandidateSuggestedUpdates(candidate: AdminDashboardAiCandidate) {
+  if (candidate.suggestedUpdates.length > 0) {
+    return candidate.suggestedUpdates;
+  }
+
+  if (candidate.source === "traffic") {
+    return [
+      "출고 전 기본 점검항목 우선 보강",
+      "AI 한줄평을 최근 조회 관심도 기준으로 갱신",
+      "대표 키워드와 주의 포인트 추가 검토",
+    ];
+  }
+
+  return [
+    `기본 점검항목에 '${candidate.keyword}' 관련 확인 항목 추가 검토`,
+    "AI 한줄평에 반복 언급 키워드 반영",
+    `대표 키워드에 '${candidate.keyword}' 추가 검토`,
+  ];
+}
+
+function getAiCandidateReasonItems(
+  candidate: AdminDashboardAiCandidate,
+  reviews: AdminReview[],
+) {
+  const evidence = getAiCandidateEvidence(candidate, reviews);
+  const reasons = [
+    candidate.reason ||
+      "후기/조회/검색 신호가 기준치 이상 반복되어 DB 업데이트 추천으로 분류됐습니다.",
+  ];
+
+  if (evidence.reviewCount !== null && evidence.keywordMentionCount !== null) {
+    reasons.push(
+      `최근 30일 후기 ${evidence.reviewCount.toLocaleString()}건에서 '${candidate.keyword}' 언급 ${evidence.keywordMentionCount.toLocaleString()}회`,
+    );
+  } else if (evidence.keywordMentionCount !== null) {
+    reasons.push(
+      `누적 분석 신호에서 '${candidate.keyword}' 언급 ${evidence.keywordMentionCount.toLocaleString()}회 확인`,
+    );
+  }
+
+  if (evidence.viewCount !== null) {
+    reasons.push(
+      `조회수 ${evidence.viewCount.toLocaleString()}회로 관리자 검토 우선순위에 포함`,
+    );
+  }
+
+  if (evidence.recentGrowthRate !== null) {
+    reasons.push(`최근 후기 증가율 ${evidence.recentGrowthRate.toLocaleString()}%`);
+  }
+
+  if ((evidence.keywordMentionCount ?? 0) >= 10) {
+    reasons.push("동일 키워드가 기준치 이상 반복되어 DB 업데이트 추천");
+  }
+
+  return Array.from(new Set(reasons));
+}
+
+function formatAiEvidenceValue(
+  value: number | null,
+  suffix: string,
+  emptyLabel = "분석 대기",
+) {
+  return value === null ? emptyLabel : value.toLocaleString() + suffix;
+}
+
 function AdminTablePanel({
   children,
   count,
