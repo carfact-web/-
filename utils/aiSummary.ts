@@ -221,9 +221,16 @@ const getPreDeliveryChecks = (
   fuelType: string | undefined,
   summaryMessages: string[],
 ) => {
-  const checkPoints = [
-    ...getMileageCheckPoints(mileage, fuelType === "전기"),
-  ];
+  const checkPoints: string[] = [];
+
+  summaryMessages.forEach((message) => {
+    addCheckPointsFromMessage(checkPoints, message);
+  });
+
+  getMileageCheckPoints(mileage, fuelType === "전기").forEach((checkPoint) => {
+    addUniqueCheckPoint(checkPoints, checkPoint);
+  });
+
   const vehicleAge = getVehicleAge(year);
 
   if (vehicleAge !== null && vehicleAge >= 7) {
@@ -242,10 +249,6 @@ const getPreDeliveryChecks = (
   } else if (fuelType === "하이브리드") {
     addUniqueCheckPoint(checkPoints, "구동 배터리 보증과 회생제동 작동 상태");
   }
-
-  summaryMessages.forEach((message) => {
-    addCheckPointsFromMessage(checkPoints, message);
-  });
 
   addUniqueCheckPoint(checkPoints, "사고, 침수, 보험 이력");
   addUniqueCheckPoint(checkPoints, "타이어와 브레이크 소모 상태");
