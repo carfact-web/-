@@ -32,6 +32,7 @@ type DashboardBoardTab =
 type DashboardViewFilter = "vehicle" | "model" | "review";
 type AiCandidateStatus = "reviewing" | "applied" | "excluded";
 type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
+type AiCandidateArchiveFilter = "today" | "recent3days" | "all";
 type CommunityCategory =
   | "free"
   | "maintenance"
@@ -160,6 +161,9 @@ interface AdminDashboardAiCandidate {
   targetBrand: string;
   targetGeneration: string;
   targetModel: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  updatedByNickname: string | null;
 }
 
 interface AdminAiCandidateStatusRow {
@@ -168,6 +172,8 @@ interface AdminAiCandidateStatusRow {
   related_models: string[];
   source: AiCandidateSource;
   status: AiCandidateStatus;
+  updated_by: string | null;
+  updated_by_nickname: string | null;
   updated_at: string;
 }
 
@@ -495,9 +501,25 @@ const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
 
 const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
   { label: "검토중", value: "reviewing" },
+  { label: "반영완료 보관함", value: "applied" },
+  { label: "제외", value: "excluded" },
+];
+
+const aiCandidateActionStatuses: { label: string; value: AiCandidateStatus }[] = [
+  { label: "검토중", value: "reviewing" },
   { label: "반영완료", value: "applied" },
   { label: "제외", value: "excluded" },
 ];
+
+const aiCandidateArchiveFilters: {
+  label: string;
+  value: AiCandidateArchiveFilter;
+}[] = [
+  { label: "오늘", value: "today" },
+  { label: "최근 3일", value: "recent3days" },
+  { label: "전체 보기", value: "all" },
+];
+const aiCandidateArchiveReferenceTime = Date.now();
 
 const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
   if (
@@ -596,7 +618,7 @@ const getReviewSnapshotValue = (review: AdminReview, keys: string[]) => {
 };
 
 const getCandidateStatusMap = (rows: AdminAiCandidateStatusRow[]) =>
-  new Map(rows.map((row) => [row.candidate_key, row.status]));
+  new Map(rows.map((row) => [row.candidate_key, row]));
 
 const createAiCandidatesFromReviewContent = (
   reviews: AdminReview[],
@@ -689,6 +711,8 @@ const createAiCandidatesFromReviewContent = (
             ? 100
             : null;
 
+      const statusRow = statusMap.get(candidateKey);
+
       return {
         candidateKey,
         keyword: aggregate.keyword,
@@ -696,7 +720,7 @@ const createAiCandidatesFromReviewContent = (
         relatedModels: Array.from(aggregate.relatedModels),
         reason: `후기 본문에서 '${aggregate.keyword}' 관련 표현이 반복되어 차량 DB 업데이트 후보로 분류됐습니다.`,
         source: "review" as const,
-        status: statusMap.get(candidateKey) ?? "reviewing",
+        status: statusRow?.status ?? "reviewing",
         suggestedUpdates: [
           `대표 키워드에 '${aggregate.keyword}' 추가 검토`,
           `기본 점검항목에 '${aggregate.keyword}' 관련 확인 항목 추가 검토`,
@@ -714,6 +738,9 @@ const createAiCandidatesFromReviewContent = (
         targetBrand: aggregate.targetBrand,
         targetGeneration: aggregate.targetGeneration,
         targetModel: aggregate.targetModel,
+        updatedAt: statusRow?.updated_at ?? null,
+        updatedBy: statusRow?.updated_by ?? null,
+        updatedByNickname: statusRow?.updated_by_nickname ?? null,
       } satisfies AdminDashboardAiCandidate;
     })
     .sort(
@@ -865,6 +892,10 @@ export default function AdminPage() {
                       ...row,
                       source: normalizeAiCandidateSource(row.source),
                       status: normalizeAiCandidateStatus(row.status),
+                      updated_by: toNullableString(row.updated_by),
+                      updated_by_nickname: toNullableString(
+                        row.updated_by_nickname,
+                      ),
                     }),
                   )
                 : [],
@@ -1037,11 +1068,18 @@ export default function AdminPage() {
     }
 
     setActionMessage("");
+    const updatedAt = new Date().toISOString();
     setOperatorDashboardData((current) => ({
       ...current,
       aiCandidates: current.aiCandidates.map((item) =>
         item.candidateKey === candidate.candidateKey
-          ? { ...item, status: nextStatus }
+          ? {
+              ...item,
+              status: nextStatus,
+              updatedAt,
+              updatedBy: user?.id ?? null,
+              updatedByNickname: profile?.nickname ?? user?.email ?? null,
+            }
           : item,
       ),
       keywordRows: current.keywordRows.map((item) =>
@@ -3306,9 +3344,57 @@ function DashboardAiCandidateTable({
   ) => void;
   reviews: AdminReview[];
 }) {
-  if (!candidates.length) {
-    return <DashboardEmptyState message="AI DB 업데이트 추천이 없습니다." />;
-  }
+  const [activeStatus, setActiveStatus] =
+    useState<AiCandidateStatus>("reviewing");
+  const [archiveFilter, setArchiveFilter] =
+    useState<AiCandidateArchiveFilter>("recent3days");
+  const statusCounts = useMemo(
+    () =>
+      aiCandidateStatuses.reduce(
+        (counts, status) => ({
+          ...counts,
+          [status.value]: candidates.filter(
+            (candidate) => candidate.status === status.value,
+          ).length,
+        }),
+        {} as Record<AiCandidateStatus, number>,
+      ),
+    [candidates],
+  );
+  const visibleCandidates = useMemo(
+    () =>
+      candidates.filter((candidate) => {
+        if (candidate.status !== activeStatus) {
+          return false;
+        }
+
+        if (activeStatus !== "applied" || archiveFilter === "all") {
+          return true;
+        }
+
+        const updatedAt = candidate.updatedAt
+          ? Date.parse(candidate.updatedAt)
+          : Number.NaN;
+
+        if (Number.isNaN(updatedAt)) {
+          return false;
+        }
+
+        const ageMs = aiCandidateArchiveReferenceTime - updatedAt;
+        const oneDayMs = 24 * 60 * 60 * 1000;
+
+        return archiveFilter === "today"
+          ? ageMs >= 0 && ageMs < oneDayMs
+          : ageMs >= 0 && ageMs < 3 * oneDayMs;
+      }),
+    [activeStatus, archiveFilter, candidates],
+  );
+  const emptyMessage =
+    activeStatus === "reviewing"
+      ? "검토중인 AI DB 업데이트 추천이 없습니다."
+      : activeStatus === "applied"
+        ? "선택한 기간에 반영완료 내역이 없습니다."
+        : "제외된 AI DB 업데이트 추천이 없습니다.";
 
   return (
     <div className="divide-y divide-zinc-900 bg-zinc-950">
@@ -3318,10 +3404,49 @@ function DashboardAiCandidateTable({
           후기 데이터와 조회 신호에서 반복 패턴을 찾고, 관리자는 반영 여부만 결정합니다.
         </p>
       </div>
-      {candidates.map((candidate) => {
+      <div className="space-y-3 bg-black px-4 py-3">
+        <div className="flex gap-2 overflow-x-auto">
+          {aiCandidateStatuses.map((status) => (
+            <button
+              key={status.value}
+              type="button"
+              className={cn(
+                "shrink-0 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                activeStatus === status.value &&
+                  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+              )}
+              onClick={() => setActiveStatus(status.value)}
+            >
+              {status.label} {statusCounts[status.value].toLocaleString()}
+            </button>
+          ))}
+        </div>
+        {activeStatus === "applied" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-zinc-500">보관 기간</span>
+            {aiCandidateArchiveFilters.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                className={cn(
+                  "rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                  archiveFilter === filter.value &&
+                    "border-red-500 bg-red-500/20 text-red-100",
+                )}
+                onClick={() => setArchiveFilter(filter.value)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {visibleCandidates.length ? (
+        visibleCandidates.map((candidate) => {
         const evidence = getAiCandidateEvidence(candidate, reviews);
         const reasonItems = getAiCandidateReasonItems(candidate, reviews);
         const suggestedUpdates = getAiCandidateSuggestedUpdates(candidate);
+        const updateTargets = getAiCandidateUpdateTargets(candidate);
 
         return (
           <article
@@ -3342,6 +3467,33 @@ function DashboardAiCandidateTable({
                 추천 키워드: {candidate.keyword || "정보 없음"} · 관련 모델:{" "}
                 {formatModelList(candidate.relatedModels)}
               </p>
+              {activeStatus !== "reviewing" ? (
+                <dl className="mt-4 grid gap-2 text-xs text-zinc-400">
+                  <div>
+                    <dt className="font-black text-zinc-500">반영 위치</dt>
+                    <dd className="mt-1 font-bold text-zinc-200">
+                      {updateTargets.join(", ")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-black text-zinc-500">
+                      {activeStatus === "applied" ? "반영일시" : "제외일시"}
+                    </dt>
+                    <dd className="mt-1 font-bold text-zinc-200">
+                      {formatOptionalDate(candidate.updatedAt)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-black text-zinc-500">처리 관리자</dt>
+                    <dd className="mt-1 font-bold text-zinc-200">
+                      {candidate.updatedByNickname ??
+                        (candidate.updatedBy
+                          ? formatCompactId(candidate.updatedBy, 8)
+                          : "시스템/관리자")}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
 
               <div className="mt-4">
                 <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
@@ -3394,35 +3546,51 @@ function DashboardAiCandidateTable({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 lg:items-end">
-              <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
-                상태 변경
-              </p>
-              <div className="flex flex-wrap gap-1.5 lg:justify-end">
-                {aiCandidateStatuses.map((status) => (
-                  <button
-                    key={status.value}
-                    type="button"
-                    className={cn(
-                      actionButtonClassName,
-                      "min-h-9 px-2.5 text-[11px]",
-                      candidate.status === status.value &&
-                        "border-red-500 bg-red-500/20 text-red-100",
-                    )}
-                    disabled={candidate.status === status.value}
-                    onClick={() => onChangeStatus(candidate, status.value)}
-                  >
-                    {status.label}
-                  </button>
-                ))}
+            {activeStatus === "reviewing" ? (
+              <div className="flex flex-col gap-2 lg:items-end">
+                <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                  상태 변경
+                </p>
+                <div className="flex flex-wrap gap-1.5 lg:justify-end">
+                  {aiCandidateActionStatuses
+                    .filter((status) => status.value !== "reviewing")
+                    .map((status) => (
+                      <button
+                        key={status.value}
+                        type="button"
+                        className={cn(
+                          actionButtonClassName,
+                          "min-h-9 px-2.5 text-[11px]",
+                        )}
+                        onClick={() => onChangeStatus(candidate, status.value)}
+                      >
+                        {status.label}
+                      </button>
+                    ))}
+                </div>
+                <p className="max-w-64 text-xs leading-5 text-zinc-500 lg:text-right">
+                  반영완료 또는 제외 처리 시 검토중 목록에서 제거되고 해당 탭으로 이동합니다.
+                </p>
               </div>
-              <p className="max-w-64 text-xs leading-5 text-zinc-500 lg:text-right">
-                AI 추천은 자동 생성되며, 관리자는 검토 후 반영완료 또는 제외만 결정합니다.
-              </p>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-2 lg:items-end">
+                <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                  보관 상태
+                </p>
+                <AiStatusBadge status={candidate.status} />
+                <p className="max-w-64 text-xs leading-5 text-zinc-500 lg:text-right">
+                  {activeStatus === "applied"
+                    ? "최근 3일 내역이 기본 표시되며, 전체 보기에서 과거 이력을 확인합니다."
+                    : "제외된 추천 항목을 다시 확인하는 공간입니다."}
+                </p>
+              </div>
+            )}
           </article>
         );
-      })}
+        })
+      ) : (
+        <DashboardEmptyState message={emptyMessage} />
+      )}
     </div>
   );
 }
@@ -3705,6 +3873,20 @@ function getAiCandidateSuggestedUpdates(candidate: AdminDashboardAiCandidate) {
     "AI 한줄평에 반복 언급 키워드 반영",
     `대표 키워드에 '${candidate.keyword}' 추가 검토`,
   ];
+}
+
+function getAiCandidateUpdateTargets(candidate: AdminDashboardAiCandidate) {
+  const updates = getAiCandidateSuggestedUpdates(candidate).join(" ");
+  const targets = [
+    updates.includes("대표 키워드") ? "대표 키워드" : null,
+    updates.includes("기본 점검항목") ? "기본 점검항목" : null,
+    updates.includes("AI 한줄평") ? "AI 한줄평" : null,
+    updates.includes("고질병") || updates.includes("정비")
+      ? "고질병 DB"
+      : null,
+  ].filter(Boolean) as string[];
+
+  return targets.length ? targets : ["차량 DB"];
 }
 
 function getAiCandidateReasonItems(

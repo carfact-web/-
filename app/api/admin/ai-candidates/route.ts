@@ -258,13 +258,49 @@ export async function GET(request: Request) {
       authResult.clients.admin,
       "ai_data_candidate_statuses",
     )
-      .select("candidate_key,candidate_keyword,source,related_models,status,updated_at");
+      .select("candidate_key,candidate_keyword,source,related_models,status,updated_by,updated_at");
 
     if (error) {
       throw error;
     }
 
-    return NextResponse.json({ statuses: data ?? [] });
+    const rows = (data ?? []) as Array<{
+      updated_by?: string | null;
+      [key: string]: unknown;
+    }>;
+    const updatedByIds = Array.from(
+      new Set(rows.map((row) => row.updated_by).filter(Boolean)),
+    ) as string[];
+    const profileMap = new Map<string, string>();
+
+    if (updatedByIds.length > 0) {
+      const { data: profiles, error: profileError } = await fromTable(
+        authResult.clients.admin,
+        "user_profiles",
+      )
+        .select("id,nickname")
+        .in("id", updatedByIds);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      (profiles ?? []).forEach((profile: { id?: unknown; nickname?: unknown }) => {
+        if (typeof profile.id === "string" && typeof profile.nickname === "string") {
+          profileMap.set(profile.id, profile.nickname);
+        }
+      });
+    }
+
+    return NextResponse.json({
+      statuses: rows.map((row) => ({
+        ...row,
+        updated_by_nickname:
+          typeof row.updated_by === "string"
+            ? profileMap.get(row.updated_by) ?? null
+            : null,
+      })),
+    });
   } catch (error) {
     return jsonError(
       getApiErrorMessage(error, "AI 추천 상태를 불러오지 못했습니다."),
