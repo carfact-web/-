@@ -1,6 +1,7 @@
 import { evBatteryInfo } from "@/data/evBatteryInfo";
 import type { EvBatteryInfo } from "@/data/evBatteryInfo";
 import { getVehicleInspectionProfile } from "@/data/vehicleInspectionData";
+import type { VehicleInspectionProfile } from "@/data/vehicleInspectionData";
 import { vehicleKnowledge } from "@/data/vehicleKnowledge";
 import type { VehicleKnowledge } from "@/data/vehicleKnowledge";
 import {
@@ -21,6 +22,7 @@ interface AiSummaryOptions {
   generation?: string;
   fuelType?: string;
   grade?: string;
+  inspectionProfile?: VehicleInspectionProfile | null;
   productUrl?: string;
   reviewKeywordStats?: ReviewKeywordStat[];
   vehicleNumber?: string;
@@ -364,11 +366,9 @@ const getMaintenanceIssues = (
   mileage: string,
   options: AiSummaryOptions,
 ) => {
-  const inspectionProfile = getVehicleInspectionProfile(
-    brand,
-    model,
-    options.generation,
-  );
+  const inspectionProfile =
+    options.inspectionProfile ??
+    getVehicleInspectionProfile(brand, model, options.generation);
 
   const groupedIssues = new Map<
     string,
@@ -643,11 +643,9 @@ const collectAiSummaryParts = (
     });
   });
 
-  const inspectionProfile = getVehicleInspectionProfile(
-    brand,
-    model,
-    options.generation
-  );
+  const inspectionProfile =
+    options.inspectionProfile ??
+    getVehicleInspectionProfile(brand, model, options.generation);
 
   if (inspectionProfile) {
     pushSummary(modelSummaries, inspectionProfile.summary, isElectric);

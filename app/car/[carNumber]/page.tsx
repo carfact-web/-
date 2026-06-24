@@ -13,6 +13,8 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { recordPageView } from "@/lib/pageViews";
+import { fetchVehicleInspectionProfile } from "@/lib/vehicleInspectionProfiles";
+import type { VehicleInspectionProfile } from "@/data/vehicleInspectionData";
 import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
@@ -83,6 +85,8 @@ export default function CarReportPage() {
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [inspectionProfile, setInspectionProfile] =
+    useState<VehicleInspectionProfile | null>(null);
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string),
   );
@@ -157,10 +161,21 @@ export default function CarReportPage() {
       getStructuredAiSummary(brand, model, year, mileage, {
         fuelType,
         generation,
+        inspectionProfile,
         reviewKeywordStats,
         vehicleNumber: carNumber,
       }),
-    [brand, carNumber, fuelType, generation, mileage, model, reviewKeywordStats, year],
+    [
+      brand,
+      carNumber,
+      fuelType,
+      generation,
+      inspectionProfile,
+      mileage,
+      model,
+      reviewKeywordStats,
+      year,
+    ],
   );
   const totalReviewPages = Math.max(
     1,
@@ -234,6 +249,37 @@ export default function CarReportPage() {
       // Traffic analytics should never block the vehicle report page.
     });
   }, [isGuestReportAllowed, vehicle?.id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!brand || !model) {
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setInspectionProfile(null);
+        }
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchVehicleInspectionProfile(brand, model, generation)
+      .then((profile) => {
+        if (isActive) {
+          setInspectionProfile(profile);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setInspectionProfile(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [brand, generation, model]);
 
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);

@@ -8,6 +8,11 @@ import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
+import {
+  countVehicleIssueKeywordMentions,
+  extractVehicleIssueKeywords,
+  normalizeVehicleIssueKeyword,
+} from "@/utils/vehicleIssueKeywords";
 import type { Json } from "@/types/supabase";
 
 type AdminTab =
@@ -152,6 +157,18 @@ interface AdminDashboardAiCandidate {
     reviewCount: number | null;
     viewCount: number | null;
   };
+  targetBrand: string;
+  targetGeneration: string;
+  targetModel: string;
+}
+
+interface AdminAiCandidateStatusRow {
+  candidate_key: string;
+  candidate_keyword: string;
+  related_models: string[];
+  source: AiCandidateSource;
+  status: AiCandidateStatus;
+  updated_at: string;
 }
 
 interface AdminOperatorDashboardData {
@@ -399,9 +416,6 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
-const toNullableNumber = (value: unknown) =>
-  value === null || value === undefined || value === "" ? null : toNumber(value);
-
 const toTrafficTopVehicles = (value: Json): AdminTrafficTopVehicle[] =>
   Array.isArray(value)
     ? (value as unknown[]).filter(isRecord).map((item) => ({
@@ -569,35 +583,146 @@ const toOperatorKeywordRows = (
       }))
     : [];
 
-const toOperatorAiCandidates = (
-  value: Json,
-): AdminDashboardAiCandidate[] =>
-  Array.isArray(value)
-    ? (value as unknown[]).filter(isRecord).map((item) => {
-        const evidence = isRecord(item.evidence) ? item.evidence : {};
+const getReviewSnapshotValue = (review: AdminReview, keys: string[]) => {
+  for (const key of keys) {
+    const value = getJsonString(review.vehicle_snapshot, key);
 
-        return {
-          candidateKey: String(item.candidate_key ?? ""),
-          keyword: String(item.keyword ?? ""),
-          mentionCount: toNumber(item.mention_count),
-          relatedModels: toStringArray(item.related_models),
-          reason: String(item.reason ?? ""),
-          source: normalizeAiCandidateSource(item.source),
-          status: normalizeAiCandidateStatus(item.status),
-          suggestedUpdates: toStringArray(item.suggested_updates),
-          evidence: {
-            keywordMentionCount: toNullableNumber(
-              evidence.keyword_mention_count ?? item.keyword_mention_count,
-            ),
-            recentGrowthRate: toNullableNumber(
-              evidence.recent_growth_rate ?? item.recent_growth_rate,
-            ),
-            reviewCount: toNullableNumber(evidence.review_count ?? item.review_count),
-            viewCount: toNullableNumber(evidence.view_count ?? item.view_count),
-          },
+    if (value?.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+};
+
+const getCandidateStatusMap = (rows: AdminAiCandidateStatusRow[]) =>
+  new Map(rows.map((row) => [row.candidate_key, row.status]));
+
+const createAiCandidatesFromReviewContent = (
+  reviews: AdminReview[],
+  statusRows: AdminAiCandidateStatusRow[],
+) => {
+  const statusMap = getCandidateStatusMap(statusRows);
+  const now = Date.now();
+  const recentStart = now - 30 * 24 * 60 * 60 * 1000;
+  const previousStart = now - 60 * 24 * 60 * 60 * 1000;
+  const aggregates = new Map<
+    string,
+    {
+      keyword: string;
+      mentionCount: number;
+      previousReviewCount: number;
+      recentReviewCount: number;
+      relatedModels: Set<string>;
+      targetBrand: string;
+      targetGeneration: string;
+      targetModel: string;
+      totalReviewCount: number;
+    }
+  >();
+
+  reviews
+    .filter((review) => !review.is_hidden)
+    .forEach((review) => {
+      const content = review.content ?? "";
+      const keywords = extractVehicleIssueKeywords(content);
+      const targetBrand = getReviewSnapshotValue(review, ["brand", "manufacturer"]);
+      const targetModel = getReviewSnapshotValue(review, ["model"]);
+      const targetGeneration = getReviewSnapshotValue(review, [
+        "generation",
+        "modelDetail",
+      ]);
+      const modelLabel = [targetBrand, targetModel, targetGeneration]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      const createdAt = Date.parse(review.created_at);
+      const isRecent = !Number.isNaN(createdAt) && createdAt >= recentStart;
+      const isPrevious =
+        !Number.isNaN(createdAt) &&
+        createdAt >= previousStart &&
+        createdAt < recentStart;
+
+      if (!targetBrand || !targetModel) {
+        return;
+      }
+
+      keywords.forEach((keyword) => {
+        const candidateKey = [
+          "review",
+          normalizeVehicleIssueKeyword(targetBrand),
+          normalizeVehicleIssueKeyword(targetModel),
+          normalizeVehicleIssueKeyword(keyword),
+        ].join(":");
+        const aggregate = aggregates.get(candidateKey) ?? {
+          keyword,
+          mentionCount: 0,
+          previousReviewCount: 0,
+          recentReviewCount: 0,
+          relatedModels: new Set<string>(),
+          targetBrand,
+          targetGeneration,
+          targetModel,
+          totalReviewCount: 0,
         };
-      })
-    : [];
+
+        aggregate.mentionCount += countVehicleIssueKeywordMentions(content, keyword);
+        aggregate.totalReviewCount += 1;
+        if (isRecent) aggregate.recentReviewCount += 1;
+        if (isPrevious) aggregate.previousReviewCount += 1;
+        if (modelLabel) aggregate.relatedModels.add(modelLabel);
+        aggregates.set(candidateKey, aggregate);
+      });
+    });
+
+  return Array.from(aggregates.entries())
+    .filter(([, aggregate]) => aggregate.mentionCount >= 1)
+    .map(([candidateKey, aggregate]) => {
+      const recentGrowthRate =
+        aggregate.previousReviewCount > 0
+          ? Math.round(
+              ((aggregate.recentReviewCount - aggregate.previousReviewCount) /
+                aggregate.previousReviewCount) *
+                100,
+            )
+          : aggregate.recentReviewCount > 0
+            ? 100
+            : null;
+
+      return {
+        candidateKey,
+        keyword: aggregate.keyword,
+        mentionCount: aggregate.mentionCount,
+        relatedModels: Array.from(aggregate.relatedModels),
+        reason: `후기 본문에서 '${aggregate.keyword}' 관련 표현이 반복되어 차량 DB 업데이트 후보로 분류됐습니다.`,
+        source: "review" as const,
+        status: statusMap.get(candidateKey) ?? "reviewing",
+        suggestedUpdates: [
+          `대표 키워드에 '${aggregate.keyword}' 추가 검토`,
+          `기본 점검항목에 '${aggregate.keyword}' 관련 확인 항목 추가 검토`,
+          `AI 한줄평에 '${aggregate.keyword}' 언급 증가 반영 검토`,
+        ],
+        evidence: {
+          keywordMentionCount: aggregate.mentionCount,
+          recentGrowthRate,
+          reviewCount:
+            aggregate.recentReviewCount > 0
+              ? aggregate.recentReviewCount
+              : aggregate.totalReviewCount,
+          viewCount: null,
+        },
+        targetBrand: aggregate.targetBrand,
+        targetGeneration: aggregate.targetGeneration,
+        targetModel: aggregate.targetModel,
+      } satisfies AdminDashboardAiCandidate;
+    })
+    .sort(
+      (left, right) =>
+        right.mentionCount - left.mentionCount ||
+        left.keyword.localeCompare(right.keyword, "ko"),
+    )
+    .slice(0, 30);
+};
 
 export default function AdminPage() {
   const router = useRouter();
@@ -608,6 +733,7 @@ export default function AdminPage() {
     isProfileReady,
     isSuperAdmin,
     profile,
+    session,
     user,
   } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -664,6 +790,7 @@ export default function AdminPage() {
     reviews.length > 0 && selectedReviews.length === reviews.length;
   const allReportsSelected =
     reports.length > 0 && selectedReports.length === reports.length;
+  const sessionAccessToken = session?.access_token ?? "";
   const activeSearch = useMemo(() => {
     if (activeTab === "posts") return postSearch;
     if (activeTab === "reviews") return reviewSearch;
@@ -723,6 +850,27 @@ export default function AdminPage() {
     setActionMessage("");
 
     try {
+      const accessToken = sessionAccessToken;
+      const statusRowsPromise = accessToken
+        ? fetch("/api/admin/ai-candidates", {
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              Array.isArray(payload?.statuses)
+                ? (payload.statuses as AdminAiCandidateStatusRow[]).map(
+                    (row) => ({
+                      ...row,
+                      source: normalizeAiCandidateSource(row.source),
+                      status: normalizeAiCandidateStatus(row.status),
+                    }),
+                  )
+                : [],
+            )
+            .catch(() => [] as AdminAiCandidateStatusRow[])
+        : Promise.resolve([] as AdminAiCandidateStatusRow[]);
       const [
         statsResult,
         postsResult,
@@ -734,6 +882,7 @@ export default function AdminPage() {
         trafficStatsResult,
         operatorDashboardResult,
         verifiedDealerFeatureResult,
+        aiCandidateStatusRows,
       ] = await Promise.all([
         supabase.rpc("admin_get_dashboard_stats"),
         supabase.rpc("admin_list_community_posts", {
@@ -759,6 +908,7 @@ export default function AdminPage() {
         supabase.rpc("list_verified_dealer_profiles", {
           target_user_ids: [],
         }),
+        statusRowsPromise,
       ]);
 
       if (statsResult.error) throw statsResult.error;
@@ -816,6 +966,7 @@ export default function AdminPage() {
           nextTrafficStats?.daily_visitors ?? [],
         ),
       });
+      const nextReviews = (reviewsResult.data ?? []) as AdminReview[];
       setOperatorDashboardData({
         totalViews: toNumber(nextOperatorDashboard?.total_views),
         trafficRows: toOperatorTrafficRows(
@@ -827,12 +978,13 @@ export default function AdminPage() {
         keywordRows: toOperatorKeywordRows(
           nextOperatorDashboard?.keyword_rows ?? [],
         ),
-        aiCandidates: toOperatorAiCandidates(
-          nextOperatorDashboard?.ai_candidates ?? [],
+        aiCandidates: createAiCandidatesFromReviewContent(
+          nextReviews,
+          aiCandidateStatusRows,
         ),
       });
       setPosts((postsResult.data ?? []) as AdminCommunityPost[]);
-      setReviews((reviewsResult.data ?? []) as AdminReview[]);
+      setReviews(nextReviews);
       setUsers((usersResult.data ?? []) as AdminUserProfile[]);
       setReports((reportsResult.data ?? []) as AdminReport[]);
       setNotices(
@@ -857,6 +1009,7 @@ export default function AdminPage() {
     postSearch,
     reportSearch,
     reviewSearch,
+    sessionAccessToken,
     userSearch,
   ]);
 
@@ -876,7 +1029,10 @@ export default function AdminPage() {
     candidate: AdminDashboardAiCandidate,
     nextStatus: AiCandidateStatus,
   ) => {
-    if (!supabase) {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
       return;
     }
 
@@ -895,23 +1051,40 @@ export default function AdminPage() {
       ),
     }));
 
-    const { error } = await supabase.rpc("admin_set_ai_candidate_status", {
-      candidate_key: candidate.candidateKey,
-      candidate_keyword: candidate.keyword,
-      candidate_source: candidate.source,
-      next_status: nextStatus,
-      related_models: candidate.relatedModels,
+    const response = await fetch("/api/admin/ai-candidates", {
+      body: JSON.stringify({
+        candidateKey: candidate.candidateKey,
+        keyword: candidate.keyword,
+        relatedModels: candidate.relatedModels,
+        source: candidate.source,
+        status: nextStatus,
+        targetBrand: candidate.targetBrand,
+        targetGeneration: candidate.targetGeneration,
+        targetModel: candidate.targetModel,
+      }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
     });
 
-    if (error) {
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
       setActionMessage(
-        getErrorMessage(error, "AI 후보 상태를 변경하지 못했습니다."),
+        typeof payload?.error === "string"
+          ? payload.error
+          : "AI 후보 상태를 변경하지 못했습니다.",
       );
       await loadAdminData();
       return;
     }
 
-    setActionMessage("AI 후보 상태를 변경했습니다.");
+    setActionMessage(
+      nextStatus === "applied"
+        ? "AI 추천 데이터를 차량 DB에 반영했습니다."
+        : "AI 추천 상태를 변경했습니다.",
+    );
     await loadAdminData();
   };
 
