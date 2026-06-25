@@ -26,9 +26,10 @@ import type {
 
 type AdminTab =
   | "dashboard"
-  | "posts"
   | "reviews"
+  | "posts"
   | "users"
+  | "ai"
   | "reports"
   | "notices";
 type AdminRole = "user" | "admin" | "super_admin";
@@ -277,10 +278,11 @@ interface AdminPopupNotice {
 }
 
 const tabs: { label: string; value: AdminTab }[] = [
-  { label: "대시보드", value: "dashboard" },
-  { label: "게시글 관리", value: "posts" },
+  { label: "Dashboard", value: "dashboard" },
   { label: "후기 관리", value: "reviews" },
+  { label: "게시글 관리", value: "posts" },
   { label: "회원 관리", value: "users" },
+  { label: "AI 관리", value: "ai" },
   { label: "신고 관리", value: "reports" },
   { label: "공지 관리", value: "notices" },
 ];
@@ -322,70 +324,70 @@ const emptyOperatorDashboardData: AdminOperatorDashboardData = {
 };
 
 const pageClassName = cn(
-  "min-h-screen bg-black px-4 py-6 pb-28 text-white sm:px-6 sm:py-8",
+  "min-h-screen bg-[#f5f6f8] px-3 py-4 pb-28 text-zinc-950 sm:px-5 sm:py-6",
 );
-const shellClassName = cn("mx-auto flex w-full max-w-[1600px] flex-col gap-5");
+const shellClassName = cn("mx-auto flex w-full max-w-[1680px] flex-col gap-4");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-xl shadow-black/20 sm:p-5",
+  "rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-200/60 sm:p-5",
 );
-const mutedTextClassName = cn("text-sm leading-relaxed text-zinc-400");
+const mutedTextClassName = cn("text-sm leading-relaxed text-zinc-500");
 const tabButtonClassName = cn(
-  "rounded-lg border border-zinc-800 px-3 py-2 text-sm font-bold text-zinc-300 transition",
-  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+  "rounded-lg px-3 py-2 text-sm font-bold text-zinc-500 transition",
+  "hover:bg-zinc-100 hover:text-zinc-950",
 );
 const activeTabButtonClassName = cn(
-  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+  "bg-zinc-950 text-white shadow-sm hover:bg-zinc-950 hover:text-white",
 );
 const actionButtonClassName = cn(
-  "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs font-bold text-zinc-100 transition",
-  "hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50",
+  "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition",
+  "hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50",
 );
 const dangerButtonClassName = cn(
   actionButtonClassName,
-  "border-red-500/50 bg-red-500/10 text-red-200 hover:border-red-400 hover:bg-red-500/20",
+  "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800",
 );
-const tableClassName = cn("min-w-full divide-y divide-zinc-800 text-sm");
+const tableClassName = cn("min-w-full divide-y divide-zinc-200 text-sm");
 const desktopTableClassName = cn(tableClassName, "hidden min-w-[1180px] md:table");
 const tableHeadCellClassName = cn(
-  "whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-zinc-500",
+  "whitespace-nowrap px-3 py-2 text-left text-[11px] font-black uppercase tracking-[0.08em] text-zinc-400",
 );
-const tableCellClassName = cn("px-3 py-3 align-top text-zinc-200");
+const tableCellClassName = cn("px-3 py-3 align-top text-zinc-700");
 const tableActionCellClassName = cn(tableCellClassName, "min-w-[24rem] text-right");
 const desktopActionGroupClassName = cn("flex flex-nowrap justify-end gap-1.5");
-const mobileListClassName = cn("divide-y divide-zinc-900 md:hidden");
+const mobileListClassName = cn("divide-y divide-zinc-100 md:hidden");
 const mobileCardClassName = cn(
-  "grid min-h-[88px] grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3",
+  "grid min-h-[88px] grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3 transition hover:bg-zinc-50",
 );
 const mobileCardTitleClassName = cn(
-  "line-clamp-2 break-words text-sm font-black leading-5 text-white",
+  "line-clamp-2 break-words text-sm font-black leading-5 text-zinc-950",
 );
 const mobileCardMetaClassName = cn(
   "mt-1 line-clamp-1 break-words text-xs leading-5 text-zinc-500",
 );
 const mobileCardSubMetaClassName = cn(
-  "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400",
+  "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500",
 );
 const inputClassName = cn(
-  "min-h-10 w-full rounded-lg border border-zinc-800 bg-black px-3 text-sm text-white outline-none transition",
-  "placeholder:text-zinc-600 focus:border-red-500",
+  "min-h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-950 outline-none transition",
+  "placeholder:text-zinc-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10",
 );
 const checkboxClassName = cn(
-  "h-4 w-4 rounded border-zinc-700 bg-black text-red-500",
-  "focus:ring-2 focus:ring-red-500/40 focus:ring-offset-0",
+  "h-4 w-4 rounded border-zinc-300 bg-white text-blue-600",
+  "focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-0",
 );
 const paginationButtonClassName = cn(
-  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-zinc-800 px-2 text-xs font-bold text-zinc-300 transition",
-  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2 text-xs font-bold text-zinc-600 transition",
+  "hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40",
 );
 const activePaginationButtonClassName = cn(
-  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+  "border-blue-600 bg-blue-600 text-white hover:border-blue-600 hover:bg-blue-600 hover:text-white",
 );
 const categoryFilterButtonClassName = cn(
-  "whitespace-nowrap rounded-lg border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-300 transition",
-  "hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+  "whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-black text-zinc-600 transition",
+  "hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950",
 );
 const activeCategoryFilterButtonClassName = cn(
-  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+  "border-blue-600 bg-blue-600 text-white hover:border-blue-600 hover:bg-blue-600 hover:text-white",
 );
 const adminPostCategoryTabs = [
   { label: "전체", value: "all" },
@@ -977,6 +979,7 @@ export default function AdminPage() {
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [notices, setNotices] = useState<AdminCommunityPost[]>([]);
   const [popupNotices, setPopupNotices] = useState<AdminPopupNotice[]>([]);
+  const [globalSearch, setGlobalSearch] = useState("");
   const [postSearch, setPostSearch] = useState("");
   const [postCategoryFilter, setPostCategoryFilter] =
     useState<CommunityBoardFilter>("all");
@@ -986,6 +989,10 @@ export default function AdminPage() {
   const [selectedPopupNoticeId, setSelectedPopupNoticeId] = useState<
     string | null
   >(null);
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewPage, setReviewPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
@@ -1068,6 +1075,18 @@ export default function AdminPage() {
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
     [reviews, selectedReviewIds],
   );
+  const selectedReview = useMemo(
+    () => reviews.find((review) => review.id === selectedReviewId) ?? null,
+    [reviews, selectedReviewId],
+  );
+  const selectedUser = useMemo(
+    () => users.find((account) => account.id === selectedUserId) ?? null,
+    [selectedUserId, users],
+  );
+  const selectedReport = useMemo(
+    () => reports.find((report) => report.report_id === selectedReportId) ?? null,
+    [reports, selectedReportId],
+  );
   const sortedReviews = useMemo(
     () =>
       reviews
@@ -1122,17 +1141,115 @@ export default function AdminPage() {
     if (activeTab === "posts") return postSearch;
     if (activeTab === "reviews") return reviewSearch;
     if (activeTab === "users") return userSearch;
+    if (activeTab === "ai") return globalSearch;
     if (activeTab === "reports") return reportSearch;
     if (activeTab === "notices") return noticeSearch;
     return "";
   }, [
     activeTab,
+    globalSearch,
     noticeSearch,
     postSearch,
     reportSearch,
     reviewSearch,
     userSearch,
   ]);
+  const todayStart = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  }, []);
+  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+  const todayReviews = useMemo(
+    () => reviews.filter((review) => Date.parse(review.created_at) >= todayStart),
+    [reviews, todayStart],
+  );
+  const yesterdayReviews = useMemo(
+    () =>
+      reviews.filter((review) => {
+        const createdAt = Date.parse(review.created_at);
+        return createdAt >= yesterdayStart && createdAt < todayStart;
+      }),
+    [reviews, todayStart, yesterdayStart],
+  );
+  const todayUsers = useMemo(
+    () => users.filter((account) => Date.parse(account.created_at) >= todayStart),
+    [todayStart, users],
+  );
+  const todayPosts = useMemo(
+    () => posts.filter((post) => Date.parse(post.created_at) >= todayStart),
+    [posts, todayStart],
+  );
+  const todayReports = useMemo(
+    () => reports.filter((report) => Date.parse(report.created_at) >= todayStart),
+    [reports, todayStart],
+  );
+  const pendingReports = useMemo(
+    () => reports.filter((report) => !report.is_hidden),
+    [reports],
+  );
+  const reviewingAiCandidates = useMemo(
+    () =>
+      operatorDashboardData.aiCandidates.filter(
+        (candidate) => candidate.status === "reviewing",
+      ),
+    [operatorDashboardData.aiCandidates],
+  );
+  const globalSearchResults = useMemo(() => {
+    const query = globalSearch.trim().toLowerCase();
+
+    if (!query) {
+      return [];
+    }
+
+    const matches = (value: string | null | undefined) =>
+      value?.toLowerCase().includes(query) ?? false;
+    const reviewResults = reviews
+      .filter((review) =>
+        [
+          getReviewPlateNumber(review),
+          getReviewVehicleModel(review),
+          review.author_nickname,
+          review.content,
+        ].some(matches),
+      )
+      .slice(0, 4)
+      .map((review) => ({
+        id: review.id,
+        label: getReviewPlateNumber(review) ?? "후기",
+        meta: "후기 · " + getReviewVehicleModel(review),
+        tab: "reviews" as AdminTab,
+      }));
+    const postResults = posts
+      .filter((post) =>
+        [post.title, post.content, post.author_nickname].some(matches),
+      )
+      .slice(0, 4)
+      .map((post) => ({
+        id: post.id,
+        label: post.title,
+        meta: "게시글 · " + getPostCategoryLabel(post),
+        tab: "posts" as AdminTab,
+      }));
+    const userResults = users
+      .filter((account) =>
+        [
+          account.nickname,
+          account.email,
+          account.provider_profile_name,
+          account.id,
+        ].some(matches),
+      )
+      .slice(0, 4)
+      .map((account) => ({
+        id: account.id,
+        label: account.nickname ?? formatCompactId(account.id, 8),
+        meta: "회원 · " + formatProviderLabel(account.login_provider),
+        tab: "users" as AdminTab,
+      }));
+
+    return [...reviewResults, ...postResults, ...userResults].slice(0, 8);
+  }, [globalSearch, posts, reviews, users]);
 
   useEffect(() => {
     if (!isAuthReady) {
@@ -2181,7 +2298,7 @@ export default function AdminPage() {
       <main className={pageClassName}>
         <div className={shellClassName}>
           <section className={panelClassName}>
-            <p className="text-sm font-bold text-red-200">
+            <p className="text-sm font-bold text-red-700">
               관리자 권한이 없습니다.
             </p>
             <p className={cn(mutedTextClassName, "mt-2")}>홈으로 이동합니다.</p>
@@ -2209,19 +2326,39 @@ export default function AdminPage() {
 
   return (
     <main className={pageClassName}>
-      <div className={shellClassName}>
-        <header className="flex flex-col gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold text-red-400">ADMIN</p>
-            <h1 className="mt-1 text-2xl font-black text-white">
-              관리자 페이지
+      <div className={cn(shellClassName, "lg:grid lg:grid-cols-[240px_minmax(0,1fr)]")}>
+        <aside className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+          <div className="px-2 py-2">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">
+              CARFACT OPS
+            </p>
+            <h1 className="mt-2 text-xl font-black tracking-tight text-zinc-950">
+              Admin
             </h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              {profile?.nickname ?? user?.email ?? "관리자"} 계정으로 접속
-              중입니다.
+            <p className="mt-1 truncate text-xs font-medium text-zinc-500">
+              {profile?.nickname ?? user?.email ?? "관리자"}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <nav className="mt-4 grid gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                className={cn(
+                  tabButtonClassName,
+                  "justify-start text-left",
+                  activeTab === tab.value && activeTabButtonClassName,
+                )}
+                onClick={() => {
+                  setActiveTab(tab.value);
+                  setIsNotificationOpen(false);
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+          <div className="mt-5 grid gap-2 border-t border-zinc-100 pt-4">
             <button
               type="button"
               className={actionButtonClassName}
@@ -2231,49 +2368,144 @@ export default function AdminPage() {
             </button>
             <Link
               href="/"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-zinc-700 px-4 py-2 text-sm font-bold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900"
+              className={cn(actionButtonClassName, "no-underline")}
             >
               홈으로
             </Link>
           </div>
-        </header>
+        </aside>
 
-        <nav className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              className={cn(
-                tabButtonClassName,
-                activeTab === tab.value && activeTabButtonClassName,
-              )}
-              onClick={() => setActiveTab(tab.value)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-
-        {activeTab !== "dashboard" ? (
-          <SearchBar
-            activeTab={activeTab}
-            searchValue={activeSearch}
-            setNoticeSearch={setNoticeSearch}
-            setPostSearch={(value) => {
-              setPostPage(1);
-              setPostSearch(value);
-            }}
-            setReportSearch={setReportSearch}
-            setReviewSearch={(value) => {
-              setReviewPage(1);
-              setReviewSearch(value);
-            }}
-            setUserSearch={setUserSearch}
-          />
-        ) : null}
+        <div className="flex min-w-0 flex-col gap-4">
+          <header className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <p className="text-xs font-black text-zinc-400">
+                  {formatDate(new Date().toISOString())}
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-zinc-950">
+                  운영 Dashboard
+                </h2>
+              </div>
+              <div className="relative flex min-w-0 flex-1 flex-col gap-2 xl:max-w-2xl">
+                <input
+                  className={cn(inputClassName, "pl-10")}
+                  placeholder="회원, 후기, 게시글, 차량번호, 닉네임, 모델명 통합 검색"
+                  value={globalSearch}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setGlobalSearch(value);
+                    setPostPage(1);
+                    setReviewPage(1);
+                    setPostSearch(value);
+                    setReviewSearch(value);
+                    setUserSearch(value);
+                    setReportSearch(value);
+                    setNoticeSearch(value);
+                  }}
+                />
+                <span className="pointer-events-none absolute left-3 top-2.5 text-sm text-zinc-400">
+                  ⌕
+                </span>
+                {globalSearchResults.length ? (
+                  <div className="absolute inset-x-0 top-12 z-30 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl shadow-zinc-900/10">
+                    {globalSearchResults.map((result) => (
+                      <button
+                        key={result.tab + result.id}
+                        type="button"
+                        className="block w-full border-b border-zinc-100 px-3 py-2 text-left transition last:border-b-0 hover:bg-blue-50"
+                        onClick={() => {
+                          setActiveTab(result.tab);
+                          if (result.tab === "posts") setSelectedPostId(result.id);
+                          if (result.tab === "reviews") setSelectedReviewId(result.id);
+                          if (result.tab === "users") setSelectedUserId(result.id);
+                        }}
+                      >
+                        <span className="block truncate text-sm font-black text-zinc-950">
+                          {result.label}
+                        </span>
+                        <span className="block truncate text-xs text-zinc-500">
+                          {result.meta}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div className="relative flex items-center gap-2">
+                <button
+                  type="button"
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg transition hover:bg-zinc-50"
+                  aria-label="운영 알림"
+                  onClick={() => setIsNotificationOpen((current) => !current)}
+                >
+                  🔔
+                  {reviewingAiCandidates.length + pendingReports.length > 0 ? (
+                    <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-blue-600 ring-2 ring-white" />
+                  ) : null}
+                </button>
+                {isNotificationOpen ? (
+                  <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/15">
+                    <NotificationItem
+                      tone="red"
+                      label="AI 반영 후보"
+                      count={reviewingAiCandidates.length}
+                      onClick={() => {
+                        setActiveTab("ai");
+                        setIsNotificationOpen(false);
+                      }}
+                    />
+                    <NotificationItem
+                      tone="yellow"
+                      label="신규 신고 접수"
+                      count={todayReports.length}
+                      onClick={() => {
+                        setActiveTab("reports");
+                        setIsNotificationOpen(false);
+                      }}
+                    />
+                    <NotificationItem
+                      tone="orange"
+                      label="API 호출 실패"
+                      count={0}
+                      onClick={() => setIsNotificationOpen(false)}
+                    />
+                    <NotificationItem
+                      tone="green"
+                      label="신규 회원 가입"
+                      count={todayUsers.length}
+                      onClick={() => {
+                        setActiveTab("users");
+                        setIsNotificationOpen(false);
+                      }}
+                    />
+                    <NotificationItem
+                      tone="blue"
+                      label="후기 급증 차량"
+                      count={trafficStats.topVehicles.length}
+                      onClick={() => {
+                        setActiveTab("dashboard");
+                        setDashboardViewFilter("vehicle");
+                        setActiveDashboardTab("views");
+                        setIsNotificationOpen(false);
+                      }}
+                    />
+                    <NotificationItem
+                      tone="purple"
+                      label="오늘 등록 후기"
+                      count={todayReviews.length}
+                      onClick={() => {
+                        setActiveTab("reviews");
+                        setIsNotificationOpen(false);
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </header>
 
         {actionMessage ? (
-          <section className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <section className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700">
             {actionMessage}
           </section>
         ) : null}
@@ -2296,12 +2528,29 @@ export default function AdminPage() {
             onChangeDashboardTab={setActiveDashboardTab}
             onChangeViewFilter={setDashboardViewFilter}
             operatorDashboardData={operatorDashboardData}
+            onNavigate={setActiveTab}
             posts={posts}
             reports={reports}
             reviews={reviews}
             stats={stats}
             trafficStats={trafficStats}
+            users={users}
           />
+        ) : null}
+
+        {activeTab === "ai" ? (
+          <AdminTablePanel
+            count={operatorDashboardData.aiCandidates.length}
+            title="AI 관리"
+          >
+            <DashboardAiCandidateTable
+              candidates={operatorDashboardData.aiCandidates}
+              onChangeStatus={(candidate, nextStatus) =>
+                void updateAiCandidateStatus(candidate, nextStatus)
+              }
+              reviews={reviews}
+            />
+          </AdminTablePanel>
         ) : null}
 
         {activeTab === "posts" ? (
@@ -2363,7 +2612,7 @@ export default function AdminPage() {
                             type="button"
                             className={cn(
                               mobileCardTitleClassName,
-                              "block text-left hover:text-red-100",
+                              "block text-left hover:text-blue-700",
                             )}
                             onClick={() => setSelectedPostId(post.id)}
                           >
@@ -2439,7 +2688,7 @@ export default function AdminPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-zinc-200">
                 {paginatedPosts.length ? (
                   paginatedPosts.map((post) => {
                     const authorRoleLabel = getPostAuthorRoleLabel(post, users);
@@ -2462,7 +2711,7 @@ export default function AdminPage() {
                       <td className={tableCellClassName}>
                         <button
                           type="button"
-                          className="block max-w-sm truncate text-left text-sm font-bold text-white hover:text-red-100"
+                          className="block max-w-sm truncate text-left text-sm font-bold text-zinc-950 hover:text-blue-700"
                           onClick={() => setSelectedPostId(post.id)}
                         >
                           {post.title}
@@ -2483,7 +2732,7 @@ export default function AdminPage() {
                             {getPostAuthorDisplayName(post, users)}
                           </VerifiedNickname>
                           {authorRoleLabel ? (
-                            <span className="shrink-0 rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
+                            <span className="shrink-0 rounded-full border border-zinc-300 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
                               {authorRoleLabel}
                             </span>
                           ) : null}
@@ -2606,7 +2855,7 @@ export default function AdminPage() {
                           }
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-black text-red-100">
+                          <p className="text-xs font-black text-blue-700">
                             {formatAdminPlateNumber(getReviewPlateNumber(review))}
                           </p>
                           <p className={mobileCardMetaClassName}>
@@ -2617,7 +2866,7 @@ export default function AdminPage() {
                               href={reviewDetailHref}
                               className={cn(
                                 mobileCardTitleClassName,
-                                "mt-1 block hover:text-red-100",
+                                "mt-1 block hover:text-blue-700",
                               )}
                             >
                               {review.content}
@@ -2695,7 +2944,7 @@ export default function AdminPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-zinc-200">
                 {paginatedReviews.length ? (
                   paginatedReviews.map((review) => {
                     const reviewDetailHref = getReviewDetailHref(review);
@@ -2714,11 +2963,11 @@ export default function AdminPage() {
                           }
                         />
                       </td>
-                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs font-bold text-zinc-100")}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs font-bold text-zinc-900")}>
                         {formatAdminPlateNumber(getReviewPlateNumber(review))}
                       </td>
                       <td className={tableCellClassName}>
-                        <p className="max-w-52 truncate text-sm font-semibold text-zinc-200">
+                        <p className="max-w-52 truncate text-sm font-semibold text-zinc-700">
                           {getReviewVehicleModel(review)}
                         </p>
                       </td>
@@ -2726,12 +2975,12 @@ export default function AdminPage() {
                         {reviewDetailHref ? (
                           <Link
                             href={reviewDetailHref}
-                            className="block max-w-[30rem] truncate text-sm leading-5 text-white hover:text-red-100"
+                            className="block max-w-[30rem] truncate text-sm leading-5 text-zinc-950 hover:text-blue-700"
                           >
                             {review.content}
                           </Link>
                         ) : (
-                          <p className="max-w-[30rem] truncate text-sm leading-5 text-white">
+                          <p className="max-w-[30rem] truncate text-sm leading-5 text-zinc-950">
                             {review.content}
                           </p>
                         )}
@@ -2828,13 +3077,20 @@ export default function AdminPage() {
                 users.map((account) => (
                   <article className={mobileCardClassName} key={account.id}>
                     <div className="min-w-0">
-                      <p className={mobileCardTitleClassName}>
+                      <button
+                        type="button"
+                        className={cn(mobileCardTitleClassName, "block text-left")}
+                        onClick={() => setSelectedUserId(account.id)}
+                      >
                         <VerifiedNickname
                           isVerifiedDealer={account.is_verified_dealer}
                         >
-                          {account.nickname ?? "닉네임 없음"}
+                          {(account.nickname ?? "닉네임 없음") +
+                            " (" +
+                            formatCompactId(account.id, 8) +
+                            ")"}
                         </VerifiedNickname>
-                      </p>
+                      </button>
                       <p className={mobileCardMetaClassName}>
                         {getDisplayValue(account.email)} ·{" "}
                         {formatProviderLabel(account.login_provider)} · 가입{" "}
@@ -2843,14 +3099,6 @@ export default function AdminPage() {
                       <p className={mobileCardMetaClassName}>
                         최근 로그인 {formatOptionalDate(account.last_sign_in_at)}
                       </p>
-                      <details className="mt-1 text-xs text-zinc-500">
-                        <summary className="cursor-pointer select-none text-zinc-400">
-                          회원 ID 보기
-                        </summary>
-                        <div className="mt-1 break-all font-mono text-[11px] leading-relaxed">
-                          {account.id}
-                        </div>
-                      </details>
                       <div className={mobileCardSubMetaClassName}>
                         <RoleBadge role={account.role} />
                         <AccountStatusBadge
@@ -2861,7 +3109,7 @@ export default function AdminPage() {
                             "rounded-full border px-2 py-1 text-xs font-bold",
                             account.is_verified_dealer
                               ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
-                              : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                              : "border-zinc-300 bg-zinc-100 text-zinc-400",
                           )}
                         >
                           딜러 {account.is_verified_dealer ? "ON" : "OFF"}
@@ -2911,48 +3159,42 @@ export default function AdminPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-zinc-200">
                 {users.length ? (
                   users.map((account) => (
                     <tr key={account.id}>
                       <td className={tableCellClassName}>
                         <div className="min-w-32">
-                          <details className="group">
-                            <summary className="cursor-pointer list-none">
-                              <span className="inline-flex items-center gap-1.5">
-                                <VerifiedNickname
-                                  isVerifiedDealer={account.is_verified_dealer}
-                                >
-                                  {account.nickname ?? "닉네임 없음"}
-                                </VerifiedNickname>
-                                <span className="text-[10px] font-bold text-zinc-600 group-open:hidden">
-                                  ID
-                                </span>
-                                <span className="hidden text-[10px] font-bold text-zinc-600 group-open:inline">
-                                  접기
-                                </span>
-                              </span>
-                            </summary>
-                            <div className="mt-1 max-w-48 break-all font-mono text-[11px] leading-relaxed text-zinc-500">
-                              {account.id}
-                            </div>
-                          </details>
+                          <button
+                            type="button"
+                            className="inline-flex max-w-56 items-center gap-1.5 truncate text-left"
+                            onClick={() => setSelectedUserId(account.id)}
+                          >
+                            <VerifiedNickname
+                              isVerifiedDealer={account.is_verified_dealer}
+                            >
+                              {(account.nickname ?? "닉네임 없음") +
+                                " (" +
+                                formatCompactId(account.id, 8) +
+                                ")"}
+                            </VerifiedNickname>
+                          </button>
                         </div>
                       </td>
                       <td className={tableCellClassName}>
                         <div className="min-w-56 max-w-72">
                           <div className="flex items-center gap-2">
-                            <span className="shrink-0 rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-bold text-red-200">
+                            <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
                               {formatProviderLabel(account.login_provider)}
                             </span>
-                            <span className="min-w-0 truncate text-xs text-zinc-300">
+                            <span className="min-w-0 truncate text-xs text-zinc-500">
                               {getDisplayValue(account.email)}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className={tableCellClassName}>
-                        <span className="font-mono text-sm font-bold text-zinc-100">
+                        <span className="font-mono text-sm font-bold text-zinc-800">
                           {account.nickname_change_available.toLocaleString()}
                         </span>
                       </td>
@@ -2964,10 +3206,10 @@ export default function AdminPage() {
                           className={cn(
                             "inline-flex rounded-full border px-2.5 py-1 text-xs font-bold",
                             !isVerifiedDealerFeatureReady
-                              ? "border-zinc-700 bg-zinc-900 text-zinc-500"
+                              ? "border-zinc-300 bg-zinc-100 text-zinc-500"
                               : account.is_verified_dealer
                                 ? "border-[#2563EB]/50 bg-[#2563EB]/10 text-[#2563EB]"
-                                : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                                : "border-zinc-300 bg-zinc-100 text-zinc-400",
                           )}
                         >
                           {!isVerifiedDealerFeatureReady
@@ -3060,12 +3302,16 @@ export default function AdminPage() {
                           }
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-red-300">
+                          <p className="text-xs font-bold text-red-600">
                             {report.report_type}
                           </p>
-                          <p className={mobileCardTitleClassName}>
+                          <button
+                            type="button"
+                            className={cn(mobileCardTitleClassName, "block text-left")}
+                            onClick={() => setSelectedReportId(report.report_id)}
+                          >
                             {report.target_title ?? report.target_content}
-                          </p>
+                          </button>
                           <p className={mobileCardMetaClassName}>
                             {report.reason ?? "사유 없음"} ·{" "}
                             {report.target_author ?? "작성자 확인 필요"} ·{" "}
@@ -3078,19 +3324,13 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </div>
-                    {report.target_path ? (
-                      <Link
-                        className={cn(
-                          actionButtonClassName,
-                          "min-h-8 px-2.5 text-[11px]",
-                        )}
-                        href={report.target_path}
-                      >
-                        보기
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-zinc-500">연결 없음</span>
-                    )}
+                    <button
+                      type="button"
+                      className={cn(actionButtonClassName, "min-h-8 px-2.5 text-[11px]")}
+                      onClick={() => setSelectedReportId(report.report_id)}
+                    >
+                      보기
+                    </button>
                   </article>
                 ))
               ) : (
@@ -3119,10 +3359,10 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>누적</th>
                   <th className={tableHeadCellClassName}>상태</th>
                   <th className={tableHeadCellClassName}>신고일</th>
-                  <th className={tableHeadCellClassName}>바로가기</th>
+                  <th className={tableHeadCellClassName}>관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-zinc-200">
                 {reports.length ? (
                   reports.map((report) => (
                     <tr key={report.report_id}>
@@ -3144,13 +3384,17 @@ export default function AdminPage() {
                         />
                       </td>
                       <td className={tableCellClassName}>
-                        <p className="text-xs font-bold text-red-300">
+                        <p className="text-xs font-bold text-red-600">
                           {report.report_type}
                         </p>
-                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words font-bold leading-[1.7] text-white">
+                        <button
+                          type="button"
+                          className="mt-1 block max-w-sm truncate text-left font-bold leading-[1.7] text-zinc-950 hover:text-blue-700"
+                          onClick={() => setSelectedReportId(report.report_id)}
+                        >
                           {report.target_title ?? report.target_content}
-                        </p>
-                        <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs leading-[1.7] text-zinc-500">
+                        </button>
+                        <p className="mt-1 max-w-sm truncate text-xs leading-[1.7] text-zinc-500">
                           {report.target_content}
                         </p>
                         <p className="mt-2 text-xs text-zinc-500">
@@ -3170,18 +3414,13 @@ export default function AdminPage() {
                         {formatDate(report.created_at)}
                       </td>
                       <td className={tableCellClassName}>
-                        {report.target_path ? (
-                          <Link
-                            className={actionButtonClassName}
-                            href={report.target_path}
-                          >
-                            대상 보기
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-zinc-500">
-                            연결 없음
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          className={actionButtonClassName}
+                          onClick={() => setSelectedReportId(report.report_id)}
+                        >
+                          상세
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -3196,7 +3435,7 @@ export default function AdminPage() {
         {activeTab === "notices" ? (
           <div className="grid gap-5 xl:grid-cols-2">
             <AdminTablePanel count={notices.length} title="공지 관리">
-              <div className="border-b border-zinc-900 p-3">
+              <div className="border-b border-zinc-200 p-3">
                 <button
                   type="button"
                   className={actionButtonClassName}
@@ -3214,7 +3453,7 @@ export default function AdminPage() {
                           type="button"
                           className={cn(
                             mobileCardTitleClassName,
-                            "block text-left hover:text-red-100",
+                            "block text-left hover:text-blue-700",
                           )}
                           onClick={() => setSelectedNoticeId(notice.id)}
                         >
@@ -3265,7 +3504,7 @@ export default function AdminPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-900">
+                <tbody className="divide-y divide-zinc-200">
                   {notices.length ? (
                     notices.map((notice) => (
                       <tr key={notice.id}>
@@ -3285,7 +3524,7 @@ export default function AdminPage() {
                         <td className={tableCellClassName}>
                           <button
                             type="button"
-                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-white hover:text-red-100"
+                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-zinc-950 hover:text-blue-700"
                             onClick={() => setSelectedNoticeId(notice.id)}
                           >
                             {notice.title}
@@ -3323,7 +3562,7 @@ export default function AdminPage() {
             </AdminTablePanel>
 
             <AdminTablePanel count={popupNotices.length} title="팝업공지 관리">
-              <div className="border-b border-zinc-900 p-3">
+              <div className="border-b border-zinc-200 p-3">
                 <button
                   type="button"
                   className={actionButtonClassName}
@@ -3341,7 +3580,7 @@ export default function AdminPage() {
                           type="button"
                           className={cn(
                             mobileCardTitleClassName,
-                            "block text-left hover:text-red-100",
+                            "block text-left hover:text-blue-700",
                           )}
                           onClick={() => setSelectedPopupNoticeId(notice.id)}
                         >
@@ -3391,7 +3630,7 @@ export default function AdminPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-900">
+                <tbody className="divide-y divide-zinc-200">
                   {popupNotices.length ? (
                     popupNotices.map((notice) => (
                       <tr key={notice.id}>
@@ -3411,7 +3650,7 @@ export default function AdminPage() {
                         <td className={tableCellClassName}>
                           <button
                             type="button"
-                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-white hover:text-red-100"
+                            className="block max-w-[34rem] truncate text-left text-sm font-bold text-zinc-950 hover:text-blue-700"
                             onClick={() => setSelectedPopupNoticeId(notice.id)}
                           >
                             {notice.title}
@@ -3455,29 +3694,29 @@ export default function AdminPage() {
 
         {selectedNotice ? (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-50/78 px-4 py-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="admin-notice-detail-title"
             onClick={() => setSelectedNoticeId(null)}
           >
             <section
-              className="w-full max-w-3xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              className="w-full max-w-3xl rounded-lg border border-zinc-200 bg-white shadow-2xl shadow-black/60"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-red-300">공지</p>
+                  <p className="text-xs font-black text-blue-600">공지</p>
                   <h2
                     id="admin-notice-detail-title"
-                    className="mt-1 break-words text-xl font-black text-white"
+                    className="mt-1 break-words text-xl font-black text-zinc-950"
                   >
                     {selectedNotice.title}
                   </h2>
                 </div>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
                   onClick={() => setSelectedNoticeId(null)}
                   aria-label="공지 상세 닫기"
                 >
@@ -3496,7 +3735,7 @@ export default function AdminPage() {
                   images={getCommunityPostImages(selectedNotice.images)}
                 />
 
-                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
                   <NoticeActionButtons
                     notice={selectedNotice}
                     onDelete={(target) => {
@@ -3513,29 +3752,29 @@ export default function AdminPage() {
 
         {selectedPopupNotice ? (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-50/78 px-4 py-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="admin-popup-notice-detail-title"
             onClick={() => setSelectedPopupNoticeId(null)}
           >
             <section
-              className="w-full max-w-2xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              className="w-full max-w-2xl rounded-lg border border-zinc-200 bg-white shadow-2xl shadow-black/60"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-red-300">팝업공지</p>
+                  <p className="text-xs font-black text-blue-600">팝업공지</p>
                   <h2
                     id="admin-popup-notice-detail-title"
-                    className="mt-1 break-words text-xl font-black text-white"
+                    className="mt-1 break-words text-xl font-black text-zinc-950"
                   >
                     {selectedPopupNotice.title}
                   </h2>
                 </div>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
                   onClick={() => setSelectedPopupNoticeId(null)}
                   aria-label="팝업공지 상세 닫기"
                 >
@@ -3549,7 +3788,7 @@ export default function AdminPage() {
                   <ActiveStatusBadge isActive={selectedPopupNotice.is_active} />
                   {selectedPopupNotice.link_url ? (
                     <a
-                      className="break-all text-red-300 hover:text-red-200"
+                      className="break-all text-red-600 hover:text-blue-700"
                       href={selectedPopupNotice.link_url}
                       target="_blank"
                       rel="noreferrer"
@@ -3559,11 +3798,11 @@ export default function AdminPage() {
                   ) : null}
                 </div>
 
-                <p className="whitespace-pre-wrap break-words text-base leading-[1.75] text-zinc-200">
+                <p className="whitespace-pre-wrap break-words text-base leading-[1.75] text-zinc-700">
                   {selectedPopupNotice.content}
                 </p>
 
-                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
                   <PopupNoticeActionButtons
                     notice={selectedPopupNotice}
                     onDelete={(target) => {
@@ -3581,31 +3820,31 @@ export default function AdminPage() {
 
         {selectedPost ? (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/78 px-4 py-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-50/78 px-4 py-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="admin-post-detail-title"
             onClick={() => setSelectedPostId(null)}
           >
             <section
-              className="w-full max-w-3xl rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/60"
+              className="w-full max-w-3xl rounded-lg border border-zinc-200 bg-white shadow-2xl shadow-black/60"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-zinc-900 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-red-300">
+                  <p className="text-xs font-black text-red-600">
                     {getPostCategoryLabel(selectedPost)}
                   </p>
                   <h2
                     id="admin-post-detail-title"
-                    className="mt-1 break-words text-xl font-black text-white"
+                    className="mt-1 break-words text-xl font-black text-zinc-950"
                   >
                     {selectedPost.title}
                   </h2>
                 </div>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-lg font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
                   onClick={() => setSelectedPostId(null)}
                   aria-label="게시글 상세 닫기"
                 >
@@ -3625,7 +3864,7 @@ export default function AdminPage() {
                       {getPostAuthorDisplayName(selectedPost, users)}
                     </VerifiedNickname>
                     {getPostAuthorRoleLabel(selectedPost, users) ? (
-                      <span className="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
+                      <span className="rounded-full border border-zinc-300 px-1.5 py-0.5 text-[10px] font-black text-zinc-400">
                         {getPostAuthorRoleLabel(selectedPost, users)}
                       </span>
                     ) : null}
@@ -3645,7 +3884,7 @@ export default function AdminPage() {
                   images={getCommunityPostImages(selectedPost.images)}
                 />
 
-                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-900 pt-4">
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
                   <PostActionButtons
                     isSuperAdmin={isSuperAdmin}
                     post={selectedPost}
@@ -3662,6 +3901,142 @@ export default function AdminPage() {
             </section>
           </div>
         ) : null}
+
+        {selectedUser ? (
+          <AdminDetailModal
+            title={
+              (selectedUser.nickname ?? "닉네임 없음") +
+              " (" +
+              formatCompactId(selectedUser.id, 8) +
+              ")"
+            }
+            eyebrow="회원 상세"
+            onClose={() => setSelectedUserId(null)}
+          >
+            <div className="grid gap-3 text-sm text-zinc-700 sm:grid-cols-2">
+              <DetailField label="이메일" value={getDisplayValue(selectedUser.email)} />
+              <DetailField
+                label="로그인"
+                value={formatProviderLabel(selectedUser.login_provider)}
+              />
+              <DetailField label="가입일" value={formatDate(selectedUser.created_at)} />
+              <DetailField
+                label="최근 로그인"
+                value={formatOptionalDate(selectedUser.last_sign_in_at)}
+              />
+              <DetailField label="회원 ID" value={selectedUser.id} />
+              <div>
+                <p className="text-xs font-black text-zinc-400">상태</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <RoleBadge role={selectedUser.role} />
+                  <AccountStatusBadge isSuspended={selectedUser.is_suspended} />
+                  <span className="inline-flex whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
+                    딜러 {selectedUser.is_verified_dealer ? "ON" : "OFF"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end border-t border-zinc-200 pt-4">
+              <UserActionButtons
+                account={selectedUser}
+                isSuperAdmin={isSuperAdmin}
+                isVerifiedDealerFeatureReady={isVerifiedDealerFeatureReady}
+                onGrantNicknameChangeTicket={(target) =>
+                  void grantNicknameChangeTicket(target)
+                }
+                onSetRole={(target, nextRole) =>
+                  void setUserRole(target, nextRole)
+                }
+                onSetSuspended={(target) => void setUserSuspended(target)}
+                onSetVerifiedDealer={(target) => void setVerifiedDealer(target)}
+              />
+            </div>
+          </AdminDetailModal>
+        ) : null}
+
+        {selectedReport ? (
+          <AdminDetailModal
+            title={selectedReport.target_title ?? selectedReport.target_content}
+            eyebrow={selectedReport.report_type + " 신고"}
+            onClose={() => setSelectedReportId(null)}
+          >
+            <div className="space-y-3 text-sm text-zinc-700">
+              <DetailField label="신고 사유" value={selectedReport.reason ?? "사유 없음"} />
+              <DetailField
+                label="대상 작성자"
+                value={selectedReport.target_author ?? "확인 필요"}
+              />
+              <DetailField
+                label="신고일"
+                value={formatDate(selectedReport.created_at)}
+              />
+              <DetailField
+                label="누적 신고"
+                value={Number(selectedReport.report_count).toLocaleString() + "건"}
+              />
+              <div>
+                <p className="text-xs font-black text-zinc-400">대상 내용</p>
+                <p className="mt-1 whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 leading-6">
+                  {selectedReport.target_content}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <HiddenStatus isHidden={selectedReport.is_hidden} />
+                {selectedReport.target_path ? (
+                  <Link className={actionButtonClassName} href={selectedReport.target_path}>
+                    대상 확인
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </AdminDetailModal>
+        ) : null}
+
+        {selectedReview ? (
+          <AdminDetailModal
+            title={formatAdminPlateNumber(getReviewPlateNumber(selectedReview))}
+            eyebrow="후기 상세"
+            onClose={() => setSelectedReviewId(null)}
+          >
+            <div className="space-y-3 text-sm text-zinc-700">
+              <DetailField
+                label="차량 모델"
+                value={getReviewVehicleModel(selectedReview)}
+              />
+              <DetailField
+                label="작성자"
+                value={
+                  selectedReview.author_nickname ??
+                  (selectedReview.author_id
+                    ? formatCompactId(selectedReview.author_id, 8)
+                    : "익명 사용자")
+                }
+              />
+              <DetailField
+                label="작성일"
+                value={formatDate(selectedReview.created_at)}
+              />
+              <div>
+                <p className="text-xs font-black text-zinc-400">후기 내용</p>
+                <p className="mt-1 whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 leading-6">
+                  {selectedReview.content}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <HiddenStatus isHidden={selectedReview.is_hidden} />
+                {getReviewDetailHref(selectedReview) ? (
+                  <Link
+                    className={actionButtonClassName}
+                    href={getReviewDetailHref(selectedReview) ?? "#"}
+                  >
+                    카팩트 리포트
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </AdminDetailModal>
+        ) : null}
+        </div>
       </div>
     </main>
   );
@@ -3688,6 +4063,7 @@ function SearchBar({
     posts: "게시글 제목, 내용, 작성자 검색",
     reviews: "후기 내용, 작성자, 차량 정보 검색",
     users: "닉네임, 회원 ID, role 검색",
+    ai: "AI 후보, 키워드, 모델명 검색",
     reports: "신고 사유, 대상 내용, 작성자 검색",
     notices: "공지 제목, 내용, 팝업 URL 검색",
   }[activeTab];
@@ -3720,18 +4096,241 @@ function SearchBar({
   );
 }
 
+function AdminDetailModal({
+  children,
+  eyebrow,
+  onClose,
+  title,
+}: {
+  children: React.ReactNode;
+  eyebrow: string;
+  onClose: () => void;
+  title: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/30 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <section
+        className="w-full max-w-3xl rounded-lg border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/20"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black text-blue-600">{eyebrow}</p>
+            <h2 className="mt-1 break-words text-xl font-black text-zinc-950">
+              {title}
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg font-black text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-950"
+            onClick={onClose}
+            aria-label="상세 닫기"
+          >
+            ×
+          </button>
+        </div>
+        <div className="px-4 py-4">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-black text-zinc-400">{label}</p>
+      <p className="mt-1 break-words font-bold text-zinc-800">{value}</p>
+    </div>
+  );
+}
+
+function NotificationItem({
+  count,
+  label,
+  onClick,
+  tone,
+}: {
+  count: number;
+  label: string;
+  onClick: () => void;
+  tone: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between border-b border-zinc-100 px-3 py-3 text-left transition last:border-b-0 hover:bg-zinc-50"
+      onClick={onClick}
+    >
+      <span className="text-sm font-black text-zinc-800">
+        <ToneDot tone={tone} /> {label}
+      </span>
+      <span className="text-sm font-black text-zinc-950">
+        {count.toLocaleString()}건
+      </span>
+    </button>
+  );
+}
+
+function ToneDot({ tone }: { tone: string }) {
+  const color =
+    tone === "red"
+      ? "text-red-500"
+      : tone === "yellow"
+        ? "text-amber-500"
+        : tone === "orange"
+          ? "text-orange-500"
+          : tone === "green"
+            ? "text-emerald-500"
+            : tone === "purple"
+              ? "text-violet-500"
+              : "text-blue-500";
+
+  return <span className={color}>●</span>;
+}
+
+function createDashboardChartRows({
+  aiCandidates,
+  posts,
+  reports,
+  reviews,
+  users,
+}: {
+  aiCandidates: AdminDashboardAiCandidate[];
+  posts: AdminCommunityPost[];
+  reports: AdminReport[];
+  reviews: AdminReview[];
+  users: AdminUserProfile[];
+}) {
+  const now = new Date();
+
+  return Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - (29 - index));
+    date.setHours(0, 0, 0, 0);
+    const nextDate = new Date(date);
+    nextDate.setDate(date.getDate() + 1);
+    const start = date.getTime();
+    const end = nextDate.getTime();
+    const inDay = (value: string | null | undefined) => {
+      const time = Date.parse(value ?? "");
+      return !Number.isNaN(time) && time >= start && time < end;
+    };
+
+    return {
+      label: String(date.getMonth() + 1) + "/" + String(date.getDate()),
+      ai: aiCandidates.filter((candidate) => inDay(candidate.updatedAt)).length,
+      posts: posts.filter((post) => inDay(post.created_at)).length,
+      reports: reports.filter((report) => inDay(report.created_at)).length,
+      reviews: reviews.filter((review) => inDay(review.created_at)).length,
+      users: users.filter((account) => inDay(account.created_at)).length,
+    };
+  });
+}
+
+function DashboardLineChart({
+  rows,
+}: {
+  rows: ReturnType<typeof createDashboardChartRows>;
+}) {
+  const series = [
+    { key: "reviews", label: "후기", color: "#2563eb" },
+    { key: "users", label: "회원", color: "#10b981" },
+    { key: "posts", label: "게시글", color: "#111827" },
+    { key: "ai", label: "AI 반영", color: "#7c3aed" },
+    { key: "reports", label: "신고", color: "#ef4444" },
+  ] as const;
+  const maxValue = Math.max(
+    1,
+    ...rows.flatMap((row) => series.map((item) => row[item.key])),
+  );
+  const width = 900;
+  const height = 220;
+  const padding = 28;
+  const xStep = (width - padding * 2) / Math.max(1, rows.length - 1);
+  const getY = (value: number) =>
+    height - padding - (value / maxValue) * (height - padding * 2);
+  const getPath = (key: (typeof series)[number]["key"]) =>
+    rows
+      .map((row, index) => {
+        const x = padding + index * xStep;
+        const y = getY(row[key]);
+        return (index === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1);
+      })
+      .join(" ");
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <div className="mb-3 flex flex-wrap gap-3">
+        {series.map((item) => (
+          <span
+            key={item.key}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600"
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            {item.label}
+          </span>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        <svg
+          className="h-[220px] min-w-[760px] w-full"
+          viewBox={"0 0 " + width + " " + height}
+          role="img"
+          aria-label="최근 30일 운영 지표 그래프"
+        >
+          {[0, 1, 2, 3].map((line) => {
+            const y = padding + line * ((height - padding * 2) / 3);
+            return (
+              <line
+                key={line}
+                x1={padding}
+                x2={width - padding}
+                y1={y}
+                y2={y}
+                stroke="#e5e7eb"
+                strokeWidth="1"
+              />
+            );
+          })}
+          {series.map((item) => (
+            <path
+              key={item.key}
+              d={getPath(item.key)}
+              fill="none"
+              stroke={item.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2.5"
+            />
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function DashboardPanel({
   activeDashboardTab,
   dashboardViewFilter,
   onChangeAiCandidateStatus,
   onChangeDashboardTab,
   onChangeViewFilter,
+  onNavigate,
   operatorDashboardData,
   posts,
   reports,
   reviews,
   stats,
   trafficStats,
+  users,
 }: {
   activeDashboardTab: DashboardBoardTab;
   dashboardViewFilter: DashboardViewFilter;
@@ -3741,50 +4340,202 @@ function DashboardPanel({
   ) => void;
   onChangeDashboardTab: (tab: DashboardBoardTab) => void;
   onChangeViewFilter: (filter: DashboardViewFilter) => void;
+  onNavigate: (tab: AdminTab) => void;
   operatorDashboardData: AdminOperatorDashboardData;
   posts: AdminCommunityPost[];
   reports: AdminReport[];
   reviews: AdminReview[];
   stats: AdminStats;
   trafficStats: AdminTrafficStats;
+  users: AdminUserProfile[];
 }) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartTime = todayStart.getTime();
+  const yesterdayStartTime = todayStartTime - 24 * 60 * 60 * 1000;
+  const todayReviews = reviews.filter(
+    (review) => Date.parse(review.created_at) >= todayStartTime,
+  );
+  const yesterdayReviews = reviews.filter((review) => {
+    const createdAt = Date.parse(review.created_at);
+    return createdAt >= yesterdayStartTime && createdAt < todayStartTime;
+  });
+  const todayPosts = posts.filter(
+    (post) => Date.parse(post.created_at) >= todayStartTime,
+  );
+  const todayUsers = users.filter(
+    (account) => Date.parse(account.created_at) >= todayStartTime,
+  );
+  const todayReports = reports.filter(
+    (report) => Date.parse(report.created_at) >= todayStartTime,
+  );
+  const pendingReports = reports.filter((report) => !report.is_hidden);
+  const reviewingAiCandidates = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "reviewing",
+  );
+  const appliedAiCandidates = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "applied",
+  );
+  const yesterdayDelta = todayReviews.length - yesterdayReviews.length;
   const summaryItems = [
-    { label: "오늘 방문자", value: trafficStats.todayVisitors },
-    { label: "7일 방문자", value: trafficStats.sevenDayVisitors },
-    { label: "30일 방문자", value: trafficStats.thirtyDayVisitors },
-    { label: "총 조회수", value: operatorDashboardData.totalViews },
-    { label: "총 후기수", value: stats.reviews },
-    { label: "총 게시글수", value: stats.communityPosts },
-    { label: "신고수", value: stats.reports },
+    {
+      label: "오늘 등록 후기",
+      value: todayReviews.length || trafficStats.todayReviews,
+      detail:
+        yesterdayDelta === 0
+          ? "어제와 동일"
+          : (yesterdayDelta > 0 ? "+" : "") + yesterdayDelta.toLocaleString() + " 어제 대비",
+      tab: "reviews" as AdminTab,
+    },
+    {
+      label: "신규 회원",
+      value: todayUsers.length,
+      detail: "최근 가입 확인",
+      tab: "users" as AdminTab,
+    },
+    {
+      label: "신고 접수",
+      value: todayReports.length,
+      detail: "오늘 접수",
+      tab: "reports" as AdminTab,
+    },
+    {
+      label: "AI 반영 후보",
+      value: reviewingAiCandidates.length,
+      detail: "검토 대기",
+      tab: "ai" as AdminTab,
+    },
+    {
+      label: "미처리 신고",
+      value: pendingReports.length,
+      detail: "운영 처리 필요",
+      tab: "reports" as AdminTab,
+    },
+    {
+      label: "오늘 게시글",
+      value: todayPosts.length,
+      detail: "공지 제외 포함",
+      tab: "posts" as AdminTab,
+    },
   ];
   const filteredRankings = operatorDashboardData.viewRankings.filter(
     (item) => item.type === dashboardViewFilter,
   );
   const recentReviews = reviews.slice(0, 5);
   const recentPosts = posts.filter((post) => !post.is_notice).slice(0, 5);
+  const recentUsers = users.slice(0, 5).map((account) => ({
+    id: account.id,
+    meta: formatDate(account.created_at),
+    title:
+      (account.nickname ?? "닉네임 없음") +
+      " (" +
+      formatCompactId(account.id, 8) +
+      ")",
+  }));
+  const chartRows = createDashboardChartRows({
+    aiCandidates: appliedAiCandidates,
+    posts,
+    reports,
+    reviews,
+    users,
+  });
+  const todoItems = [
+    { label: "AI 반영 후보", count: reviewingAiCandidates.length, tab: "ai" as AdminTab, tone: "red" },
+    { label: "신고 대기", count: pendingReports.length, tab: "reports" as AdminTab, tone: "yellow" },
+    { label: "신규 회원", count: todayUsers.length, tab: "users" as AdminTab, tone: "green" },
+    { label: "오늘 등록 후기", count: todayReviews.length || trafficStats.todayReviews, tab: "reviews" as AdminTab, tone: "blue" },
+  ];
 
   return (
     <div className="space-y-4">
-      <section className={panelClassName}>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-white">운영 요약</h2>
-            <p className="mt-1 text-xs font-medium text-zinc-500">
-              오늘 확인할 핵심 지표만 표시합니다.
-            </p>
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+        {summaryItems.map((item) => (
+          <StatCard
+            key={item.label}
+            detail={item.detail}
+            label={item.label}
+            value={item.value}
+            onClick={() => onNavigate(item.tab)}
+          />
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className={panelClassName}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-zinc-950">오늘 해야 할 일</h2>
+              <p className="mt-1 text-xs font-medium text-zinc-500">
+                처리 우선순위가 높은 항목입니다.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {todoItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                onClick={() => onNavigate(item.tab)}
+              >
+                <span className="text-sm font-black text-zinc-800">
+                  <ToneDot tone={item.tone} /> {item.label}
+                </span>
+                <span className="text-sm font-black text-zinc-950">
+                  {item.count.toLocaleString()}건
+                </span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-          {summaryItems.map((item) => (
-            <StatCard key={item.label} label={item.label} value={item.value} />
-          ))}
+        <div className={panelClassName}>
+          <h2 className="text-lg font-black text-zinc-950">최근 30일 운영 흐름</h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            후기, 회원, 게시글, AI 반영, 신고 추이를 한 화면에서 봅니다.
+          </p>
+          <DashboardLineChart rows={chartRows} />
         </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-4">
+        <DashboardRecentList
+          emptyMessage="최근 후기가 없습니다."
+          items={recentReviews.map((review) => ({
+            id: review.id,
+            meta: formatDate(review.created_at),
+            title: formatAdminPlateNumber(getReviewPlateNumber(review)) + " · " + review.content,
+          }))}
+          title="최근 후기"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 게시글이 없습니다."
+          items={recentPosts.map((post) => ({
+            id: post.id,
+            meta: getPostCategoryLabel(post) + " · " + formatDate(post.created_at),
+            title: post.title,
+          }))}
+          title="최근 게시글"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 가입 회원은 회원 관리에서 확인하세요."
+          items={recentUsers}
+          title="최근 가입 회원"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 신고가 없습니다."
+          items={reports.slice(0, 5).map((report) => ({
+            id: report.report_id,
+            meta: report.report_type + " · " + formatDate(report.created_at),
+            title: report.target_title ?? report.target_content,
+          }))}
+          title="최근 신고"
+        />
       </section>
 
       <section className={panelClassName}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-black text-white">운영 게시판</h2>
+            <h2 className="text-lg font-black text-zinc-950">운영 분석</h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
               트래픽, 조회수, 콘텐츠, 키워드, AI DB 업데이트 추천을 탭으로 확인합니다.
             </p>
@@ -3795,9 +4546,9 @@ function DashboardPanel({
                 key={tab.value}
                 type="button"
                 className={cn(
-                  "shrink-0 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                  categoryFilterButtonClassName,
                   activeDashboardTab === tab.value &&
-                    "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+                    activeCategoryFilterButtonClassName,
                 )}
                 onClick={() => onChangeDashboardTab(tab.value)}
               >
@@ -3806,8 +4557,7 @@ function DashboardPanel({
             ))}
           </div>
         </div>
-
-        <div className="mt-4 overflow-hidden rounded-lg border border-zinc-900">
+        <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
           {activeDashboardTab === "traffic" ? (
             <DashboardTrafficTable rows={operatorDashboardData.trafficRows} />
           ) : null}
@@ -3842,14 +4592,31 @@ function DashboardPanel({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  detail,
+  label,
+  onClick,
+  value,
+}: {
+  detail?: string;
+  label: string;
+  onClick?: () => void;
+  value: number;
+}) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-black p-3 sm:p-4">
-      <p className="truncate text-xs font-bold text-zinc-500">{label}</p>
-      <p className="mt-2 text-xl font-black text-white sm:text-2xl">
+    <button
+      type="button"
+      className="rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-sm shadow-zinc-200/60 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:p-4"
+      onClick={onClick}
+    >
+      <p className="truncate text-xs font-black text-zinc-500">{label}</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
         {value.toLocaleString()}
       </p>
-    </div>
+      {detail ? (
+        <p className="mt-2 truncate text-xs font-bold text-blue-600">{detail}</p>
+      ) : null}
+    </button>
   );
 }
 
@@ -3864,8 +4631,8 @@ function DashboardTrafficTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[920px] divide-y divide-zinc-900 text-sm">
-        <thead className="bg-black">
+      <table className="min-w-[920px] divide-y divide-zinc-200 text-sm">
+        <thead className="bg-zinc-50">
           <tr>
             <DashboardHeadCell>날짜</DashboardHeadCell>
             <DashboardHeadCell>방문자 수</DashboardHeadCell>
@@ -3875,7 +4642,7 @@ function DashboardTrafficTable({
             <DashboardHeadCell>브라우저/OS 요약</DashboardHeadCell>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+        <tbody className="divide-y divide-zinc-200 bg-white">
           {rows.map((row) => (
             <tr key={row.date}>
               <DashboardCell strong>{row.date}</DashboardCell>
@@ -3903,15 +4670,15 @@ function DashboardViewsTable({
 }) {
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto border-b border-zinc-900 bg-black p-3">
+      <div className="flex gap-2 overflow-x-auto border-b border-zinc-200 bg-zinc-50 p-3">
         {dashboardViewFilters.map((item) => (
           <button
             key={item.value}
             type="button"
             className={cn(
-              "shrink-0 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+              "shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
               filter === item.value &&
-                "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+                "border-blue-600 bg-blue-600 text-white hover:border-blue-600 hover:bg-blue-600 hover:text-white",
             )}
             onClick={() => onChangeFilter(item.value)}
           >
@@ -3921,8 +4688,8 @@ function DashboardViewsTable({
       </div>
       {rows.length ? (
         <div className="overflow-x-auto">
-          <table className="min-w-[840px] divide-y divide-zinc-900 text-sm">
-            <thead className="bg-black">
+          <table className="min-w-[840px] divide-y divide-zinc-200 text-sm">
+            <thead className="bg-zinc-50">
               <tr>
                 <DashboardHeadCell>순위</DashboardHeadCell>
                 <DashboardHeadCell>
@@ -3938,7 +4705,7 @@ function DashboardViewsTable({
                 <DashboardHeadCell align="right">상세보기</DashboardHeadCell>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+            <tbody className="divide-y divide-zinc-200 bg-white">
               {rows.map((row) => (
                 <tr key={row.type + row.targetId + row.rank}>
                   <DashboardCell strong>{row.rank}</DashboardCell>
@@ -4003,8 +4770,8 @@ function DashboardContentTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[760px] divide-y divide-zinc-900 text-sm">
-        <thead className="bg-black">
+      <table className="min-w-[760px] divide-y divide-zinc-200 text-sm">
+        <thead className="bg-zinc-50">
           <tr>
             <DashboardHeadCell>항목</DashboardHeadCell>
             <DashboardHeadCell>건수</DashboardHeadCell>
@@ -4012,7 +4779,7 @@ function DashboardContentTable({
             <DashboardHeadCell>최근 등록/발생</DashboardHeadCell>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+        <tbody className="divide-y divide-zinc-200 bg-white">
           {rows.map((row) => (
             <tr key={row.label}>
               <DashboardCell strong>{row.label}</DashboardCell>
@@ -4031,7 +4798,7 @@ function DashboardContentTable({
           ))}
         </tbody>
       </table>
-      <div className="grid gap-0 border-t border-zinc-900 md:grid-cols-2">
+      <div className="grid gap-0 border-t border-zinc-200 md:grid-cols-2">
         <DashboardRecentList
           emptyMessage="최근 후기가 없습니다."
           items={reviews.map((review) => ({
@@ -4076,8 +4843,8 @@ function DashboardKeywordTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[900px] divide-y divide-zinc-900 text-sm">
-        <thead className="bg-black">
+      <table className="min-w-[900px] divide-y divide-zinc-200 text-sm">
+        <thead className="bg-zinc-50">
           <tr>
             <DashboardHeadCell>키워드명</DashboardHeadCell>
             <DashboardHeadCell>언급 횟수</DashboardHeadCell>
@@ -4086,7 +4853,7 @@ function DashboardKeywordTable({
             <DashboardHeadCell>AI 데이터 반영 여부</DashboardHeadCell>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+        <tbody className="divide-y divide-zinc-200 bg-white">
           {rows.map((row) => (
             <tr key={row.keyword}>
               <DashboardCell strong>{row.keyword}</DashboardCell>
@@ -4169,23 +4936,23 @@ function DashboardAiCandidateTable({
         : "제외된 AI DB 업데이트 추천이 없습니다.";
 
   return (
-    <div className="divide-y divide-zinc-900 bg-zinc-950">
-      <div className="bg-black px-4 py-3">
-        <h3 className="text-sm font-black text-white">AI DB 업데이트 추천</h3>
+    <div className="divide-y divide-zinc-200 bg-white">
+      <div className="bg-zinc-50 px-4 py-3">
+        <h3 className="text-sm font-black text-zinc-950">AI DB 업데이트 추천</h3>
         <p className="mt-1 text-xs font-medium text-zinc-500">
           후기 데이터와 조회 신호에서 반복 패턴을 찾고, 관리자는 반영 여부만 결정합니다.
         </p>
       </div>
-      <div className="space-y-3 bg-black px-4 py-3">
+      <div className="space-y-3 bg-zinc-50 px-4 py-3">
         <div className="flex gap-2 overflow-x-auto">
           {aiCandidateStatuses.map((status) => (
             <button
               key={status.value}
               type="button"
               className={cn(
-                "shrink-0 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                "shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
                 activeStatus === status.value &&
-                  "border-red-500 bg-red-500 text-white hover:border-red-500 hover:bg-red-500",
+                  "border-blue-600 bg-blue-600 text-white hover:border-blue-600 hover:bg-blue-600 hover:text-white",
               )}
               onClick={() => setActiveStatus(status.value)}
             >
@@ -4201,9 +4968,9 @@ function DashboardAiCandidateTable({
                 key={filter.value}
                 type="button"
                 className={cn(
-                  "rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-black text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-white",
+                  "rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
                   archiveFilter === filter.value &&
-                    "border-red-500 bg-red-500/20 text-red-100",
+                    "border-blue-600 bg-blue-50 text-blue-700",
                 )}
                 onClick={() => setArchiveFilter(filter.value)}
               >
@@ -4227,12 +4994,12 @@ function DashboardAiCandidateTable({
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-black text-red-100">
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
                   {getAiSourceLabel(candidate.source)}
                 </span>
                 <AiStatusBadge status={candidate.status} />
               </div>
-              <h4 className="mt-3 break-words text-lg font-black leading-snug text-white">
+              <h4 className="mt-3 break-words text-lg font-black leading-snug text-zinc-950">
                 {getAiCandidateTarget(candidate)}
               </h4>
               <p className="mt-1 text-xs font-bold text-zinc-500">
@@ -4243,7 +5010,7 @@ function DashboardAiCandidateTable({
                 <dl className="mt-4 grid gap-2 text-xs text-zinc-400">
                   <div>
                     <dt className="font-black text-zinc-500">반영 위치</dt>
-                    <dd className="mt-1 font-bold text-zinc-200">
+                    <dd className="mt-1 font-bold text-zinc-700">
                       {updateTargets.join(", ")}
                     </dd>
                   </div>
@@ -4251,13 +5018,13 @@ function DashboardAiCandidateTable({
                     <dt className="font-black text-zinc-500">
                       {activeStatus === "applied" ? "반영일시" : "제외일시"}
                     </dt>
-                    <dd className="mt-1 font-bold text-zinc-200">
+                    <dd className="mt-1 font-bold text-zinc-700">
                       {formatOptionalDate(candidate.updatedAt)}
                     </dd>
                   </div>
                   <div>
                     <dt className="font-black text-zinc-500">처리 관리자</dt>
-                    <dd className="mt-1 font-bold text-zinc-200">
+                    <dd className="mt-1 font-bold text-zinc-700">
                       {candidate.updatedByNickname ??
                         (candidate.updatedBy
                           ? formatCompactId(candidate.updatedBy, 8)
@@ -4271,10 +5038,10 @@ function DashboardAiCandidateTable({
                 <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
                   추천 내용
                 </p>
-                <ul className="mt-2 space-y-1.5 text-sm font-medium leading-6 text-zinc-200">
+                <ul className="mt-2 space-y-1.5 text-sm font-medium leading-6 text-zinc-700">
                   {suggestedUpdates.map((item) => (
                     <li key={item} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -4286,7 +5053,7 @@ function DashboardAiCandidateTable({
               <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
                 추천 사유
               </p>
-              <ul className="mt-2 space-y-1.5 text-sm leading-6 text-zinc-300">
+              <ul className="mt-2 space-y-1.5 text-sm leading-6 text-zinc-600">
                 {reasonItems.map((item) => (
                   <li key={item} className="flex gap-2">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
@@ -4369,9 +5136,9 @@ function DashboardAiCandidateTable({
 
 function AiEvidenceMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-black px-3 py-2">
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
       <p className="text-[11px] font-bold text-zinc-500">{label}</p>
-      <p className="mt-1 truncate text-sm font-black text-white">{value}</p>
+      <p className="mt-1 truncate text-sm font-black text-zinc-950">{value}</p>
     </div>
   );
 }
@@ -4386,13 +5153,13 @@ function DashboardRecentList({
   title: string;
 }) {
   return (
-    <section className="border-zinc-900 p-4 md:border-r md:last:border-r-0">
-      <h3 className="text-sm font-black text-white">{title}</h3>
+    <section className="border-zinc-200 p-4 md:border-r md:last:border-r-0">
+      <h3 className="text-sm font-black text-zinc-950">{title}</h3>
       {items.length ? (
         <ul className="mt-3 space-y-2">
           {items.slice(0, 5).map((item) => (
-            <li key={item.id} className="rounded-lg border border-zinc-900 bg-black p-3">
-              <p className="line-clamp-1 text-sm font-bold text-zinc-100">
+            <li key={item.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <p className="line-clamp-1 text-sm font-bold text-zinc-900">
                 {item.title}
               </p>
               <p className="mt-1 line-clamp-1 text-xs text-zinc-500">
@@ -4439,9 +5206,9 @@ function DashboardCell({
   return (
     <td
       className={cn(
-        "max-w-[24rem] px-3 py-3 align-middle text-zinc-300",
+        "max-w-[24rem] px-3 py-3 align-middle text-zinc-600",
         align === "right" && "text-right",
-        strong && "font-black text-white",
+        strong && "font-black text-zinc-950",
       )}
     >
       <span className="line-clamp-2 break-words">{children}</span>
@@ -4450,7 +5217,7 @@ function DashboardCell({
 }
 
 function DashboardEmptyState({ message }: { message: string }) {
-  return <p className={cn(mutedTextClassName, "bg-zinc-950 p-4")}>{message}</p>;
+  return <p className={cn(mutedTextClassName, "bg-white p-4")}>{message}</p>;
 }
 
 function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
@@ -4468,8 +5235,8 @@ function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
           : effectiveStatus === "reviewing"
             ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
             : effectiveStatus === "excluded"
-              ? "border-zinc-600 bg-zinc-900 text-zinc-400"
-              : "border-red-500/40 bg-red-500/10 text-red-100",
+              ? "border-zinc-600 bg-zinc-100 text-zinc-400"
+              : "border-red-500/40 bg-red-500/10 text-red-700",
       )}
     >
       {label ?? "검토중"}
@@ -4718,10 +5485,10 @@ function AdminTablePanel({
   return (
     <section className={panelClassName}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-black text-white">{title}</h2>
+        <h2 className="text-lg font-black text-zinc-950">{title}</h2>
         <p className="text-xs text-zinc-500">{count.toLocaleString()}건 표시</p>
       </div>
-      <div className="overflow-hidden rounded-lg border border-zinc-900 md:overflow-x-auto">
+      <div className="overflow-hidden rounded-lg border border-zinc-200 md:overflow-x-auto">
         {children}
       </div>
     </section>
@@ -4748,7 +5515,7 @@ function BulkActionBar({
   const hasSelection = selectedCount > 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-zinc-900 p-3">
+    <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 p-3">
       <span className="mr-auto text-xs font-bold text-zinc-400">
         선택 {selectedCount.toLocaleString()}개
       </span>
@@ -4787,17 +5554,19 @@ function BulkActionBar({
 }
 
 function MobileActionDetails({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+function ActionMenu({ children }: { children: React.ReactNode }) {
   return (
-    <details className="relative">
+    <details className="relative inline-flex justify-end">
       <summary
-        className={cn(
-          actionButtonClassName,
-          "min-h-8 cursor-pointer list-none px-2.5 text-[11px] [&::-webkit-details-marker]:hidden",
-        )}
+        className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg font-black text-zinc-500 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 [&::-webkit-details-marker]:hidden"
+        aria-label="더보기"
       >
-        관리
+        ⋯
       </summary>
-      <div className="absolute right-0 z-20 mt-2 flex w-40 flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-xl shadow-black/40">
+      <div className="absolute right-0 top-9 z-30 flex w-40 flex-col gap-1 rounded-lg border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10">
         {children}
       </div>
     </details>
@@ -4823,7 +5592,7 @@ function PostActionButtons({
   post: AdminCommunityPost;
 }) {
   return (
-    <>
+    <ActionMenu>
       <button
         type="button"
         className={actionButtonClassName}
@@ -4866,7 +5635,7 @@ function PostActionButtons({
           영구삭제
         </button>
       ) : null}
-    </>
+    </ActionMenu>
   );
 }
 
@@ -4882,7 +5651,7 @@ function ReviewActionButtons({
   review: AdminReview;
 }) {
   return (
-    <>
+    <ActionMenu>
       <button
         type="button"
         className={actionButtonClassName}
@@ -4899,7 +5668,7 @@ function ReviewActionButtons({
           영구삭제
         </button>
       ) : null}
-    </>
+    </ActionMenu>
   );
 }
 
@@ -4921,7 +5690,7 @@ function UserActionButtons({
   onSetVerifiedDealer: (account: AdminUserProfile) => void;
 }) {
   return (
-    <>
+    <ActionMenu>
       <button
         type="button"
         className={actionButtonClassName}
@@ -4966,7 +5735,7 @@ function UserActionButtons({
       >
         관리자 회수
       </button>
-    </>
+    </ActionMenu>
   );
 }
 
@@ -4980,7 +5749,7 @@ function NoticeActionButtons({
   onEdit: (notice: AdminCommunityPost) => void;
 }) {
   return (
-    <>
+    <ActionMenu>
       <button
         type="button"
         className={actionButtonClassName}
@@ -4995,7 +5764,7 @@ function NoticeActionButtons({
       >
         삭제
       </button>
-    </>
+    </ActionMenu>
   );
 }
 
@@ -5011,7 +5780,7 @@ function PopupNoticeActionButtons({
   onToggle: (notice: AdminPopupNotice) => void;
 }) {
   return (
-    <>
+    <ActionMenu>
       <button
         type="button"
         className={actionButtonClassName}
@@ -5033,7 +5802,7 @@ function PopupNoticeActionButtons({
       >
         삭제
       </button>
-    </>
+    </ActionMenu>
   );
 }
 
@@ -5087,7 +5856,7 @@ function PostStatusBadges({ post }: { post: AdminCommunityPost }) {
   return (
     <div className="flex flex-nowrap gap-1.5 whitespace-nowrap">
       {post.is_notice ? (
-        <span className="shrink-0 rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
+        <span className="shrink-0 rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">
           공지
         </span>
       ) : null}
@@ -5103,11 +5872,11 @@ function PostStatusBadges({ post }: { post: AdminCommunityPost }) {
 
 function HiddenStatus({ isHidden }: { isHidden: boolean }) {
   return isHidden ? (
-    <span className="shrink-0 rounded-full bg-zinc-700 px-2 py-1 text-xs font-bold text-zinc-200">
+    <span className="shrink-0 rounded-full bg-zinc-700 px-2 py-1 text-xs font-bold text-zinc-700">
       숨김
     </span>
   ) : (
-    <span className="shrink-0 rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
+    <span className="shrink-0 rounded-full border border-zinc-300 px-2 py-1 text-xs font-bold text-zinc-400">
       노출
     </span>
   );
@@ -5116,10 +5885,10 @@ function HiddenStatus({ isHidden }: { isHidden: boolean }) {
 function RoleBadge({ role }: { role: AdminRole }) {
   const roleClassName =
     role === "super_admin"
-      ? "border-red-500/60 bg-red-500/10 text-red-200"
+      ? "border-zinc-300 bg-zinc-100 text-zinc-800"
       : role === "admin"
-        ? "border-amber-500/60 bg-amber-500/10 text-amber-200"
-        : "border-zinc-700 text-zinc-300";
+        ? "border-blue-200 bg-blue-50 text-blue-700"
+        : "border-zinc-300 text-zinc-600";
 
   return (
     <span
@@ -5135,11 +5904,11 @@ function RoleBadge({ role }: { role: AdminRole }) {
 
 function AccountStatusBadge({ isSuspended }: { isSuspended: boolean }) {
   return isSuspended ? (
-    <span className="inline-flex whitespace-nowrap rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-200">
+    <span className="inline-flex whitespace-nowrap rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-700">
       정지
     </span>
   ) : (
-    <span className="inline-flex whitespace-nowrap rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-300">
+    <span className="inline-flex whitespace-nowrap rounded-full border border-zinc-300 px-2 py-1 text-xs font-bold text-zinc-600">
       정상
     </span>
   );
@@ -5151,7 +5920,7 @@ function ActiveStatusBadge({ isActive }: { isActive: boolean }) {
       활성
     </span>
   ) : (
-    <span className="shrink-0 whitespace-nowrap rounded-full border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-400">
+    <span className="shrink-0 whitespace-nowrap rounded-full border border-zinc-300 px-2 py-1 text-xs font-bold text-zinc-400">
       비활성
     </span>
   );
