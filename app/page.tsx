@@ -158,12 +158,12 @@ const noticeTickerClassName = cn(
 );
 const heroCopyFrameClassName = cn("relative h-24 overflow-hidden sm:h-32");
 const heroCopyClassName = cn(
-  "absolute inset-x-0 top-0 bg-gradient-to-b from-white via-white to-zinc-300 bg-clip-text px-1.5 text-[1.95rem] font-black leading-[1.18] tracking-[-0.03em] text-transparent sm:px-0 sm:text-5xl sm:leading-tight",
+  "absolute inset-x-0 top-0 px-1.5 text-[1.95rem] font-black leading-[1.18] tracking-[-0.03em] text-white sm:bg-gradient-to-b sm:from-white sm:via-white sm:to-zinc-300 sm:bg-clip-text sm:px-0 sm:text-5xl sm:leading-tight sm:text-transparent",
   "drop-shadow-[0_4px_8px_rgba(0,0,0,0.18)] [text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_0_rgba(0,0,0,0.14),0_4px_8px_rgba(0,0,0,0.18)]",
 );
 const heroHighlightClassName = cn(
-  "bg-gradient-to-b from-[#ff535b] via-[#ff2b35] to-[#ec202b] bg-clip-text text-transparent md:from-[#ff4a43] md:via-[#FF3B30] md:to-[#b91c1c]",
-  "drop-shadow-[0_4px_9px_rgba(0,0,0,0.2)] [text-shadow:0_1px_0_rgba(255,255,255,0.2),0_2px_0_rgba(80,0,0,0.24),0_4px_9px_rgba(0,0,0,0.2)]",
+  "text-[#ff2b35] sm:bg-gradient-to-b sm:from-[#ff535b] sm:via-[#ff2b35] sm:to-[#ec202b] sm:bg-clip-text sm:text-transparent md:from-[#ff4a43] md:via-[#FF3B30] md:to-[#b91c1c]",
+  "drop-shadow-[0_4px_9px_rgba(0,0,0,0.18)] [text-shadow:0_1px_0_rgba(255,255,255,0.18),0_2px_0_rgba(80,0,0,0.14),0_4px_8px_rgba(0,0,0,0.16)] sm:drop-shadow-[0_4px_9px_rgba(0,0,0,0.2)] sm:[text-shadow:0_1px_0_rgba(255,255,255,0.2),0_2px_0_rgba(80,0,0,0.24),0_4px_9px_rgba(0,0,0,0.2)]",
 );
 
 interface RecentFact {
