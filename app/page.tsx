@@ -123,10 +123,10 @@ const topRankingCardClassName = cn(
   "flex h-full flex-col rounded-lg border border-white/[0.09] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.09),transparent_34%),linear-gradient(180deg,#17191d_0%,#101114_52%,#090a0c_100%)] p-3 shadow-[0_26px_70px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.04),inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-200 md:p-5 md:hover:-translate-y-[3px] md:hover:border-white/[0.14]",
 );
 const topRankingItemClassName = cn(
-  "grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.6rem_1fr_auto] md:gap-3 md:p-3",
+  "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.6rem_1fr_auto] md:gap-3 md:p-3",
 );
 const topRankingButtonClassName = cn(
-  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.10] bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-black leading-none text-[#FF6970] shadow-[0_10px_22px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur transition sm:px-3 sm:text-xs",
+  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.10] bg-white/[0.07] px-2 py-1.5 text-[10px] font-black leading-none text-[#FF6970] shadow-[0_10px_22px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur transition sm:px-3 sm:text-xs",
   "hover:-translate-y-0.5 hover:border-[#FF4D4F]/35 hover:bg-white/[0.10] hover:text-[#FF8085] active:scale-[0.98]",
 );
 const topRankingRankBadgeClassName = cn(
@@ -143,7 +143,7 @@ const topRankingSubTextClassName = cn(
   "mt-0.5 block text-xs font-semibold leading-snug text-zinc-300 break-keep md:truncate md:text-sm md:leading-normal",
 );
 const topRankingViewClassName = cn(
-  "col-start-2 mt-0.5 text-[11px] font-semibold text-zinc-500 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm",
+  "justify-self-end whitespace-nowrap text-right text-[11px] font-semibold text-zinc-500 md:pt-0.5 md:text-sm",
 );
 const topRankingCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
@@ -162,7 +162,7 @@ const heroCopyClassName = cn(
   "drop-shadow-[0_4px_8px_rgba(0,0,0,0.18)] [text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_0_rgba(0,0,0,0.14),0_4px_8px_rgba(0,0,0,0.18)]",
 );
 const heroHighlightClassName = cn(
-  "bg-gradient-to-b from-[#ff4a43] via-[#FF3B30] to-[#b91c1c] bg-clip-text text-transparent",
+  "bg-gradient-to-b from-[#ff535b] via-[#ff2b35] to-[#ec202b] bg-clip-text text-transparent md:from-[#ff4a43] md:via-[#FF3B30] md:to-[#b91c1c]",
   "drop-shadow-[0_4px_9px_rgba(0,0,0,0.2)] [text-shadow:0_1px_0_rgba(255,255,255,0.2),0_2px_0_rgba(80,0,0,0.24),0_4px_9px_rgba(0,0,0,0.2)]",
 );
 
@@ -1132,7 +1132,7 @@ export default function Home() {
           )}
         </header>
 
-        <section className="pt-4 sm:pt-5">
+        <section className="pt-3 sm:pt-5">
           <div className={heroCopyFrameClassName} aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
               <motion.h1
@@ -1161,7 +1161,7 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300 sm:mt-5 sm:text-lg">
+          <p className="mt-3.5 max-w-2xl text-base leading-7 text-zinc-300 sm:mt-5 sm:text-lg">
             수많은 실제 방문 후기와 정보를 모아,
             <br className="sm:hidden" />
             <span className="hidden sm:inline"> </span>더 현명한 중고차 구매를
@@ -1169,7 +1169,7 @@ export default function Home() {
           </p>
         </section>
 
-        <form className={panelClassName} onSubmit={goToReport}>
+        <form className={cn(panelClassName, "-mt-1 sm:mt-0")} onSubmit={goToReport}>
           <div>
             <p className="text-[15px] font-extrabold leading-[1.2] tracking-[0.08em] text-[#FF2B35]">
               차량번호 조회
@@ -1599,8 +1599,7 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             className={topRankingButtonClassName}
             onClick={() => setIsModalOpen(true)}
           >
-            <span className="md:hidden">TOP10 &gt;</span>
-            <span className="hidden md:inline">🏆 TOP10 전체보기</span>
+            🏆 TOP10 전체보기
           </button>
         ) : null}
       </div>
@@ -1724,8 +1723,7 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             className={topRankingButtonClassName}
             onClick={() => setIsModalOpen(true)}
           >
-            <span className="md:hidden">TOP10 &gt;</span>
-            <span className="hidden md:inline">🏆 TOP10 전체보기</span>
+            🏆 TOP10 전체보기
           </button>
         ) : null}
       </div>
