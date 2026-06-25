@@ -555,14 +555,10 @@ const getPostAuthorDisplayName = (
   getPostAuthorProfile(post, users)?.nickname ??
   formatCompactId(post.user_id);
 
-const maskAdminPlateNumber = (plateNumber: string | null | undefined) => {
+const formatAdminPlateNumber = (plateNumber: string | null | undefined) => {
   const normalizedPlateNumber = plateNumber?.replace(/\s+/g, "").trim() ?? "";
 
-  if (normalizedPlateNumber.length <= 3) {
-    return normalizedPlateNumber || "차량번호 없음";
-  }
-
-  return normalizedPlateNumber.slice(0, -3) + "XXX";
+  return normalizedPlateNumber || "차량번호 없음";
 };
 
 const getReviewPlateNumber = (review: AdminReview) =>
@@ -2611,7 +2607,7 @@ export default function AdminPage() {
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-black text-red-100">
-                            {maskAdminPlateNumber(getReviewPlateNumber(review))}
+                            {formatAdminPlateNumber(getReviewPlateNumber(review))}
                           </p>
                           <p className={mobileCardMetaClassName}>
                             {getReviewVehicleModel(review)}
@@ -2719,7 +2715,7 @@ export default function AdminPage() {
                         />
                       </td>
                       <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs font-bold text-zinc-100")}>
-                        {maskAdminPlateNumber(getReviewPlateNumber(review))}
+                        {formatAdminPlateNumber(getReviewPlateNumber(review))}
                       </td>
                       <td className={tableCellClassName}>
                         <p className="max-w-52 truncate text-sm font-semibold text-zinc-200">
