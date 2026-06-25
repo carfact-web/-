@@ -34,7 +34,7 @@ begin
     vehicle.car_number,
     review.author_id,
     review.author_nickname,
-    review.title,
+    null::text as title,
     review.content,
     review.tags,
     review.images,
@@ -49,7 +49,6 @@ begin
   where coalesce(search_text, '') = ''
     or review.content ilike '%' || search_text || '%'
     or coalesce(review.author_nickname, '') ilike '%' || search_text || '%'
-    or coalesce(review.title, '') ilike '%' || search_text || '%'
     or coalesce(vehicle.car_number, '') ilike '%' || search_text || '%'
     or review.vehicle_snapshot::text ilike '%' || search_text || '%'
   order by review.created_at desc
