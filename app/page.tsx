@@ -1149,7 +1149,7 @@ export default function Home() {
 
         <form className={panelClassName} onSubmit={goToReport}>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#FF3B30]">
+            <p className="text-[15px] font-extrabold leading-[1.2] tracking-[0.08em] text-[#FF2B35]">
               차량번호 조회
             </p>
             <p className="text-sm leading-6 text-zinc-400">
