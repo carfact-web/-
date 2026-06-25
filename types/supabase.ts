@@ -756,6 +756,7 @@ export interface Database {
         Returns: {
           id: string;
           vehicle_id: string;
+          car_number: string | null;
           author_id: string | null;
           author_nickname: string | null;
           title: string | null;

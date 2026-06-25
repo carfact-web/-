@@ -215,8 +215,10 @@ interface AdminCommunityPost {
 interface AdminReview {
   id: string;
   vehicle_id: string;
+  car_number: string | null;
   author_id: string | null;
   author_nickname: string | null;
+  title: string | null;
   content: string;
   tags: string[];
   images: Json;
@@ -427,7 +429,7 @@ const formatReviewVehicleSummary = (review: AdminReview) => {
   const snapshot = review.vehicle_snapshot;
   const brand = getJsonString(snapshot, "brand");
   const model = getJsonString(snapshot, "model");
-  const plateNumber = getJsonString(snapshot, "plateNumber");
+  const plateNumber = getReviewPlateNumber(review);
   const year = getJsonString(snapshot, "year");
   const vehicleName = [brand, model].filter(Boolean).join(" ");
 
@@ -564,6 +566,7 @@ const maskAdminPlateNumber = (plateNumber: string | null | undefined) => {
 };
 
 const getReviewPlateNumber = (review: AdminReview) =>
+  review.car_number?.trim() ||
   getJsonString(review.vehicle_snapshot, "plateNumber");
 
 const getReviewVehicleModel = (review: AdminReview) => {
