@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import {
+  createReviewIndexNowUrl,
+  createVehicleIndexNowUrl,
+} from "@/lib/indexNow";
+import { notifyIndexNow } from "@/lib/indexNowClient";
+import {
   createSupabaseFailureError,
   isRlsPolicyError,
 } from "@/lib/supabaseErrorMessages";
@@ -225,7 +230,14 @@ export const saveSupabaseVehicle = async (vehicle: Vehicle) => {
     throw error;
   }
 
-  return mapVehicleRow(data);
+  const savedVehicle = mapVehicleRow(data);
+
+  void notifyIndexNow({
+    reason: "vehicle-save",
+    urls: [createVehicleIndexNowUrl(savedVehicle.plateNumber)],
+  });
+
+  return savedVehicle;
 };
 
 export const fetchSupabaseReviews = async (plateNumber: string) => {
@@ -401,8 +413,17 @@ export const saveSupabaseReview = async (
   }
 
   const verifiedDealers = await fetchVerifiedDealerMap([data.author_id]);
+  const savedReview = mapReviewRow(data, verifiedDealers);
 
-  return mapReviewRow(data, verifiedDealers);
+  void notifyIndexNow({
+    reason: "review-save",
+    urls: [
+      createVehicleIndexNowUrl(vehicle.plateNumber),
+      createReviewIndexNowUrl(vehicle.plateNumber, String(savedReview.id)),
+    ],
+  });
+
+  return savedReview;
 };
 
 export const updateSupabaseReview = async (

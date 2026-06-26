@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { createCommunityPostIndexNowUrl } from "@/lib/indexNow";
+import { notifyIndexNow } from "@/lib/indexNowClient";
 import { createSupabaseFailureError } from "@/lib/supabaseErrorMessages";
 import {
   communityImagesBucketName,
@@ -770,6 +772,12 @@ export const saveCommunityPost = async (input: {
       isVerifiedDealer: verifiedDealers[sessionUserId] ?? false,
       nickname: basePayload.author_nickname,
     },
+  });
+  const postUrl = createCommunityPostIndexNowUrl(savedPost.id);
+
+  void notifyIndexNow({
+    reason: savedPost.isNotice ? "notice-save" : "community-post-save",
+    urls: [postUrl],
   });
 
   if (uploadResult.failedCount > 0) {
