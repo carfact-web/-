@@ -593,6 +593,7 @@ export default function ReviewPage() {
                     src={image.dataUrl ?? image.url ?? ""}
                     alt={image.name}
                     fill
+                    loading="lazy"
                     unoptimized
                     sizes="120px"
                     className="object-cover"

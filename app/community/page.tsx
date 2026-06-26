@@ -2132,6 +2132,7 @@ export default function CommunityPage() {
                               src={image.dataUrl ?? image.url}
                               alt={image.name}
                               fill
+                              loading="lazy"
                               unoptimized
                               sizes="120px"
                               className="object-cover"
@@ -2310,6 +2311,7 @@ export default function CommunityPage() {
                                 src={thumbnailImageUrl}
                                 alt={thumbnailImage.name}
                                 fill
+                                loading="lazy"
                                 unoptimized
                                 sizes="(min-width: 640px) 180px, 96px"
                                 className="object-cover"

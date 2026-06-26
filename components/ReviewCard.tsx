@@ -488,6 +488,7 @@ export function ReviewCard({
                   src={image.url ?? image.dataUrl ?? ""}
                   alt={image.name}
                   fill
+                  loading="lazy"
                   unoptimized
                   sizes="120px"
                   className="object-cover"
@@ -698,6 +699,7 @@ export function ReviewCard({
                 src={selectedImage.url ?? selectedImage.dataUrl ?? ""}
                 alt={selectedImage.name}
                 fill
+                loading="lazy"
                 unoptimized
                 sizes="100vw"
                 className="object-contain"

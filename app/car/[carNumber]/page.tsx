@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { SeoBreadcrumb } from "@/components/SeoBreadcrumb";
 import CarReportPageClient from "./CarReportPageClient";
 import { fetchSupabaseVehicle } from "@/lib/supabaseData";
 import {
@@ -6,6 +8,10 @@ import {
   getTextExcerpt,
   getVehicleDisplayName,
 } from "@/lib/seo";
+import {
+  createBreadcrumbListJsonLd,
+  createVehicleProductJsonLd,
+} from "@/lib/structuredData";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 
 type CarReportPageProps = {
@@ -36,6 +42,26 @@ export async function generateMetadata({
   });
 }
 
-export default function CarReportPage() {
-  return <CarReportPageClient />;
+export default async function CarReportPage({ params }: CarReportPageProps) {
+  const carNumber = await getCarNumber(params);
+  const vehicle = await fetchSupabaseVehicle(carNumber).catch(() => null);
+  const vehicleName = getVehicleDisplayName(vehicle) || carNumber;
+  const path = "/car/" + encodeURIComponent(carNumber);
+  const breadcrumbItems = [
+    { href: "/", name: "홈" },
+    { href: path, name: vehicleName },
+  ];
+
+  return (
+    <>
+      <JsonLd
+        data={[
+          createBreadcrumbListJsonLd(breadcrumbItems),
+          createVehicleProductJsonLd({ path, vehicle, vehicleName }),
+        ]}
+      />
+      <SeoBreadcrumb items={breadcrumbItems} />
+      <CarReportPageClient />
+    </>
+  );
 }

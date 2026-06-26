@@ -92,6 +92,7 @@ export function CommunityPostBody({
                 alt={block.image.name}
                 width={1600}
                 height={1000}
+                loading="lazy"
                 unoptimized
                 sizes="(min-width: 768px) 720px, 100vw"
                 className="h-auto w-full object-contain"
@@ -137,6 +138,7 @@ export function CommunityPostBody({
                   src={imageUrl}
                   alt={image.name}
                   fill
+                  loading="lazy"
                   unoptimized
                   sizes="160px"
                   className="object-cover"

@@ -20,6 +20,7 @@ export function BrandIcon({ className }: BrandIconProps) {
       width={512}
       height={512}
       decoding="async"
+      loading="lazy"
     />
   );
 }

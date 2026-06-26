@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { SeoBreadcrumb } from "@/components/SeoBreadcrumb";
 import ReviewPageClient from "./ReviewPageClient";
 import { fetchSupabaseReviewById, fetchSupabaseVehicle } from "@/lib/supabaseData";
 import {
@@ -6,6 +8,10 @@ import {
   getTextExcerpt,
   getVehicleDisplayName,
 } from "@/lib/seo";
+import {
+  createBreadcrumbListJsonLd,
+  createReviewJsonLd,
+} from "@/lib/structuredData";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 
 type ReviewPageProps = {
@@ -63,6 +69,52 @@ export async function generateMetadata({
   });
 }
 
-export default function ReviewPage() {
-  return <ReviewPageClient />;
+export default async function ReviewPage({
+  params,
+  searchParams,
+}: ReviewPageProps) {
+  const carNumber = await getCarNumber(params);
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const reviewId = resolvedSearchParams.reviewId?.trim();
+  const [vehicle, reviewResult] = await Promise.all([
+    fetchSupabaseVehicle(carNumber).catch(() => null),
+    reviewId ? fetchSupabaseReviewById(reviewId).catch(() => null) : null,
+  ]);
+  const vehicleName = getVehicleDisplayName(vehicle) || carNumber;
+  const reviewTitle = getReviewTitle(reviewResult);
+  const path =
+    "/car/" +
+    encodeURIComponent(carNumber) +
+    "/review" +
+    (reviewId ? "?reviewId=" + encodeURIComponent(reviewId) : "");
+  const vehiclePath = "/car/" + encodeURIComponent(carNumber);
+  const pageName = reviewTitle || "후기 작성";
+  const breadcrumbItems = [
+    { href: "/", name: "홈" },
+    { href: vehiclePath, name: vehicleName },
+    { href: path, name: pageName },
+  ];
+
+  return (
+    <>
+      <JsonLd
+        data={[
+          createBreadcrumbListJsonLd(breadcrumbItems),
+          ...(reviewResult
+            ? [
+                createReviewJsonLd({
+                  path,
+                  review: reviewResult.review,
+                  reviewTitle: pageName,
+                  vehicle,
+                  vehicleName,
+                }),
+              ]
+            : []),
+        ]}
+      />
+      <SeoBreadcrumb items={breadcrumbItems} />
+      <ReviewPageClient />
+    </>
+  );
 }
