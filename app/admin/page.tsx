@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArcElement, Chart, DoughnutController, Tooltip } from "chart.js";
 import { CommunityPostBody } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import {
@@ -23,6 +24,8 @@ import type {
   CommunityBoardFilter,
   CommunityImageAttachment,
 } from "@/types/community";
+
+Chart.register(ArcElement, DoughnutController, Tooltip);
 
 type AdminTab =
   | "dashboard"
@@ -193,6 +196,12 @@ interface AdminOperatorDashboardData {
   viewRankings: AdminDashboardViewRanking[];
   keywordRows: AdminDashboardKeywordRow[];
   aiCandidates: AdminDashboardAiCandidate[];
+}
+
+interface TrafficSourceDonutItem {
+  color: string;
+  label: string;
+  value: number;
 }
 
 interface AdminCommunityPost {
@@ -698,6 +707,61 @@ const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
   { label: "유입 키워드", value: "keywords" },
   { label: "AI DB 업데이트 추천", value: "ai" },
 ];
+
+const trafficSourceConfig = [
+  { label: "Google", color: "#2563eb" },
+  { label: "Naver", color: "#16a34a" },
+  { label: "Direct", color: "#111827" },
+  { label: "SNS", color: "#e11d48" },
+  { label: "기타", color: "#a855f7" },
+] satisfies Array<{ label: string; color: string }>;
+
+const normalizeTrafficSourceGroup = (value: string) => {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (
+    !normalizedValue ||
+    normalizedValue === "direct" ||
+    normalizedValue === "(direct)" ||
+    normalizedValue === "직접 유입"
+  ) {
+    return "Direct";
+  }
+
+  if (normalizedValue.includes("google")) return "Google";
+  if (normalizedValue.includes("naver")) return "Naver";
+  if (
+    normalizedValue.includes("facebook") ||
+    normalizedValue.includes("instagram") ||
+    normalizedValue.includes("threads") ||
+    normalizedValue.includes("twitter") ||
+    normalizedValue.includes("x.com") ||
+    normalizedValue.includes("t.co") ||
+    normalizedValue.includes("kakao")
+  ) {
+    return "SNS";
+  }
+
+  return "기타";
+};
+
+const createTrafficSourceDonutItems = (
+  referrerTop: AdminTrafficBreakdownItem[],
+): TrafficSourceDonutItem[] => {
+  const counts = new Map(
+    trafficSourceConfig.map((item) => [item.label, 0]),
+  );
+
+  referrerTop.forEach((item) => {
+    const source = normalizeTrafficSourceGroup(item.label);
+    counts.set(source, (counts.get(source) ?? 0) + item.visitor_count);
+  });
+
+  return trafficSourceConfig.map((item) => ({
+    ...item,
+    value: counts.get(item.label) ?? 0,
+  }));
+};
 
 const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
   { label: "검토중", value: "reviewing" },
@@ -4279,9 +4343,9 @@ function DashboardLineChart({
           </span>
         ))}
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-hidden md:overflow-x-auto">
         <svg
-          className="h-[220px] min-w-[760px] w-full"
+          className="h-[180px] w-full min-w-0 md:h-[220px] md:min-w-[760px]"
           viewBox={"0 0 " + width + " " + height}
           role="img"
           aria-label="최근 30일 운영 지표 그래프"
@@ -4445,9 +4509,115 @@ function DashboardPanel({
     { label: "신규 회원", count: todayUsers.length, tab: "users" as AdminTab, tone: "green" },
     { label: "오늘 등록 후기", count: todayReviews.length || trafficStats.todayReviews, tab: "reviews" as AdminTab, tone: "blue" },
   ];
+  const trafficSourceItems = createTrafficSourceDonutItems(
+    trafficStats.referrerTop,
+  );
 
   return (
-    <div className="space-y-4">
+    <div>
+      <div className="space-y-4 md:hidden">
+        <section className="grid grid-cols-2 gap-3">
+          {summaryItems.slice(0, 4).map((item) => (
+            <StatCard
+              key={item.label}
+              detail={item.detail}
+              label={item.label}
+              value={item.value}
+              onClick={() => onNavigate(item.tab)}
+            />
+          ))}
+        </section>
+
+        <section className={panelClassName}>
+          <h2 className="text-base font-black text-zinc-950">오늘 해야 할 일</h2>
+          <div className="mt-3 grid gap-2">
+            {todoItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className="flex min-h-12 items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left"
+                onClick={() => onNavigate(item.tab)}
+              >
+                <span className="text-sm font-black text-zinc-800">
+                  <ToneDot tone={item.tone} /> {item.label}
+                </span>
+                <span className="text-sm font-black text-zinc-950">
+                  {item.count.toLocaleString()}건
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className={panelClassName}>
+          <h2 className="text-base font-black text-zinc-950">운영 알림</h2>
+          <div className="mt-3 divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-zinc-50">
+            <NotificationItem
+              count={pendingReports.length}
+              label="미처리 신고"
+              tone="red"
+              onClick={() => onNavigate("reports")}
+            />
+            <NotificationItem
+              count={reviewingAiCandidates.length}
+              label="AI 검토 대기"
+              tone="purple"
+              onClick={() => onNavigate("ai")}
+            />
+            <NotificationItem
+              count={todayPosts.length}
+              label="오늘 게시글"
+              tone="blue"
+              onClick={() => onNavigate("posts")}
+            />
+            <NotificationItem
+              count={appliedAiCandidates.length}
+              label="AI 반영 완료"
+              tone="green"
+              onClick={() => onNavigate("ai")}
+            />
+          </div>
+        </section>
+
+        <TrafficSourceDonutCard items={trafficSourceItems} />
+
+        <DashboardMobileList
+          emptyMessage="최근 후기가 없습니다."
+          items={recentReviews.map((review) => ({
+            id: review.id,
+            meta: formatDate(review.created_at),
+            title:
+              formatAdminPlateNumber(getReviewPlateNumber(review)) +
+              " · " +
+              review.content,
+          }))}
+          title="최근 후기"
+        />
+        <DashboardMobileList
+          emptyMessage="최근 가입 회원이 없습니다."
+          items={recentUsers}
+          title="최근 회원"
+        />
+        <DashboardMobileList
+          emptyMessage="최근 신고가 없습니다."
+          items={reports.slice(0, 5).map((report) => ({
+            id: report.report_id,
+            meta: report.report_type + " · " + formatDate(report.created_at),
+            title: report.target_title ?? report.target_content,
+          }))}
+          title="최근 신고"
+        />
+
+        <section className={panelClassName}>
+          <h2 className="text-base font-black text-zinc-950">통계</h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            최근 30일 운영 흐름입니다.
+          </p>
+          <DashboardLineChart rows={chartRows} />
+        </section>
+      </div>
+
+      <div className="hidden space-y-4 md:block">
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
         {summaryItems.map((item) => (
           <StatCard
@@ -4588,6 +4758,7 @@ function DashboardPanel({
           ) : null}
         </div>
       </section>
+      </div>
     </div>
   );
 }
@@ -4617,6 +4788,155 @@ function StatCard({
         <p className="mt-2 truncate text-xs font-bold text-blue-600">{detail}</p>
       ) : null}
     </button>
+  );
+}
+
+function TrafficSourceDonutCard({
+  items,
+}: {
+  items: TrafficSourceDonutItem[];
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<Chart<"doughnut"> | null>(null);
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+
+  useEffect(() => {
+    if (!canvasRef.current) {
+      return;
+    }
+
+    const chartValues = total > 0 ? items.map((item) => item.value) : [1];
+    const chartColors =
+      total > 0 ? items.map((item) => item.color) : ["#e5e7eb"];
+
+    chartRef.current?.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "doughnut",
+      data: {
+        labels: total > 0 ? items.map((item) => item.label) : ["데이터 없음"],
+        datasets: [
+          {
+            data: chartValues,
+            backgroundColor: chartColors,
+            borderColor: "#ffffff",
+            borderWidth: 3,
+            hoverOffset: 3,
+          },
+        ],
+      },
+      options: {
+        animation: false,
+        cutout: "68%",
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                if (total <= 0) return "데이터 없음";
+                const value = Number(context.raw ?? 0);
+                const percent = Math.round((value / total) * 100);
+
+                return context.label + " " + percent.toLocaleString() + "%";
+              },
+            },
+          },
+        },
+        responsive: true,
+      },
+    });
+
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, [items, total]);
+
+  return (
+    <section className={panelClassName}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-black text-zinc-950">트래픽 유입</h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            주요 유입 채널 비율입니다.
+          </p>
+        </div>
+        <p className="text-xs font-black text-zinc-400">
+          {total.toLocaleString()}명
+        </p>
+      </div>
+      <div className="mt-4 grid grid-cols-[128px_minmax(0,1fr)] items-center gap-4">
+        <div className="relative h-32 w-32">
+          <canvas ref={canvasRef} aria-label="트래픽 유입 도넛 차트" />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-black text-zinc-500">
+              {total > 0 ? "유입" : "대기"}
+            </span>
+          </div>
+        </div>
+        <dl className="min-w-0 space-y-2">
+          {items.map((item) => {
+            const percent =
+              total > 0 ? Math.round((item.value / total) * 100) : 0;
+
+            return (
+              <div
+                key={item.label}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs"
+              >
+                <dt className="flex min-w-0 items-center gap-2 font-bold text-zinc-700">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </dt>
+                <dd className="font-black text-zinc-950">
+                  {percent.toLocaleString()}%
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function DashboardMobileList({
+  emptyMessage,
+  items,
+  title,
+}: {
+  emptyMessage: string;
+  items: { id: string; meta: string; title: string }[];
+  title: string;
+}) {
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-base font-black text-zinc-950">{title}</h2>
+      {items.length ? (
+        <ul className="mt-3 space-y-2">
+          {items.slice(0, 5).map((item) => (
+            <li
+              key={item.id}
+              className="rounded-lg border border-zinc-200 bg-zinc-50 p-3"
+            >
+              <p className="line-clamp-2 break-words text-sm font-bold leading-5 text-zinc-900">
+                {item.title}
+              </p>
+              <p className="mt-1 line-clamp-1 break-words text-xs leading-5 text-zinc-500">
+                {item.meta}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={cn(mutedTextClassName, "mt-3")}>{emptyMessage}</p>
+      )}
+    </section>
   );
 }
 

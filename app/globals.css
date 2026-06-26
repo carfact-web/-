@@ -34,6 +34,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
+
 .plate-input-frame {
   position: relative;
   isolation: isolate;
@@ -80,17 +87,17 @@ body {
 
 .plate-number-input {
   width: 100%;
-  height: 54px;
+  height: 60px;
   border: 3px solid #050505;
   border-radius: 9px;
   outline: none;
   background: #f3f4f5;
   color: #03070d;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
-  padding: 0 48px;
+  padding: 0 56px;
   text-align: center;
   font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", Arial, Helvetica, sans-serif;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 2px;

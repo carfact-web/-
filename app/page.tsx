@@ -74,7 +74,7 @@ const inputClassName = cn(
   "plate-number-input",
 );
 const primaryButtonClassName = cn(
-  "mt-3 w-full rounded-lg px-4 py-3.5 text-base font-bold text-white transition sm:py-4",
+  "mt-3 w-full rounded-lg px-4 py-4 text-base font-bold text-white transition",
   "bg-[#FF3B30] hover:bg-[#f52f25] active:scale-[0.99]",
   "disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:hover:bg-[#3A3A3A] disabled:active:scale-100",
 );
@@ -120,30 +120,30 @@ const recentStatusBadgeClassName = cn(
   "inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full border border-[#FF3B30]/20 bg-[#FF3B30]/10 px-2 py-0.5 text-[11px] font-bold leading-tight text-[#FF8A84] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2.5 sm:py-1 sm:text-xs",
 );
 const topRankingCardClassName = cn(
-  "flex h-full flex-col rounded-lg border border-white/[0.09] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.09),transparent_34%),linear-gradient(180deg,#17191d_0%,#101114_52%,#090a0c_100%)] p-3 shadow-[0_26px_70px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.04),inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-200 md:p-5 md:hover:-translate-y-[3px] md:hover:border-white/[0.14]",
+  "flex h-full flex-col rounded-lg border border-white/[0.09] bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.09),transparent_34%),linear-gradient(180deg,#17191d_0%,#101114_52%,#090a0c_100%)] p-4 shadow-[0_26px_70px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.04),inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-200 md:p-5 md:hover:-translate-y-[3px] md:hover:border-white/[0.14]",
 );
 const topRankingItemClassName = cn(
-  "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.6rem_1fr_auto] md:gap-3 md:p-3",
+  "grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-2 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.6rem_1fr_auto] md:gap-3 md:p-3",
 );
 const topRankingButtonClassName = cn(
-  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.10] bg-white/[0.07] px-2 py-1.5 text-[10px] font-black leading-none text-[#FF6970] shadow-[0_10px_22px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur transition sm:px-3 sm:text-xs",
+  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.10] bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-black leading-none text-[#FF6970] shadow-[0_10px_22px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur transition sm:px-3 sm:text-xs",
   "hover:-translate-y-0.5 hover:border-[#FF4D4F]/35 hover:bg-white/[0.10] hover:text-[#FF8085] active:scale-[0.98]",
 );
 const topRankingRankBadgeClassName = cn(
-  "flex h-7 w-7 shrink-0 items-center justify-center self-center justify-self-center rounded-lg border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-center text-sm font-black text-[#FF5B62] shadow-[0_8px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-9 md:w-9 md:text-lg",
+  "flex h-8 w-8 shrink-0 items-center justify-center self-center justify-self-center rounded-lg border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-center text-base font-black text-[#FF5B62] shadow-[0_8px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-9 md:w-9 md:text-lg",
 );
 const topRankingPreviewRankBadgeClassName = cn(
   topRankingRankBadgeClassName,
   "row-span-2 md:row-span-1",
 );
 const topRankingTitleClassName = cn(
-  "block text-sm font-black leading-snug tracking-normal text-white break-keep md:truncate md:text-base md:leading-normal",
+  "block truncate text-sm font-black tracking-normal text-white md:text-base",
 );
 const topRankingSubTextClassName = cn(
-  "mt-0.5 block text-xs font-semibold leading-snug text-zinc-300 break-keep md:truncate md:text-sm md:leading-normal",
+  "mt-0.5 block truncate text-xs font-semibold text-zinc-300 md:text-sm",
 );
 const topRankingViewClassName = cn(
-  "justify-self-end whitespace-nowrap text-right text-[11px] font-semibold text-zinc-500 md:pt-0.5 md:text-sm",
+  "col-start-2 mt-0.5 text-[11px] font-semibold text-zinc-500 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm",
 );
 const topRankingCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
@@ -156,15 +156,11 @@ const noticeTickerClassName = cn(
   "mt-1 block min-w-0 overflow-hidden truncate whitespace-nowrap text-sm font-bold text-white transition",
   "hover:text-white",
 );
-const heroCopyFrameClassName = cn("relative h-24 overflow-hidden sm:h-32");
+const heroCopyFrameClassName = cn("relative h-20 overflow-hidden sm:h-32");
 const heroCopyClassName = cn(
-  "absolute inset-x-0 top-0 px-1.5 text-[1.95rem] font-black leading-[1.18] tracking-[-0.03em] text-white sm:bg-gradient-to-b sm:from-white sm:via-white sm:to-zinc-300 sm:bg-clip-text sm:px-0 sm:text-5xl sm:leading-tight sm:text-transparent",
-  "drop-shadow-[0_4px_8px_rgba(0,0,0,0.18)] [text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_0_rgba(0,0,0,0.14),0_4px_8px_rgba(0,0,0,0.18)]",
+  "absolute inset-x-0 top-0 text-[1.65rem] font-black leading-[1.14] text-white sm:text-5xl sm:leading-tight",
 );
-const heroHighlightClassName = cn(
-  "text-[#ff2b35] sm:bg-gradient-to-b sm:from-[#ff535b] sm:via-[#ff2b35] sm:to-[#ec202b] sm:bg-clip-text sm:text-transparent md:from-[#ff4a43] md:via-[#FF3B30] md:to-[#b91c1c]",
-  "drop-shadow-[0_4px_9px_rgba(0,0,0,0.18)] [text-shadow:0_1px_0_rgba(255,255,255,0.18),0_2px_0_rgba(80,0,0,0.14),0_4px_8px_rgba(0,0,0,0.16)] sm:drop-shadow-[0_4px_9px_rgba(0,0,0,0.2)] sm:[text-shadow:0_1px_0_rgba(255,255,255,0.2),0_2px_0_rgba(80,0,0,0.24),0_4px_9px_rgba(0,0,0,0.2)]",
-);
+const heroHighlightClassName = cn("text-[#FF3B30]");
 
 interface RecentFact {
   id: number | string;
@@ -190,7 +186,6 @@ const communityGuidePreviewCount = 8;
 const communityGuideSwipeThresholdPx = 42;
 const heroCopyIntervalMs = 3500;
 const noticeRollIntervalMs = 3000;
-const topRankingSlideIntervalMs = 6000;
 const topVehiclesPreviewCount = 3;
 const topModelsPreviewCount = 4;
 const topRankingModalLimit = 10;
@@ -915,23 +910,6 @@ export default function Home() {
   }, [activeRecentSlideIndex, recentFactPages]);
 
   useEffect(() => {
-    if (!trafficRankings) {
-      return;
-    }
-
-    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
-    if (isDesktop) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      scrollToTopRankingSlide(activeTopRankingSlideIndex + 1);
-    }, topRankingSlideIntervalMs);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [activeTopRankingSlideIndex, trafficRankings]);
-
-  useEffect(() => {
     let isActive = true;
 
     if (!isSupabaseConfigured) {
@@ -1132,7 +1110,7 @@ export default function Home() {
           )}
         </header>
 
-        <section className="pt-3 sm:pt-5">
+        <section className="pt-4 sm:pt-5">
           <div className={heroCopyFrameClassName} aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
               <motion.h1
@@ -1161,7 +1139,7 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          <p className="mt-3.5 max-w-2xl text-base leading-7 text-zinc-300 sm:mt-5 sm:text-lg">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300 sm:mt-5 sm:text-lg">
             수많은 실제 방문 후기와 정보를 모아,
             <br className="sm:hidden" />
             <span className="hidden sm:inline"> </span>더 현명한 중고차 구매를
@@ -1169,7 +1147,7 @@ export default function Home() {
           </p>
         </section>
 
-        <form className={cn(panelClassName, "-mt-1 sm:mt-0")} onSubmit={goToReport}>
+        <form className={panelClassName} onSubmit={goToReport}>
           <div>
             <p className="text-[15px] font-extrabold leading-[1.2] tracking-[0.08em] text-[#FF2B35]">
               차량번호 조회
@@ -1220,18 +1198,18 @@ export default function Home() {
         {trafficRankings &&
         (trafficRankings.topVehicles.length ||
           trafficRankings.topModels.length) ? (
-          <section className="mb-2 sm:mb-0">
+          <section className="mb-2 overflow-hidden sm:mb-0 md:overflow-visible">
             <div
               className="snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden"
               onScroll={handleTopRankingScroll}
               data-testid="top-rankings-carousel"
             >
-              <div className="flex md:contents">
+              <div className="flex gap-3 px-[6%] md:contents md:px-0">
                 <div
                   ref={(element) => {
                     topRankingCardRefs.current[0] = element;
                   }}
-                  className="w-full shrink-0 snap-start md:w-auto md:shrink md:snap-none"
+                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
                 >
                   <HomeTopVehiclesPanel rankings={trafficRankings} />
                 </div>
@@ -1239,7 +1217,7 @@ export default function Home() {
                   ref={(element) => {
                     topRankingCardRefs.current[1] = element;
                   }}
-                  className="w-full shrink-0 snap-start md:w-auto md:shrink md:snap-none"
+                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
                 >
                   <HomeTopModelsPanel rankings={trafficRankings} />
                 </div>
