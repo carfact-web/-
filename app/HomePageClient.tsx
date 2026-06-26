@@ -148,6 +148,8 @@ const topRankingViewClassName = cn(
 const topRankingModalItemClassName = cn(
   "grid grid-cols-[2.3rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-2.5 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.45rem_minmax(0,1fr)_auto] md:gap-2.5 md:p-3",
 );
+const topRankingFirstItemClassName =
+  "!border-[#F6C343]/[0.12] !shadow-[0_0_10px_rgba(246,195,67,0.10),0_0_30px_rgba(246,195,67,0.05),0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]";
 const topRankingCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
 );
@@ -349,6 +351,30 @@ const formatTopModelName = (
 
   return manufacturer + " " + modelName;
 };
+
+const getTopRankingRankBadgeClassName = (rank: number, isPreview = false) =>
+  cn(
+    isPreview
+      ? topRankingPreviewRankBadgeClassName
+      : topRankingRankBadgeClassName,
+    rank === 1 && "!text-[#F6C343]",
+    rank === 2 && "!text-[#D8DCE3]",
+    rank === 3 && "!text-[#C67A3A]",
+  );
+
+const getTopRankingItemClassName = (rank: number, className?: string) =>
+  cn(
+    topRankingItemClassName,
+    rank === 1 && topRankingFirstItemClassName,
+    className,
+  );
+
+const getTopRankingModalItemClassName = (rank: number, className?: string) =>
+  cn(
+    topRankingModalItemClassName,
+    rank === 1 && topRankingFirstItemClassName,
+    className,
+  );
 
 const chunkRecentFacts = (facts: RecentFact[]) => {
   const chunks: RecentFact[][] = [];
@@ -1585,7 +1611,9 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
             const href = getTopVehicleHref(vehicle);
             const content = (
               <>
-                <span className={topRankingPreviewRankBadgeClassName}>
+                <span
+                  className={getTopRankingRankBadgeClassName(index + 1, true)}
+                >
                   {index + 1}
                 </span>
                 <span className="min-w-0">
@@ -1610,14 +1638,16 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                   <Link
                     href={href}
                     className={cn(
-                      topRankingItemClassName,
+                      getTopRankingItemClassName(index + 1),
                       "cursor-pointer transition duration-200 hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 hover:shadow-[0_16px_32px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] active:scale-[0.99]",
                     )}
                   >
                     {content}
                   </Link>
                 ) : (
-                  <div className={topRankingItemClassName}>{content}</div>
+                  <div className={getTopRankingItemClassName(index + 1)}>
+                    {content}
+                  </div>
                 )}
               </li>
             );
@@ -1639,7 +1669,9 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                   const href = getTopVehicleHref(vehicle);
                   const content = (
                     <>
-                      <span className={topRankingRankBadgeClassName}>
+                      <span
+                        className={getTopRankingRankBadgeClassName(index + 1)}
+                      >
                         {index + 1}
                       </span>
                       <span className="min-w-0">
@@ -1667,14 +1699,16 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                         <Link
                           href={href}
                           className={cn(
-                            topRankingModalItemClassName,
+                            getTopRankingModalItemClassName(index + 1),
                             "cursor-pointer transition hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 active:scale-[0.99]",
                           )}
                         >
                           {content}
                         </Link>
                       ) : (
-                        <div className={topRankingModalItemClassName}>
+                        <div
+                          className={getTopRankingModalItemClassName(index + 1)}
+                        >
                           {content}
                         </div>
                       )}
@@ -1717,9 +1751,11 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
           {previewModels.map((model, index) => (
             <li
               key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
-              className={topRankingItemClassName}
+              className={getTopRankingItemClassName(index + 1)}
             >
-              <span className={topRankingPreviewRankBadgeClassName}>
+              <span
+                className={getTopRankingRankBadgeClassName(index + 1, true)}
+              >
                 {index + 1}
               </span>
               <span className="min-w-0">
@@ -1754,9 +1790,11 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                         (model.modelName ?? "") +
                         index
                       }
-                      className={topRankingModalItemClassName}
+                      className={getTopRankingModalItemClassName(index + 1)}
                     >
-                      <span className={topRankingRankBadgeClassName}>
+                      <span
+                        className={getTopRankingRankBadgeClassName(index + 1)}
+                      >
                         {index + 1}
                       </span>
                       <span className={topRankingTitleClassName}>
