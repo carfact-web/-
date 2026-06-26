@@ -4630,7 +4630,7 @@ function DashboardPanel({
         ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,1.15fr)_minmax(0,0.8fr)]">
         <div className={panelClassName}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -4665,6 +4665,7 @@ function DashboardPanel({
           </p>
           <DashboardLineChart rows={chartRows} />
         </div>
+        <TrafficSourceDonutCard items={trafficSourceItems} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-4">
