@@ -9,6 +9,11 @@ import {
   saveSupabaseReview,
   updateSupabaseReview,
 } from "@/lib/supabaseData";
+import {
+  createReviewIndexNowUrl,
+  createVehicleIndexNowUrl,
+} from "@/lib/indexNow";
+import { notifyIndexNow } from "@/lib/indexNowClient";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
   filterValidReviews,
@@ -194,6 +199,14 @@ export function useReviews(carNumber: string): UseReviewsResult {
           content: validation.content,
         };
       }
+
+      void notifyIndexNow({
+        reason: "review-update",
+        urls: [
+          createVehicleIndexNowUrl(sanitizedCarNumber),
+          createReviewIndexNowUrl(sanitizedCarNumber, reviewId),
+        ],
+      });
 
       const savedReviews = parseReviews(
         localStorage.getItem(reviewStorageKey) || fallbackReviewsJson

@@ -831,7 +831,16 @@ export const updateCommunityPost = async (input: {
     );
   }
 
-  return Boolean(data);
+  const didUpdate = Boolean(data);
+
+  if (didUpdate) {
+    void notifyIndexNow({
+      reason: input.isNotice ? "notice-update" : "community-post-update",
+      urls: [createCommunityPostIndexNowUrl(input.postId)],
+    });
+  }
+
+  return didUpdate;
 };
 
 export const saveCommunityComment = async (input: {

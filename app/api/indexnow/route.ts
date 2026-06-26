@@ -56,8 +56,20 @@ const submitIndexNow = async (urlList: string[]) => {
           status: response.status,
         };
       }
+
+      console.warn("indexnow-submit-attempt-failed", {
+        attempt: attemptIndex + 1,
+        body: lastBody,
+        status: response.status,
+        urlCount: urlList.length,
+      });
     } catch (error) {
       lastBody = error instanceof Error ? error.message : String(error);
+      console.warn("indexnow-submit-attempt-error", {
+        attempt: attemptIndex + 1,
+        error: lastBody,
+        urlCount: urlList.length,
+      });
     }
   }
 

@@ -1,6 +1,19 @@
-export const indexNowKey = "c80d2b6f9a0b4c15a437e8d02f3c6b91";
-export const indexNowHost = "www.carfact.kr";
-export const indexNowBaseUrl = "https://" + indexNowHost;
+const defaultIndexNowKey = "c80d2b6f9a0b4c15a437e8d02f3c6b91";
+const defaultIndexNowHost = "https://www.carfact.kr";
+
+const normalizeHost = (value: string) => {
+  const withProtocol = /^https?:\/\//.test(value)
+    ? value
+    : "https://" + value;
+
+  return withProtocol.replace(/\/+$/, "");
+};
+
+export const indexNowKey = process.env.INDEXNOW_KEY ?? defaultIndexNowKey;
+export const indexNowBaseUrl = normalizeHost(
+  process.env.INDEXNOW_HOST ?? defaultIndexNowHost,
+);
+export const indexNowHost = new URL(indexNowBaseUrl).hostname;
 export const indexNowKeyLocation =
   indexNowBaseUrl + "/" + indexNowKey + ".txt";
 export const indexNowSitemapUrl = indexNowBaseUrl + "/sitemap.xml";
