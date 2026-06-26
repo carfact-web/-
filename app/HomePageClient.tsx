@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -47,7 +48,6 @@ import type {
   MouseEvent,
   ReactNode,
   TouchEvent,
-  UIEvent,
 } from "react";
 import type { CommunityPost } from "@/types/community";
 import type { Review } from "@/types/review";
@@ -144,6 +144,9 @@ const topRankingSubTextClassName = cn(
 );
 const topRankingViewClassName = cn(
   "col-start-2 mt-0.5 text-[11px] font-semibold text-zinc-500 md:col-start-auto md:mt-0 md:pt-0.5 md:text-right md:text-sm",
+);
+const topRankingModalItemClassName = cn(
+  "grid grid-cols-[2.3rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-2.5 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] md:grid-cols-[2.45rem_minmax(0,1fr)_auto] md:gap-2.5 md:p-3",
 );
 const topRankingCarouselDotClassName = cn(
   "h-2.5 w-2.5 rounded-full bg-zinc-700 transition",
@@ -531,13 +534,13 @@ export default function Home() {
   >(null);
   const [noticeIndex, setNoticeIndex] = useState(0);
   const guideTouchStartX = useRef<number | null>(null);
+  const topRankingTouchStartX = useRef<number | null>(null);
   const recentTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   const recentTouchSuppressClickRef = useRef(false);
   const recentTouchSuppressClickTimeoutRef = useRef<number | null>(null);
   const recentFadeTimeoutRef = useRef<number | null>(null);
   const guideAnimationTimeoutRef = useRef<number | null>(null);
   const recentSlideRef = useRef<HTMLDivElement | null>(null);
-  const topRankingCardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [homeNotices, setHomeNotices] = useState<CommunityPost[]>([]);
   const [guidePosts, setGuidePosts] = useState<CommunityPost[]>([]);
   const [trafficRankings, setTrafficRankings] =
@@ -654,33 +657,26 @@ export default function Home() {
     const normalizedIndex = (nextIndex + 2) % 2;
 
     setTopRankingSlideIndex(normalizedIndex);
-    topRankingCardRefs.current[normalizedIndex]?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
   };
-  const handleTopRankingScroll = (event: UIEvent<HTMLDivElement>) => {
-    const scroller = event.currentTarget;
-    const scrollerCenter =
-      scroller.getBoundingClientRect().left + scroller.clientWidth / 2;
-    const nearestIndex = topRankingCardRefs.current.reduce(
-      (nearest, card, index) => {
-        if (!card) {
-          return nearest;
-        }
+  const handleTopRankingTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    topRankingTouchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleTopRankingTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startX = topRankingTouchStartX.current;
+    topRankingTouchStartX.current = null;
 
-        const rect = card.getBoundingClientRect();
-        const distance = Math.abs(rect.left + rect.width / 2 - scrollerCenter);
-
-        return distance < nearest.distance ? { distance, index } : nearest;
-      },
-      { distance: Number.POSITIVE_INFINITY, index: activeTopRankingSlideIndex },
-    ).index;
-
-    if (nearestIndex !== activeTopRankingSlideIndex) {
-      setTopRankingSlideIndex(nearestIndex);
+    if (startX === null) {
+      return;
     }
+
+    const endX = event.changedTouches[0]?.clientX ?? startX;
+    const deltaX = endX - startX;
+
+    if (Math.abs(deltaX) < 36) {
+      return;
+    }
+
+    scrollToTopRankingSlide(deltaX < 0 ? 1 : 0);
   };
   const goToPreviousGuideSlide = () => {
     startGuideCarouselTransition("previous");
@@ -1198,26 +1194,26 @@ export default function Home() {
         {trafficRankings &&
         (trafficRankings.topVehicles.length ||
           trafficRankings.topModels.length) ? (
-          <section className="mb-2 overflow-hidden sm:mb-0 md:overflow-visible">
+          <section className="mb-2 w-full min-w-0 overflow-hidden sm:mb-0 md:overflow-visible">
             <div
-              className="snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden"
-              onScroll={handleTopRankingScroll}
+              className="w-full min-w-0 overflow-hidden pb-1 md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:pb-0"
+              onTouchStart={handleTopRankingTouchStart}
+              onTouchEnd={handleTopRankingTouchEnd}
               data-testid="top-rankings-carousel"
             >
-              <div className="flex gap-3 px-[6%] md:contents md:px-0">
+              <div
+                className="flex w-[200%] transition-transform duration-300 ease-out md:contents"
+                style={{
+                  transform: `translateX(-${activeTopRankingSlideIndex * 50}%)`,
+                }}
+              >
                 <div
-                  ref={(element) => {
-                    topRankingCardRefs.current[0] = element;
-                  }}
-                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
+                  className="w-1/2 min-w-0 shrink-0 px-0 md:w-auto md:shrink md:px-0"
                 >
                   <HomeTopVehiclesPanel rankings={trafficRankings} />
                 </div>
                 <div
-                  ref={(element) => {
-                    topRankingCardRefs.current[1] = element;
-                  }}
-                  className="w-[88%] shrink-0 snap-center md:w-auto md:shrink md:snap-none"
+                  className="w-1/2 min-w-0 shrink-0 px-0 md:w-auto md:shrink md:px-0"
                 >
                   <HomeTopModelsPanel rankings={trafficRankings} />
                 </div>
@@ -1565,6 +1561,7 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const previewVehicles = rankings.topVehicles.slice(0, topVehiclesPreviewCount);
   const topVehicles = rankings.topVehicles.slice(0, topRankingModalLimit);
+  const vehicleColumns = [topVehicles.slice(0, 5), topVehicles.slice(5, 10)];
 
   return (
     <div className={topRankingCardClassName}>
@@ -1634,51 +1631,59 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
           title="인기 차량 TOP10"
           onClose={() => setIsModalOpen(false)}
         >
-          <ol className="space-y-2">
-            {topVehicles.map((vehicle, index) => {
-              const href = getTopVehicleHref(vehicle);
-              const content = (
-                <>
-                  <span className={topRankingRankBadgeClassName}>
-                    {index + 1}
-                  </span>
-                  <span className="min-w-0">
-                    <span className={topRankingTitleClassName}>
-                      {maskPlateNumber(vehicle.carNumber ?? "")}
-                    </span>
-                    <span className={topRankingSubTextClassName}>
-                      {[vehicle.manufacturer, vehicle.model]
-                        .filter(Boolean)
-                        .join(" ") || "차종 정보 없음"}
-                    </span>
-                    <span className="mt-1 block truncate text-xs font-medium text-zinc-500">
-                      {formatTopVehicleModel(vehicle)}
-                    </span>
-                  </span>
-                  <span className="pt-0.5 text-right text-sm font-semibold text-zinc-500">
-                    조회 {vehicle.viewCount.toLocaleString()}
-                  </span>
-                </>
-              );
+          <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+            {vehicleColumns.map((vehicles, columnIndex) => (
+              <ol key={columnIndex} className="space-y-2">
+                {vehicles.map((vehicle, itemIndex) => {
+                  const index = columnIndex * 5 + itemIndex;
+                  const href = getTopVehicleHref(vehicle);
+                  const content = (
+                    <>
+                      <span className={topRankingRankBadgeClassName}>
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className={topRankingTitleClassName}>
+                          {maskPlateNumber(vehicle.carNumber ?? "")}
+                        </span>
+                        <span className={topRankingSubTextClassName}>
+                          {[vehicle.manufacturer, vehicle.model]
+                            .filter(Boolean)
+                            .join(" ") || "차종 정보 없음"}
+                        </span>
+                        <span className="mt-1 block truncate text-xs font-medium text-zinc-500">
+                          {formatTopVehicleModel(vehicle)}
+                        </span>
+                      </span>
+                      <span className="pt-0.5 text-right text-xs font-semibold text-zinc-500 md:text-sm">
+                        조회 {vehicle.viewCount.toLocaleString()}
+                      </span>
+                    </>
+                  );
 
-              return (
-                <li key={vehicle.vehicleId || index}>
-                  {href ? (
-                    <Link
-                      href={href}
-                      className="grid cursor-pointer grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 active:scale-[0.99]"
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      {content}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+                  return (
+                    <li key={vehicle.vehicleId || index}>
+                      {href ? (
+                        <Link
+                          href={href}
+                          className={cn(
+                            topRankingModalItemClassName,
+                            "cursor-pointer transition hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-zinc-950 active:scale-[0.99]",
+                          )}
+                        >
+                          {content}
+                        </Link>
+                      ) : (
+                        <div className={topRankingModalItemClassName}>
+                          {content}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            ))}
+          </div>
         </TopRankingModal>
       ) : null}
     </div>
@@ -1689,6 +1694,7 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const previewModels = rankings.topModels.slice(0, topModelsPreviewCount);
   const topModels = rankings.topModels.slice(0, topRankingModalLimit);
+  const modelColumns = [topModels.slice(0, 5), topModels.slice(5, 10)];
 
   return (
     <div className={topRankingCardClassName}>
@@ -1735,24 +1741,36 @@ function HomeTopModelsPanel({ rankings }: { rankings: HomeTrafficRankings }) {
           title="인기 모델 TOP10"
           onClose={() => setIsModalOpen(false)}
         >
-          <ol className="space-y-2">
-            {topModels.map((model, index) => (
-              <li
-                key={(model.manufacturer ?? "") + (model.modelName ?? "") + index}
-                className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-white/[0.07] bg-[linear-gradient(180deg,rgba(20,22,27,0.95),rgba(7,8,11,0.96))] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]"
-              >
-                <span className={topRankingRankBadgeClassName}>
-                  {index + 1}
-                </span>
-                <span className={topRankingTitleClassName}>
-                  {formatTopModelName(model)}
-                </span>
-                <span className="text-right text-sm font-semibold text-zinc-500">
-                  조회 {model.viewCount.toLocaleString()}
-                </span>
-              </li>
+          <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+            {modelColumns.map((models, columnIndex) => (
+              <ol key={columnIndex} className="space-y-2">
+                {models.map((model, itemIndex) => {
+                  const index = columnIndex * 5 + itemIndex;
+
+                  return (
+                    <li
+                      key={
+                        (model.manufacturer ?? "") +
+                        (model.modelName ?? "") +
+                        index
+                      }
+                      className={topRankingModalItemClassName}
+                    >
+                      <span className={topRankingRankBadgeClassName}>
+                        {index + 1}
+                      </span>
+                      <span className={topRankingTitleClassName}>
+                        {formatTopModelName(model)}
+                      </span>
+                      <span className="text-right text-xs font-semibold text-zinc-500 md:text-sm">
+                        조회 {model.viewCount.toLocaleString()}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
             ))}
-          </ol>
+          </div>
         </TopRankingModal>
       ) : null}
     </div>
@@ -1786,14 +1804,14 @@ function TopRankingModal({
     };
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:justify-center"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
       role="presentation"
       onClick={onClose}
     >
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border border-white/[0.09] bg-[linear-gradient(180deg,#15171c,#090a0d)] shadow-[0_28px_80px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.07)]"
+        className="fixed left-1/2 top-[45%] max-h-[calc(100vh-160px)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg border border-white/[0.09] bg-[linear-gradient(180deg,#15171c,#090a0d)] shadow-[0_28px_80px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.07)] sm:top-1/2 md:max-h-[80vh] md:max-w-5xl"
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -1809,10 +1827,11 @@ function TopRankingModal({
             닫기
           </button>
         </div>
-        <div className="max-h-[calc(80vh-3.5rem)] overflow-y-auto p-4">
+        <div className="max-h-[calc(100vh-216px)] overflow-y-auto p-4 pb-[calc(2rem+env(safe-area-inset-bottom))] md:max-h-[calc(80vh-3.5rem)] md:pb-4">
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
