@@ -4,7 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "카팩트",
     short_name: "카팩트",
-    description: "판매글에는 없는 이야기",
+    description:
+      "중고차 실매물 후기 공유 플랫폼. 판매글에서는 볼 수 없는 실제 후기와 차량 정보를 확인하세요.",
     start_url: "/",
     display: "standalone",
     background_color: "#09090b",

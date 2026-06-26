@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BottomTabNav } from "@/components/BottomTabNav";
+import {
+  createPageMetadata,
+  defaultOgImageUrl,
+  siteName,
+  siteUrl,
+} from "@/lib/seo";
 import "./globals.css";
-
-const siteUrl = "https://carfact.kr";
-const siteTitle = "카팩트 - 중고차 실매물 후기 공유 플랫폼";
-const siteDescription = "판매글에는 없는 이야기";
-const ogImageUrl = `${siteUrl}/og-image-v2.png`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,13 +20,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  ...createPageMetadata(),
   metadataBase: new URL(siteUrl),
-  title: siteTitle,
-  description: siteDescription,
   manifest: "/manifest.webmanifest",
-  alternates: {
-    canonical: siteUrl,
-  },
   icons: {
     icon: [
       { url: "/favicon.ico?v=20260610-favicon-fill", sizes: "any" },
@@ -54,30 +51,17 @@ export const metadata: Metadata = {
       },
     ],
   },
-  openGraph: {
-    title: siteTitle,
-    description: siteDescription,
-    url: siteUrl,
-    siteName: "카팩트",
-    images: [
-      {
-        url: ogImageUrl,
-        width: 1200,
-        height: 630,
-        alt: siteTitle,
-      },
-    ],
-    locale: "ko_KR",
-    type: "website",
+  applicationName: siteName,
+  appleWebApp: {
+    capable: true,
+    title: siteName,
   },
-  twitter: {
-    card: "summary_large_image",
-    title: siteTitle,
-    description: siteDescription,
-    images: [ogImageUrl],
-  },
+  category: "automotive",
+  creator: siteName,
+  publisher: siteName,
   other: {
     "twitter:url": siteUrl,
+    "twitter:image": defaultOgImageUrl,
   },
 };
 

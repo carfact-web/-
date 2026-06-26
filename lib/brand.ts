@@ -4,7 +4,7 @@ export const brand = {
   primary: "#FF3B30",
   black: "#111111",
   slogan: "판매글에는 없는 이야기",
-  description: "판매글에는 없는 이야기",
+  description: "중고차 실매물 후기 공유 플랫폼.",
   storeDescription:
-    "판매글에는 없는 이야기. 수많은 실제 방문 후기와 정보를 모아, 더 현명한 자동차 선택을 돕습니다.",
+    "중고차 실매물 후기 공유 플랫폼. 판매글에서는 볼 수 없는 실제 후기와 차량 정보를 확인하세요.",
 } as const;
