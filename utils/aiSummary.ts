@@ -24,6 +24,7 @@ interface AiSummaryOptions {
   grade?: string;
   inspectionProfile?: VehicleInspectionProfile | null;
   productUrl?: string;
+  reviewCount?: number;
   reviewKeywordStats?: ReviewKeywordStat[];
   vehicleNumber?: string;
 }
@@ -60,6 +61,7 @@ export interface AiSummaryMaintenanceIssue {
   title: string;
   description: string;
   estimatedRepairCost: string;
+  reviewMentionScore: number | null;
   symptoms: string[];
   causes: string[];
   replacementParts: string[];
@@ -77,8 +79,11 @@ interface MaintenanceIssueCategory {
 export interface StructuredAiSummary {
   vehicle: AiSummaryVehicleSource;
   oneLineReview: string;
+  overviewSentences: string[];
   preDeliveryChecks: string[];
+  reviewAnalysisLabel: string;
   reviewKeywords: ReviewKeywordStat[];
+  representativeIssues: string[];
   maintenanceIssues: AiSummaryMaintenanceIssue[];
   source: "manual" | "product-api" | "vehicle-number";
 }
@@ -131,6 +136,74 @@ const getVehicleTitle = (vehicle: AiSummaryVehicleSource) =>
     .filter(Boolean)
     .join(" ")
     .trim() || "이 차";
+
+const joinKoreanList = (items: string[]) => {
+  if (items.length <= 2) {
+    return items.join(", ");
+  }
+
+  return items.slice(0, -1).join(", ") + ", " + items[items.length - 1];
+};
+
+const getReviewAnalysisLabel = (reviewCount = 0) => {
+  if (reviewCount <= 0) {
+    return "등록된 후기 데이터가 부족하여 차량 DB와 정비 이슈 DB를 기반으로 생성되었습니다.";
+  }
+
+  if (reviewCount < 10) {
+    return "최근 등록된 후기 " + reviewCount.toLocaleString("ko-KR") + "건을 기반으로 생성되었습니다.";
+  }
+
+  return "최근 후기 " + reviewCount.toLocaleString("ko-KR") + "건을 분석하여 요약했습니다.";
+};
+
+const getDataBasedOverview = (
+  vehicle: AiSummaryVehicleSource,
+  reviewKeywords: ReviewKeywordStat[],
+  maintenanceIssues: AiSummaryMaintenanceIssue[],
+) => {
+  const vehicleTitle = getVehicleTitle(vehicle);
+  const keywordLabels = reviewKeywords.slice(0, 3).map((keyword) => keyword.label);
+  const issueTitles = maintenanceIssues.slice(0, 3).map((issue) => issue.title);
+  const sentences: string[] = [];
+
+  if (keywordLabels.length > 0) {
+    sentences.push(
+      vehicleTitle +
+        "는 후기에서 " +
+        joinKoreanList(keywordLabels) +
+        " 관련 언급이 반복적으로 확인됩니다.",
+    );
+  } else if (issueTitles.length > 0) {
+    sentences.push(
+      vehicleTitle +
+        "는 차량 DB와 정비 이슈 DB에서 " +
+        joinKoreanList(issueTitles) +
+        " 항목이 확인됩니다.",
+    );
+  } else {
+    sentences.push(
+      vehicleTitle +
+        "는 현재 등록된 데이터 기준으로 확인 가능한 정비 이슈가 제한적입니다.",
+    );
+  }
+
+  if (issueTitles.length > 0) {
+    sentences.push(
+      "구매 전 " +
+        joinKoreanList(issueTitles) +
+        " 관련 상태 확인을 권장합니다.",
+    );
+  }
+
+  if (keywordLabels.length > 0 && issueTitles.length > 0) {
+    sentences.push(
+      "후기 키워드와 정비 이슈 DB를 함께 반영해 현재 조회 중인 세대 기준으로 정리했습니다.",
+    );
+  }
+
+  return sentences.slice(0, 3);
+};
 
 const getVehicleAge = (year: string) => {
   const yearNumber = Number(year);
@@ -363,6 +436,37 @@ const getMaintenanceIssueCategoryOrder = (key: string) => {
   return index === -1 ? maintenanceIssueCategories.length : index;
 };
 
+const getMatchedReviewKeywordStat = (
+  category: MaintenanceIssueCategory,
+  replacementParts: string[],
+  reviewKeywordStats: ReviewKeywordStat[],
+) =>
+  reviewKeywordStats.find((stat) => {
+    const searchText = [stat.label, ...replacementParts].join(" ");
+
+    return category.pattern.test(searchText);
+  });
+
+const getReviewMentionScore = (stat?: ReviewKeywordStat) => {
+  if (!stat) {
+    return null;
+  }
+
+  if (stat.percentage >= 40 || stat.count >= 20) {
+    return 5;
+  }
+
+  if (stat.percentage >= 25 || stat.count >= 10) {
+    return 4;
+  }
+
+  if (stat.percentage >= 15 || stat.count >= 5) {
+    return 3;
+  }
+
+  return 2;
+};
+
 const getMaintenanceIssues = (
   brand: string,
   model: string,
@@ -372,6 +476,7 @@ const getMaintenanceIssues = (
   const inspectionProfile =
     options.inspectionProfile ??
     getVehicleInspectionProfile(brand, model, options.generation);
+  const reviewKeywordStats = options.reviewKeywordStats ?? [];
 
   const groupedIssues = new Map<
     string,
@@ -408,15 +513,25 @@ const getMaintenanceIssues = (
         getMaintenanceIssueCategoryOrder(right.category.key),
     )
     .slice(0, MAX_MAINTENANCE_ISSUE_COUNT)
-    .map((group) => ({
-      title: group.category.title,
-      description: getMaintenanceIssueDescription(group.category, mileage),
-      estimatedRepairCost: getMergedRepairCost(group.repairCosts),
-      symptoms: group.symptoms.slice(0, 4),
-      causes: group.category.causes,
-      replacementParts: group.replacementParts.slice(0, 6),
-      additionalDescription: group.descriptions[0] ?? group.category.description,
-    }));
+    .map((group) => {
+      const replacementParts = group.replacementParts.slice(0, 6);
+      const matchedReviewKeyword = getMatchedReviewKeywordStat(
+        group.category,
+        replacementParts,
+        reviewKeywordStats,
+      );
+
+      return {
+        title: group.category.title,
+        description: getMaintenanceIssueDescription(group.category, mileage),
+        estimatedRepairCost: getMergedRepairCost(group.repairCosts),
+        reviewMentionScore: getReviewMentionScore(matchedReviewKeyword),
+        symptoms: group.symptoms.slice(0, 4),
+        causes: group.category.causes,
+        replacementParts,
+        additionalDescription: group.descriptions[0] ?? group.category.description,
+      };
+    });
 };
 
 const matchesModel = (rule: ModelIssueRule | EvCheckRule, model: string) => {
@@ -832,18 +947,27 @@ export function getStructuredAiSummary(
     0,
     MAX_SUMMARY_COUNT,
   );
+  const maintenanceIssues = getMaintenanceIssues(brand, model, mileage, options);
+  const overviewSentences = getDataBasedOverview(
+    vehicle,
+    reviewKeywords,
+    maintenanceIssues,
+  );
 
   return {
     vehicle,
-    oneLineReview: getOneLineReview(vehicle, reviewKeywords),
+    oneLineReview: overviewSentences[0] ?? getOneLineReview(vehicle, reviewKeywords),
+    overviewSentences,
     preDeliveryChecks: getPreDeliveryChecks(
       year,
       mileage,
       options.fuelType,
       summaryMessages,
     ),
+    reviewAnalysisLabel: getReviewAnalysisLabel(options.reviewCount),
     reviewKeywords,
-    maintenanceIssues: getMaintenanceIssues(brand, model, mileage, options),
+    representativeIssues: maintenanceIssues.map((issue) => issue.title),
+    maintenanceIssues,
     source: options.productUrl
       ? "product-api"
       : options.vehicleNumber

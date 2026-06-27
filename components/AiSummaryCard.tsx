@@ -12,7 +12,7 @@ interface AiSummaryCardProps {
 }
 
 const cardClassName = cn(
-  "mb-5 rounded-2xl border border-white/[0.09] bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.08),transparent_32%),linear-gradient(180deg,#16181d_0%,#0b0c10_100%)] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.07)] transition duration-200 sm:p-5 md:hover:-translate-y-[2px]",
+  "mb-5 rounded-2xl border border-white/[0.09] bg-[linear-gradient(180deg,#15171c_0%,#090a0d_100%)] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-5",
 );
 const headerClassName = cn("mb-3 flex items-start justify-between gap-3");
 const titleClassName = cn("text-lg font-black tracking-normal text-white sm:text-xl");
@@ -20,22 +20,26 @@ const metaClassName = cn(
   "mt-1 line-clamp-1 text-xs font-medium text-zinc-500 sm:text-sm",
 );
 const sourceClassName = cn(
-  "shrink-0 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-[11px] font-black text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+  "shrink-0 rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
 );
 const sectionClassName = cn("border-t border-white/[0.07] py-3 first:border-t-0 first:pt-0");
 const sectionTitleClassName = cn(
-  "mb-2 text-[13px] font-black tracking-[-0.01em] text-zinc-100",
+  "mb-2 text-[13px] font-black tracking-normal text-zinc-100",
 );
-const oneLineClassName = cn(
-  "rounded-xl border border-red-500/20 bg-[linear-gradient(180deg,rgba(255,59,48,0.14),rgba(255,59,48,0.07))] px-3.5 py-3 text-[15px] font-bold leading-[1.55] text-red-50 shadow-[0_10px_24px_rgba(0,0,0,0.20),inset_0_1px_0_rgba(255,255,255,0.05)] sm:text-base",
+const overviewClassName = cn(
+  "space-y-2 text-[15px] font-semibold leading-[1.75] text-zinc-100 sm:text-base",
 );
-const compactListClassName = cn("grid grid-cols-1 gap-1.5 sm:grid-cols-2");
-const compactItemClassName = cn(
-  "flex min-h-8 items-center gap-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-sm font-semibold leading-5 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+const analysisLabelClassName = cn(
+  "mt-2 text-xs font-medium leading-5 text-zinc-500 sm:text-sm",
+);
+const bulletListClassName = cn("space-y-1.5 text-sm font-semibold leading-6 text-zinc-200");
+const keywordListClassName = cn("flex flex-wrap gap-1.5");
+const keywordTagClassName = cn(
+  "rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1 text-xs font-bold text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:text-sm",
 );
 const issueListClassName = cn("space-y-2");
 const issueClassName = cn(
-  "rounded-xl border border-white/[0.07] bg-[linear-gradient(180deg,rgba(18,20,25,0.86),rgba(5,6,8,0.72))] px-3.5 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-200 md:hover:-translate-y-0.5 md:hover:border-white/[0.12]",
+  "rounded-xl border border-white/[0.07] bg-black/20 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
 );
 const issueToggleButtonClassName = cn(
   "mt-3 inline-flex w-full items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm font-black text-zinc-200 transition hover:border-white/[0.14] hover:bg-white/[0.07] active:scale-[0.99]",
@@ -58,20 +62,28 @@ const formatMileage = (mileage?: string) => {
 
 const getSourceLabel = (source: StructuredAiSummary["source"]) => {
   if (source === "product-api") {
-    return "상품 API";
+    return "차량 DB";
   }
 
   if (source === "vehicle-number") {
-    return "차량번호";
+    return "데이터 분석";
   }
 
-  return "AI";
+  return "DB 기반";
+};
+
+const getReviewMentionLabel = (score: number | null) => {
+  if (!score) {
+    return "데이터 부족";
+  }
+
+  return "★".repeat(score) + "☆".repeat(5 - score);
 };
 
 export function AiSummaryCard({
   analysis,
   summaries,
-  title = "카팩트 AI 요약",
+  title = "카팩트 AI 개요",
   emptyMessage = "차량 정보를 입력하면 AI 요약이 표시됩니다.",
 }: AiSummaryCardProps) {
   const [showAllMaintenanceIssues, setShowAllMaintenanceIssues] =
@@ -132,30 +144,51 @@ export function AiSummaryCard({
       </div>
 
       <section className={sectionClassName}>
-        <h3 className={sectionTitleClassName}>💡 카팩트 한줄평</h3>
-        <p className={oneLineClassName}>{analysis.oneLineReview}</p>
+        <div className={overviewClassName}>
+          {analysis.overviewSentences.map((sentence) => (
+            <p key={sentence}>{sentence}</p>
+          ))}
+        </div>
+        <p className={analysisLabelClassName}>{analysis.reviewAnalysisLabel}</p>
       </section>
 
       <section className={sectionClassName}>
-        <h3 className={sectionTitleClassName}>🔥 사람들이 많이 이야기한 내용</h3>
-        {analysis.reviewKeywords.length > 0 ? (
-          <ul className={compactListClassName}>
-            {analysis.reviewKeywords.map((keyword) => (
-              <li key={keyword.label} className={compactItemClassName}>
-                <span className="text-red-300">•</span>
-                <span className="line-clamp-1">{keyword.label}</span>
+        <h3 className={sectionTitleClassName}>대표 정비 이슈</h3>
+        {analysis.representativeIssues.length > 0 ? (
+          <ul className={bulletListClassName}>
+            {analysis.representativeIssues.map((issue) => (
+              <li key={issue} className="flex gap-2">
+                <span className="text-zinc-500">•</span>
+                <span>{issue}</span>
               </li>
             ))}
           </ul>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
-            후기 키워드가 쌓이면 많이 언급된 내용부터 자동 정렬됩니다.
+            현재 세대 기준으로 등록된 대표 정비 이슈가 아직 없습니다.
+          </p>
+        )}
+      </section>
+
+      <section className={sectionClassName}>
+        <h3 className={sectionTitleClassName}>사람들이 많이 언급한 키워드</h3>
+        {analysis.reviewKeywords.length > 0 ? (
+          <ul className={keywordListClassName}>
+            {analysis.reviewKeywords.map((keyword) => (
+              <li key={keyword.label} className={keywordTagClassName}>
+                {keyword.label}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm leading-6 text-zinc-500">
+            후기 키워드가 더 쌓이면 많이 언급된 명사부터 표시됩니다.
           </p>
         )}
       </section>
 
       <section className="border-t border-zinc-800/80 pt-3">
-        <h3 className={sectionTitleClassName}>🚨 자주 발생하는 정비 이슈</h3>
+        <h3 className={sectionTitleClassName}>자주 발생하는 정비 항목</h3>
         {analysis.maintenanceIssues.length > 0 ? (
           <div>
             <div className={issueListClassName}>
@@ -167,9 +200,14 @@ export function AiSummaryCard({
                   <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-zinc-400">
                     {issue.description}
                   </p>
-                  <p className="mt-1 text-xs font-bold text-red-100">
-                    💰 예상수리비 {issue.estimatedRepairCost}
-                  </p>
+                  <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs font-bold leading-5">
+                    <dt className="text-zinc-500">후기 언급도</dt>
+                    <dd className="text-zinc-200">
+                      {getReviewMentionLabel(issue.reviewMentionScore)}
+                    </dd>
+                    <dt className="text-zinc-500">예상수리비</dt>
+                    <dd className="text-zinc-200">{issue.estimatedRepairCost}</dd>
+                  </dl>
                 </article>
               ))}
             </div>
