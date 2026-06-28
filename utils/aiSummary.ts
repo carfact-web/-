@@ -457,6 +457,24 @@ const getReviewMentionScore = (stat?: ReviewKeywordStat) => {
 const hasDieselFuelType = (fuelType?: string) =>
   /디젤|diesel/i.test(fuelType ?? "");
 
+const hasGasolineOrLpgFuelType = (fuelType?: string) =>
+  /가솔린|휘발유|gasoline|petrol|lpg/i.test(fuelType ?? "");
+
+const parseVehicleYear = (year: string) => {
+  const yearNumber = Number(String(year).match(/\d{4}/)?.[0] ?? year);
+
+  return Number.isFinite(yearNumber) ? yearNumber : null;
+};
+
+const parseVehicleMileage = (mileage: string) => {
+  const mileageNumber = Number(String(mileage).replace(/[^0-9]/g, ""));
+
+  return Number.isFinite(mileageNumber) ? mileageNumber : null;
+};
+
+const normalizeMaintenancePart = (part: string) =>
+  part.toLowerCase().replace(/[^0-9a-z가-힣/]+/g, "");
+
 const hasCommercialDieselSignal = (...values: Array<string | undefined>) =>
   values.some((value) =>
     /화물|상용|트럭|카고|포터|봉고|마이티|탑차|냉동탑|윙바디|리프트/i.test(
@@ -495,10 +513,10 @@ const shouldIncludeScrMaintenance = (
   inspectionProfile: VehicleInspectionProfile | null | undefined,
   reviewKeywordStats: ReviewKeywordStat[],
 ) => {
-  const yearNumber = Number(year);
+  const yearNumber = parseVehicleYear(year);
 
   return (
-    (Number.isFinite(yearNumber) && yearNumber >= 2015) ||
+    (yearNumber !== null && yearNumber >= 2015) ||
     hasCommercialDieselSignal(
       brand,
       model,
@@ -516,22 +534,117 @@ const shouldIncludeScrMaintenance = (
   );
 };
 
-const addDieselDefaultMaintenanceIssue = (
+interface DefaultMaintenanceRule {
+  fuelType: "gasoline-lpg";
+  minAgeYears?: number;
+  minMileage?: number;
+  replacementParts: string[];
+  title: string;
+  description: string;
+  additionalDescription: string;
+}
+
+const defaultMaintenanceRules: DefaultMaintenanceRule[] = [
+  {
+    fuelType: "gasoline-lpg",
+    minAgeYears: 5,
+    minMileage: 50000,
+    replacementParts: ["점화코일", "점화플러그"],
+    title: "기본 소모품 참고 항목",
+    description: "연식/주행거리 기준 확인 항목",
+    additionalDescription:
+      "연식 또는 주행거리 기준으로 함께 확인할 참고 정비 항목입니다.",
+  },
+];
+
+const matchesDefaultMaintenanceRule = (
+  rule: DefaultMaintenanceRule,
+  year: string,
+  mileage: string,
+  options: AiSummaryOptions,
+) => {
+  if (
+    rule.fuelType === "gasoline-lpg" &&
+    !hasGasolineOrLpgFuelType(options.fuelType)
+  ) {
+    return false;
+  }
+
+  const yearNumber = parseVehicleYear(year);
+  const mileageNumber = parseVehicleMileage(mileage);
+  const vehicleAge =
+    yearNumber === null ? null : new Date().getFullYear() - yearNumber;
+  const matchesAge =
+    rule.minAgeYears !== undefined &&
+    vehicleAge !== null &&
+    vehicleAge >= rule.minAgeYears;
+  const matchesMileage =
+    rule.minMileage !== undefined &&
+    mileageNumber !== null &&
+    mileageNumber >= rule.minMileage;
+
+  return matchesAge || matchesMileage;
+};
+
+const getExistingMaintenancePartSet = (
+  issues: AiSummaryMaintenanceIssue[],
+  reviewKeywordStats: ReviewKeywordStat[],
+) =>
+  new Set(
+    [
+      ...issues.flatMap((issue) => issue.replacementParts),
+      ...reviewKeywordStats.map((keyword) => keyword.label),
+    ].map(normalizeMaintenancePart),
+  );
+
+const addDefaultMaintenanceIssue = (
   issues: AiSummaryMaintenanceIssue[],
   year: string,
   brand: string,
   model: string,
+  mileage: string,
   options: AiSummaryOptions,
   inspectionProfile: VehicleInspectionProfile | null | undefined,
   reviewKeywordStats: ReviewKeywordStat[],
 ) => {
+  const existingParts = getExistingMaintenancePartSet(
+    issues,
+    reviewKeywordStats,
+  );
+  const defaultIssues: AiSummaryMaintenanceIssue[] = [];
+
+  defaultMaintenanceRules.forEach((rule) => {
+    if (!matchesDefaultMaintenanceRule(rule, year, mileage, options)) {
+      return;
+    }
+
+    const replacementParts = rule.replacementParts.filter(
+      (part) => !existingParts.has(normalizeMaintenancePart(part)),
+    );
+
+    if (replacementParts.length === 0) {
+      return;
+    }
+
+    replacementParts.forEach((part) =>
+      existingParts.add(normalizeMaintenancePart(part)),
+    );
+    defaultIssues.push({
+      title: rule.title,
+      description: rule.description,
+      estimatedRepairCost: "현장 확인",
+      reviewMentionScore: null,
+      symptoms: [],
+      causes: [],
+      replacementParts,
+      additionalDescription: rule.additionalDescription,
+    });
+  });
+
   if (!hasDieselFuelType(options.fuelType)) {
-    return issues;
+    return [...defaultIssues, ...issues];
   }
 
-  const existingParts = new Set(
-    issues.flatMap((issue) => issue.replacementParts),
-  );
   const defaultParts = ["DPF", "터보", "인젝터", "촉매"];
 
   if (
@@ -547,23 +660,26 @@ const addDieselDefaultMaintenanceIssue = (
     defaultParts.push("요소수/SCR");
   }
 
-  const replacementParts = defaultParts.filter((part) => !existingParts.has(part));
-
-  if (replacementParts.length === 0) {
-    return issues;
-  }
+  const replacementParts = defaultParts.filter(
+    (part) => !existingParts.has(normalizeMaintenancePart(part)),
+  );
 
   return [
-    {
-      title: "디젤 참고 정비 항목",
-      description: "디젤 차량 기본 확인 항목",
-      estimatedRepairCost: "현장 확인",
-      reviewMentionScore: null,
-      symptoms: [],
-      causes: [],
-      replacementParts,
-      additionalDescription: "디젤 차량에서 함께 확인할 참고 정비 항목입니다.",
-    },
+    ...defaultIssues,
+    ...(replacementParts.length > 0
+      ? [
+          {
+            title: "디젤 참고 정비 항목",
+            description: "디젤 차량 기본 확인 항목",
+            estimatedRepairCost: "현장 확인",
+            reviewMentionScore: null,
+            symptoms: [],
+            causes: [],
+            replacementParts,
+            additionalDescription: "디젤 차량에서 함께 확인할 참고 정비 항목입니다.",
+          },
+        ]
+      : []),
     ...issues,
   ];
 };
@@ -635,11 +751,12 @@ const getMaintenanceIssues = (
       };
     });
 
-  return addDieselDefaultMaintenanceIssue(
+  return addDefaultMaintenanceIssue(
     issues,
     year,
     brand,
     model,
+    mileage,
     options,
     inspectionProfile,
     reviewKeywordStats,
