@@ -18,6 +18,7 @@ import {
   countVehicleIssueKeywordMentions,
   extractVehicleIssueKeywords,
   normalizeVehicleIssueKeyword,
+  vehicleIssueKeywordDefinitions,
 } from "@/utils/vehicleIssueKeywords";
 import type { Json } from "@/types/supabase";
 import type {
@@ -46,6 +47,7 @@ type DashboardViewFilter = "vehicle" | "model" | "review";
 type AiCandidateStatus = "reviewing" | "applied" | "excluded";
 type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
 type AiCandidateArchiveFilter = "today" | "recent3days" | "all";
+type AiManagementTab = "keywords" | "maintenance" | "candidates";
 type CommunityCategory =
   | "free"
   | "maintenance"
@@ -54,6 +56,40 @@ type CommunityCategory =
   | "imported"
   | "domestic"
   | "partner";
+type ReviewDateFilter = "all" | "today" | "7days" | "30days";
+type ReviewDealerFilter = "all" | "dealer" | "member";
+type ReviewReportFilter = "all" | "reported" | "clean";
+type ReviewSortOption =
+  | "latest"
+  | "oldest"
+  | "reports"
+  | "plate"
+  | "model"
+  | "author";
+type ReviewVisibilityFilter = "all" | "visible" | "hidden";
+
+interface AdminAiKeywordRule {
+  id: string;
+  label: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  category: string;
+  fuelType: string;
+  targetModel: string;
+  isDefaultMaintenance: boolean;
+  isVisible: boolean;
+  memo: string;
+}
+
+interface AdminAiMaintenanceRule {
+  id: string;
+  title: string;
+  condition: string;
+  fuelType: string;
+  items: string[];
+  isVisible: boolean;
+  memo: string;
+}
 
 interface AdminStats {
   comments: number;
@@ -351,6 +387,10 @@ const actionButtonClassName = cn(
   "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition",
   "hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50",
 );
+const adminInputClassName = cn(
+  "min-h-9 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 outline-none transition",
+  "placeholder:text-zinc-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100",
+);
 const dangerButtonClassName = cn(
   actionButtonClassName,
   "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800",
@@ -585,6 +625,11 @@ const getReviewVehicleModel = (review: AdminReview) => {
   return [brand, generation || model].filter(Boolean).join(" ") || "차량 정보 없음";
 };
 
+const getReviewFuelType = (review: AdminReview) =>
+  getJsonString(review.vehicle_snapshot, "fuelType") ||
+  getJsonString(review.vehicle_snapshot, "fuel_type") ||
+  "";
+
 const getReviewDetailHref = (review: AdminReview) => {
   const plateNumber = getReviewPlateNumber(review);
 
@@ -784,6 +829,110 @@ const aiCandidateArchiveFilters: {
   { label: "전체 보기", value: "all" },
 ];
 const aiCandidateArchiveReferenceTime = Date.now();
+
+const aiManagementTabs: { label: string; value: AiManagementTab }[] = [
+  { label: "키워드 관리", value: "keywords" },
+  { label: "정비항목 룰", value: "maintenance" },
+  { label: "자동 감지 후보", value: "candidates" },
+];
+
+const reviewDateFilters: { label: string; value: ReviewDateFilter }[] = [
+  { label: "전체 기간", value: "all" },
+  { label: "오늘", value: "today" },
+  { label: "최근 7일", value: "7days" },
+  { label: "최근 30일", value: "30days" },
+];
+
+const reviewVisibilityFilters: {
+  label: string;
+  value: ReviewVisibilityFilter;
+}[] = [
+  { label: "전체 상태", value: "all" },
+  { label: "노출", value: "visible" },
+  { label: "숨김", value: "hidden" },
+];
+
+const reviewReportFilters: { label: string; value: ReviewReportFilter }[] = [
+  { label: "신고 전체", value: "all" },
+  { label: "신고 있음", value: "reported" },
+  { label: "신고 없음", value: "clean" },
+];
+
+const reviewDealerFilters: { label: string; value: ReviewDealerFilter }[] = [
+  { label: "전체 회원", value: "all" },
+  { label: "딜러", value: "dealer" },
+  { label: "일반 회원", value: "member" },
+];
+
+const reviewSortOptions: { label: string; value: ReviewSortOption }[] = [
+  { label: "최신순", value: "latest" },
+  { label: "오래된순", value: "oldest" },
+  { label: "신고 많은순", value: "reports" },
+  { label: "차량번호순", value: "plate" },
+  { label: "차종명순", value: "model" },
+  { label: "작성자순", value: "author" },
+];
+
+const aiKeywordStorageKey = "carfact-admin-ai-keyword-rules";
+const aiMaintenanceStorageKey = "carfact-admin-ai-maintenance-rules";
+
+const createInitialAiKeywordRules = (): AdminAiKeywordRule[] =>
+  vehicleIssueKeywordDefinitions.map((definition, index) => ({
+    id: "code-keyword-" + index + "-" + normalizeVehicleIssueKeyword(definition.label),
+    label: definition.groupLabel ?? definition.label,
+    includeKeywords: Array.from(new Set([definition.label, ...definition.aliases])),
+    excludeKeywords: [],
+    category: definition.inspectionTitle.replace(/\s*확인$/, ""),
+    fuelType: "",
+    targetModel: "",
+    isDefaultMaintenance: false,
+    isVisible: true,
+    memo: "코드 사전 기준 초기값",
+  }));
+
+const initialAiMaintenanceRules: AdminAiMaintenanceRule[] = [
+  {
+    id: "diesel-default",
+    title: "디젤 기본 참고 항목",
+    condition: "유종이 디젤인 차량",
+    fuelType: "디젤",
+    items: ["DPF", "터보", "인젝터", "촉매"],
+    isVisible: true,
+    memo: "요소수/SCR은 명시 SCR 데이터가 있을 때만 별도 노출",
+  },
+  {
+    id: "gasoline-lpg-aged",
+    title: "가솔린/LPG 연식·주행거리 기본 항목",
+    condition: "5년 이상 또는 50,000km 이상",
+    fuelType: "가솔린/LPG",
+    items: ["점화코일", "점화플러그"],
+    isVisible: true,
+    memo: "디젤 차량에는 적용하지 않음",
+  },
+  {
+    id: "scr-confirmed",
+    title: "SCR 확인 차량",
+    condition: "DB에서 hasScr=true 또는 scrType이 확인된 차량",
+    fuelType: "디젤",
+    items: ["요소수/SCR"],
+    isVisible: true,
+    memo: "연식만으로 자동 노출 금지",
+  },
+];
+
+const readStoredAdminRules = <Rule,>(key: string, fallback: Rule[]): Rule[] => {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(key);
+
+    return storedValue ? (JSON.parse(storedValue) as Rule[]) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
   if (
@@ -1058,6 +1207,19 @@ export default function AdminPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewAuthorFilter, setReviewAuthorFilter] = useState("");
+  const [reviewDateFilter, setReviewDateFilter] =
+    useState<ReviewDateFilter>("all");
+  const [reviewDealerFilter, setReviewDealerFilter] =
+    useState<ReviewDealerFilter>("all");
+  const [reviewFuelFilter, setReviewFuelFilter] = useState("");
+  const [reviewModelFilter, setReviewModelFilter] = useState("");
+  const [reviewPlateFilter, setReviewPlateFilter] = useState("");
+  const [reviewReportFilter, setReviewReportFilter] =
+    useState<ReviewReportFilter>("all");
+  const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
+  const [reviewVisibilityFilter, setReviewVisibilityFilter] =
+    useState<ReviewVisibilityFilter>("all");
   const [reviewPage, setReviewPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
   const [reportSearch, setReportSearch] = useState("");
@@ -1074,12 +1236,38 @@ export default function AdminPage() {
   >([]);
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
   const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
+  const [activeAiManagementTab, setActiveAiManagementTab] =
+    useState<AiManagementTab>("keywords");
+  const [aiKeywordRules, setAiKeywordRules] = useState<AdminAiKeywordRule[]>(
+    () =>
+      readStoredAdminRules(
+        aiKeywordStorageKey,
+        createInitialAiKeywordRules(),
+      ),
+  );
+  const [aiMaintenanceRules, setAiMaintenanceRules] = useState<
+    AdminAiMaintenanceRule[]
+  >(() =>
+    readStoredAdminRules(aiMaintenanceStorageKey, initialAiMaintenanceRules),
+  );
 
   const hasProfile = Boolean(profile);
   const isCheckingRole =
     isAuthReady && isAuthenticated && (!isProfileReady || !hasProfile);
   const canAccess =
     isAuthReady && isAuthenticated && isProfileReady && hasProfile && isAdmin;
+  useEffect(() => {
+    window.localStorage.setItem(
+      aiKeywordStorageKey,
+      JSON.stringify(aiKeywordRules),
+    );
+  }, [aiKeywordRules]);
+  useEffect(() => {
+    window.localStorage.setItem(
+      aiMaintenanceStorageKey,
+      JSON.stringify(aiMaintenanceRules),
+    );
+  }, [aiMaintenanceRules]);
   const selectedPosts = useMemo(
     () => posts.filter((post) => selectedPostIds.includes(post.id)),
     [posts, selectedPostIds],
@@ -1151,15 +1339,152 @@ export default function AdminPage() {
     () => reports.find((report) => report.report_id === selectedReportId) ?? null,
     [reports, selectedReportId],
   );
+  const userProfileMap = useMemo(
+    () => new Map(users.map((account) => [account.id, account])),
+    [users],
+  );
   const sortedReviews = useMemo(
-    () =>
-      reviews
-        .slice()
-        .sort(
-          (left, right) =>
-            Date.parse(right.created_at) - Date.parse(left.created_at),
-        ),
-    [reviews],
+    () => {
+      const searchText = reviewSearch.trim().toLowerCase();
+      const authorText = reviewAuthorFilter.trim().toLowerCase();
+      const fuelText = reviewFuelFilter.trim().toLowerCase();
+      const modelText = reviewModelFilter.trim().toLowerCase();
+      const plateText = reviewPlateFilter.replace(/\s+/g, "").toLowerCase();
+      const filteredReviews = reviews.filter((review) => {
+        const plateNumber = (getReviewPlateNumber(review) ?? "").replace(
+          /\s+/g,
+          "",
+        );
+        const vehicleModel = getReviewVehicleModel(review);
+        const fuelType = getReviewFuelType(review);
+        const authorName =
+          review.author_nickname ??
+          userProfileMap.get(review.author_id ?? "")?.nickname ??
+          "";
+        const authorId = review.author_id ?? "";
+        const authorProfile = userProfileMap.get(authorId);
+        const createdAt = Date.parse(review.created_at);
+        const haystack = [
+          plateNumber,
+          vehicleModel,
+          fuelType,
+          review.content,
+          authorName,
+          authorId,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        if (searchText && !haystack.includes(searchText)) return false;
+        if (
+          authorText &&
+          ![authorName, authorId].join(" ").toLowerCase().includes(authorText)
+        ) {
+          return false;
+        }
+        if (plateText && !plateNumber.toLowerCase().includes(plateText)) {
+          return false;
+        }
+        if (modelText && !vehicleModel.toLowerCase().includes(modelText)) {
+          return false;
+        }
+        if (fuelText && !fuelType.toLowerCase().includes(fuelText)) {
+          return false;
+        }
+        if (reviewVisibilityFilter === "visible" && review.is_hidden) {
+          return false;
+        }
+        if (reviewVisibilityFilter === "hidden" && !review.is_hidden) {
+          return false;
+        }
+        if (reviewReportFilter === "reported" && review.report_count <= 0) {
+          return false;
+        }
+        if (reviewReportFilter === "clean" && review.report_count > 0) {
+          return false;
+        }
+        if (
+          reviewDealerFilter === "dealer" &&
+          !authorProfile?.is_verified_dealer
+        ) {
+          return false;
+        }
+        if (
+          reviewDealerFilter === "member" &&
+          authorProfile?.is_verified_dealer
+        ) {
+          return false;
+        }
+        if (reviewDateFilter !== "all") {
+          const dayMs = 24 * 60 * 60 * 1000;
+          const rangeMs =
+            reviewDateFilter === "today"
+              ? dayMs
+              : reviewDateFilter === "7days"
+                ? 7 * dayMs
+                : 30 * dayMs;
+
+          if (
+            Number.isNaN(createdAt) ||
+            aiCandidateArchiveReferenceTime - createdAt > rangeMs
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      return filteredReviews.sort((left, right) => {
+        if (reviewSort === "oldest") {
+          return Date.parse(left.created_at) - Date.parse(right.created_at);
+        }
+
+        if (reviewSort === "reports") {
+          return (
+            right.report_count - left.report_count ||
+            Date.parse(right.created_at) - Date.parse(left.created_at)
+          );
+        }
+
+        if (reviewSort === "plate") {
+          return (getReviewPlateNumber(left) ?? "").localeCompare(
+            getReviewPlateNumber(right) ?? "",
+            "ko",
+          );
+        }
+
+        if (reviewSort === "model") {
+          return getReviewVehicleModel(left).localeCompare(
+            getReviewVehicleModel(right),
+            "ko",
+          );
+        }
+
+        if (reviewSort === "author") {
+          const leftAuthor = left.author_nickname ?? left.author_id ?? "";
+          const rightAuthor = right.author_nickname ?? right.author_id ?? "";
+
+          return leftAuthor.localeCompare(rightAuthor, "ko");
+        }
+
+        return Date.parse(right.created_at) - Date.parse(left.created_at);
+      });
+    },
+    [
+      reviewAuthorFilter,
+      reviewDateFilter,
+      reviewDealerFilter,
+      reviewFuelFilter,
+      reviewModelFilter,
+      reviewPlateFilter,
+      reviewReportFilter,
+      reviewSearch,
+      reviewSort,
+      reviewVisibilityFilter,
+      reviews,
+      userProfileMap,
+    ],
   );
   const totalReviewPages = Math.max(
     1,
@@ -2604,14 +2929,26 @@ export default function AdminPage() {
 
         {activeTab === "ai" ? (
           <AdminTablePanel
-            count={operatorDashboardData.aiCandidates.length}
-            title="AI 관리"
+            count={
+              activeAiManagementTab === "keywords"
+                ? aiKeywordRules.length
+                : activeAiManagementTab === "maintenance"
+                  ? aiMaintenanceRules.length
+                  : operatorDashboardData.aiCandidates.length
+            }
+            title="AI DB 로드맵 / 키워드 관리"
           >
-            <DashboardAiCandidateTable
+            <AiManagementPanel
+              activeTab={activeAiManagementTab}
               candidates={operatorDashboardData.aiCandidates}
-              onChangeStatus={(candidate, nextStatus) =>
+              keywordRules={aiKeywordRules}
+              maintenanceRules={aiMaintenanceRules}
+              onChangeCandidateStatus={(candidate, nextStatus) =>
                 void updateAiCandidateStatus(candidate, nextStatus)
               }
+              onChangeKeywordRules={setAiKeywordRules}
+              onChangeMaintenanceRules={setAiMaintenanceRules}
+              onChangeTab={setActiveAiManagementTab}
               reviews={reviews}
             />
           </AdminTablePanel>
@@ -2883,7 +3220,123 @@ export default function AdminPage() {
         ) : null}
 
         {activeTab === "reviews" ? (
-          <AdminTablePanel count={reviews.length} title="후기 관리">
+          <AdminTablePanel count={sortedReviews.length} title="후기 관리">
+            <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <input
+                  className={adminInputClassName}
+                  placeholder="차량번호 검색"
+                  value={reviewPlateFilter}
+                  onChange={(event) => setReviewPlateFilter(event.target.value)}
+                />
+                <input
+                  className={adminInputClassName}
+                  placeholder="차종명 검색"
+                  value={reviewModelFilter}
+                  onChange={(event) => setReviewModelFilter(event.target.value)}
+                />
+                <input
+                  className={adminInputClassName}
+                  placeholder="작성자/회원 ID"
+                  value={reviewAuthorFilter}
+                  onChange={(event) => setReviewAuthorFilter(event.target.value)}
+                />
+                <input
+                  className={adminInputClassName}
+                  placeholder="유종"
+                  value={reviewFuelFilter}
+                  onChange={(event) => setReviewFuelFilter(event.target.value)}
+                />
+                <select
+                  className={adminInputClassName}
+                  value={reviewDateFilter}
+                  onChange={(event) =>
+                    setReviewDateFilter(event.target.value as ReviewDateFilter)
+                  }
+                >
+                  {reviewDateFilters.map((filter) => (
+                    <option key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={adminInputClassName}
+                  value={reviewSort}
+                  onChange={(event) =>
+                    setReviewSort(event.target.value as ReviewSortOption)
+                  }
+                >
+                  {reviewSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={adminInputClassName}
+                  value={reviewVisibilityFilter}
+                  onChange={(event) =>
+                    setReviewVisibilityFilter(
+                      event.target.value as ReviewVisibilityFilter,
+                    )
+                  }
+                >
+                  {reviewVisibilityFilters.map((filter) => (
+                    <option key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={adminInputClassName}
+                  value={reviewReportFilter}
+                  onChange={(event) =>
+                    setReviewReportFilter(event.target.value as ReviewReportFilter)
+                  }
+                >
+                  {reviewReportFilters.map((filter) => (
+                    <option key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={adminInputClassName}
+                  value={reviewDealerFilter}
+                  onChange={(event) =>
+                    setReviewDealerFilter(event.target.value as ReviewDealerFilter)
+                  }
+                >
+                  {reviewDealerFilters.map((filter) => (
+                    <option key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => {
+                    setReviewAuthorFilter("");
+                    setReviewDateFilter("all");
+                    setReviewDealerFilter("all");
+                    setReviewFuelFilter("");
+                    setReviewModelFilter("");
+                    setReviewPlateFilter("");
+                    setReviewReportFilter("all");
+                    setReviewSearch("");
+                    setReviewSort("latest");
+                    setReviewVisibilityFilter("all");
+                  }}
+                >
+                  필터 초기화
+                </button>
+              </div>
+              <p className="mt-2 text-xs font-bold text-zinc-500">
+                차량번호, 차종, 후기 내용, 작성자 검색은 상단 통합 검색과 함께 적용됩니다.
+              </p>
+            </div>
             <BulkActionBar
               selectedCount={selectedReviews.length}
               hasVisibleSelection={selectedReviews.some(
@@ -5188,6 +5641,349 @@ function DashboardKeywordTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AiManagementPanel({
+  activeTab,
+  candidates,
+  keywordRules,
+  maintenanceRules,
+  onChangeCandidateStatus,
+  onChangeKeywordRules,
+  onChangeMaintenanceRules,
+  onChangeTab,
+  reviews,
+}: {
+  activeTab: AiManagementTab;
+  candidates: AdminDashboardAiCandidate[];
+  keywordRules: AdminAiKeywordRule[];
+  maintenanceRules: AdminAiMaintenanceRule[];
+  onChangeCandidateStatus: (
+    candidate: AdminDashboardAiCandidate,
+    nextStatus: AiCandidateStatus,
+  ) => void;
+  onChangeKeywordRules: (rules: AdminAiKeywordRule[]) => void;
+  onChangeMaintenanceRules: (rules: AdminAiMaintenanceRule[]) => void;
+  onChangeTab: (tab: AiManagementTab) => void;
+  reviews: AdminReview[];
+}) {
+  return (
+    <div className="divide-y divide-zinc-200 bg-white">
+      <div className="bg-zinc-50 px-4 py-3">
+        <h3 className="text-sm font-black text-zinc-950">
+          AI DB 로드맵 / 키워드 관리
+        </h3>
+        <p className="mt-1 text-xs font-medium text-zinc-500">
+          대표 키워드, 포함/제외 키워드, 유종 조건, 기본 정비항목 룰을 한 곳에서 관리합니다.
+        </p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto bg-zinc-50 px-4 py-3">
+        {aiManagementTabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            className={cn(
+              "shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
+              activeTab === tab.value &&
+                "border-zinc-950 bg-zinc-950 text-white hover:border-zinc-950 hover:bg-zinc-950 hover:text-white",
+            )}
+            onClick={() => onChangeTab(tab.value)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {activeTab === "keywords" ? (
+        <AiKeywordRuleManager
+          rules={keywordRules}
+          onChangeRules={onChangeKeywordRules}
+        />
+      ) : null}
+      {activeTab === "maintenance" ? (
+        <AiMaintenanceRuleManager
+          rules={maintenanceRules}
+          onChangeRules={onChangeMaintenanceRules}
+        />
+      ) : null}
+      {activeTab === "candidates" ? (
+        <DashboardAiCandidateTable
+          candidates={candidates}
+          onChangeStatus={onChangeCandidateStatus}
+          reviews={reviews}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AiKeywordRuleManager({
+  onChangeRules,
+  rules,
+}: {
+  onChangeRules: (rules: AdminAiKeywordRule[]) => void;
+  rules: AdminAiKeywordRule[];
+}) {
+  const [search, setSearch] = useState("");
+  const visibleRules = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (!normalizedSearch) return rules;
+
+    return rules.filter((rule) =>
+      [
+        rule.label,
+        rule.category,
+        rule.fuelType,
+        rule.targetModel,
+        rule.memo,
+        rule.includeKeywords.join(" "),
+        rule.excludeKeywords.join(" "),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch),
+    );
+  }, [rules, search]);
+  const upsertRule = (rule?: AdminAiKeywordRule) => {
+    const label = window.prompt("대표 키워드", rule?.label ?? "");
+    if (label === null || !label.trim()) return;
+    const includeKeywords = window.prompt(
+      "포함 키워드(쉼표 구분)",
+      rule?.includeKeywords.join(", ") ?? label,
+    );
+    if (includeKeywords === null) return;
+    const excludeKeywords = window.prompt(
+      "제외 키워드(쉼표 구분)",
+      rule?.excludeKeywords.join(", ") ?? "",
+    );
+    if (excludeKeywords === null) return;
+    const category = window.prompt("카테고리", rule?.category ?? "");
+    if (category === null) return;
+    const fuelType = window.prompt("적용 유종", rule?.fuelType ?? "");
+    if (fuelType === null) return;
+    const targetModel = window.prompt("적용 차종/세대", rule?.targetModel ?? "");
+    if (targetModel === null) return;
+    const memo = window.prompt("메모", rule?.memo ?? "");
+    if (memo === null) return;
+
+    const nextRule: AdminAiKeywordRule = {
+      id: rule?.id ?? "custom-keyword-" + Date.now(),
+      label: label.trim(),
+      includeKeywords: includeKeywords
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      excludeKeywords: excludeKeywords
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      category: category.trim(),
+      fuelType: fuelType.trim(),
+      targetModel: targetModel.trim(),
+      isDefaultMaintenance:
+        rule?.isDefaultMaintenance ??
+        window.confirm("기본 정비항목 룰로 표시하시겠습니까?"),
+      isVisible: rule?.isVisible ?? true,
+      memo: memo.trim(),
+    };
+
+    onChangeRules(
+      rule
+        ? rules.map((item) => (item.id === rule.id ? nextRule : item))
+        : [nextRule, ...rules],
+    );
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          className={cn(adminInputClassName, "sm:w-80")}
+          placeholder="대표 키워드, 포함 키워드, 카테고리 검색"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <button
+          type="button"
+          className={actionButtonClassName}
+          onClick={() => upsertRule()}
+        >
+          키워드 추가
+        </button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {visibleRules.map((rule) => (
+          <article key={rule.id} className="rounded-lg border border-zinc-200 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-blue-700">#{rule.label}</p>
+                <h4 className="mt-1 text-base font-black text-zinc-950">
+                  {rule.category || "카테고리 없음"}
+                </h4>
+              </div>
+              <HiddenStatus isHidden={!rule.isVisible} />
+            </div>
+            <dl className="mt-3 grid gap-2 text-xs text-zinc-600">
+              <DetailLine label="포함" value={rule.includeKeywords.join(", ") || "없음"} />
+              <DetailLine label="제외" value={rule.excludeKeywords.join(", ") || "없음"} />
+              <DetailLine label="적용 유종" value={rule.fuelType || "전체"} />
+              <DetailLine label="차종/세대" value={rule.targetModel || "전체"} />
+              <DetailLine label="메모" value={rule.memo || "없음"} />
+            </dl>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={actionButtonClassName}
+                onClick={() => upsertRule(rule)}
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                className={actionButtonClassName}
+                onClick={() =>
+                  onChangeRules(
+                    rules.map((item) =>
+                      item.id === rule.id
+                        ? { ...item, isVisible: !item.isVisible }
+                        : item,
+                    ),
+                  )
+                }
+              >
+                {rule.isVisible ? "숨김" : "노출"}
+              </button>
+              <button
+                type="button"
+                className={dangerButtonClassName}
+                onClick={() => {
+                  if (window.confirm("키워드 룰을 삭제하시겠습니까?")) {
+                    onChangeRules(rules.filter((item) => item.id !== rule.id));
+                  }
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AiMaintenanceRuleManager({
+  onChangeRules,
+  rules,
+}: {
+  onChangeRules: (rules: AdminAiMaintenanceRule[]) => void;
+  rules: AdminAiMaintenanceRule[];
+}) {
+  const upsertRule = (rule?: AdminAiMaintenanceRule) => {
+    const title = window.prompt("룰 이름", rule?.title ?? "");
+    if (title === null || !title.trim()) return;
+    const condition = window.prompt("조건", rule?.condition ?? "");
+    if (condition === null) return;
+    const fuelType = window.prompt("적용 유종", rule?.fuelType ?? "");
+    if (fuelType === null) return;
+    const items = window.prompt("정비 항목(쉼표 구분)", rule?.items.join(", ") ?? "");
+    if (items === null) return;
+    const memo = window.prompt("메모", rule?.memo ?? "");
+    if (memo === null) return;
+
+    const nextRule: AdminAiMaintenanceRule = {
+      id: rule?.id ?? "custom-maintenance-" + Date.now(),
+      title: title.trim(),
+      condition: condition.trim(),
+      fuelType: fuelType.trim(),
+      items: items.split(",").map((item) => item.trim()).filter(Boolean),
+      isVisible: rule?.isVisible ?? true,
+      memo: memo.trim(),
+    };
+
+    onChangeRules(
+      rule
+        ? rules.map((item) => (item.id === rule.id ? nextRule : item))
+        : [nextRule, ...rules],
+    );
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold text-zinc-500">
+          기본 참고 정비항목 노출 조건을 관리합니다. 요소수/SCR은 DB 확인 차량만 노출합니다.
+        </p>
+        <button
+          type="button"
+          className={actionButtonClassName}
+          onClick={() => upsertRule()}
+        >
+          룰 추가
+        </button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        {rules.map((rule) => (
+          <article key={rule.id} className="rounded-lg border border-zinc-200 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <h4 className="text-base font-black text-zinc-950">{rule.title}</h4>
+              <HiddenStatus isHidden={!rule.isVisible} />
+            </div>
+            <dl className="mt-3 grid gap-2 text-xs text-zinc-600">
+              <DetailLine label="조건" value={rule.condition || "없음"} />
+              <DetailLine label="유종" value={rule.fuelType || "전체"} />
+              <DetailLine label="항목" value={rule.items.map((item) => "#" + item).join(" ") || "없음"} />
+              <DetailLine label="메모" value={rule.memo || "없음"} />
+            </dl>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={actionButtonClassName}
+                onClick={() => upsertRule(rule)}
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                className={actionButtonClassName}
+                onClick={() =>
+                  onChangeRules(
+                    rules.map((item) =>
+                      item.id === rule.id
+                        ? { ...item, isVisible: !item.isVisible }
+                        : item,
+                    ),
+                  )
+                }
+              >
+                {rule.isVisible ? "숨김" : "노출"}
+              </button>
+              <button
+                type="button"
+                className={dangerButtonClassName}
+                onClick={() => {
+                  if (window.confirm("정비항목 룰을 삭제하시겠습니까?")) {
+                    onChangeRules(rules.filter((item) => item.id !== rule.id));
+                  }
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-black text-zinc-500">{label}</dt>
+      <dd className="mt-0.5 break-words font-bold text-zinc-700">{value}</dd>
     </div>
   );
 }
