@@ -31,7 +31,7 @@ const overviewClassName = cn(
 );
 const keywordListClassName = cn("flex flex-wrap gap-2");
 const keywordTagClassName = cn(
-  "rounded-full border border-white/[0.08] bg-white/[0.05] px-3 py-1.5 text-sm font-black text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+  "rounded-full border border-[rgba(150,220,255,0.25)] bg-[rgba(150,220,255,0.10)] px-3 py-1.5 text-sm font-black text-[#b9e8ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
 );
 const focusReviewCardClassName = cn(
   "my-3 rounded-2xl border border-blue-400/25 bg-[rgba(45,105,255,0.10)] p-4 text-left shadow-[0_0_18px_rgba(80,140,255,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]",
@@ -85,15 +85,22 @@ const getAnalysisLabel = (analysis: StructuredAiSummary) => {
     .join(" ");
 };
 
-const hasRepeatedIssueKeyword = (keywords: ReviewKeywordStat[]) =>
-  keywords.some((keyword) => keyword.count >= 2);
-
 const getFocusedReviewMessage = (keywordLabels: string[]) => {
   if (keywordLabels.length === 0) {
     return "현재 등록된 후기에서는 특별한 문제점이 확인되지 않았습니다. 😊";
   }
 
   return "이 차량에서는 " + keywordLabels.join(", ") + " 관련 언급이 확인되었습니다.";
+};
+
+const getOverviewMessage = (keywords: ReviewKeywordStat[]) => {
+  if (keywords.length === 0) {
+    return "현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉";
+  }
+
+  const keywordLabels = keywords.map((keyword) => "#" + keyword.label).join(" ");
+
+  return "해당 차종은 " + keywordLabels + " 키워드가 주로 언급되고 있네요 🔎";
 };
 
 export function AiSummaryCard({
@@ -128,12 +135,7 @@ export function AiSummaryCard({
   const plateNumber = normalizeVehiclePlateNumber(
     analysis.vehicle.vehicleNumber ?? "",
   );
-  const shouldShowKeywordFallback =
-    analysis.reviewKeywords.length === 0 ||
-    !hasRepeatedIssueKeyword(analysis.reviewKeywords);
-  const overviewMessage = shouldShowKeywordFallback
-    ? "현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉"
-    : "등록된 후기를 분석하여 자주 언급된 내용을 보여드립니다.";
+  const overviewMessage = getOverviewMessage(analysis.reviewKeywords);
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -200,7 +202,9 @@ export function AiSummaryCard({
       </section>
 
       <section className="border-t border-zinc-800/80 pt-3">
-        <h3 className={sectionTitleClassName}>자주 발생하는 정비 항목</h3>
+        <h3 className={sectionTitleClassName}>
+          차종 관련 참고하면 좋은 정비 항목
+        </h3>
         {maintenancePillLabels.length > 0 ? (
           <div className={maintenancePillListClassName}>
             {maintenancePillLabels.map((label) => (

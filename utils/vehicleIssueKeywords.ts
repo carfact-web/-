@@ -175,6 +175,12 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     inspectionTitle: "흡연 흔적 확인",
   },
   {
+    label: "담배",
+    aliases: ["담배"],
+    relatedParts: ["실내", "시트", "천장 내장재"],
+    inspectionTitle: "담배 흔적 확인",
+  },
+  {
     label: "담배냄새",
     aliases: ["담배냄새", "담배 냄새"],
     relatedParts: ["실내", "시트", "천장 내장재"],
@@ -191,6 +197,42 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     aliases: ["악취"],
     relatedParts: ["실내", "공조 장치"],
     inspectionTitle: "실내 악취 확인",
+  },
+  {
+    label: "곰팡이냄새",
+    aliases: ["곰팡이냄새", "곰팡이 냄새"],
+    relatedParts: ["실내", "공조 장치", "카펫"],
+    inspectionTitle: "곰팡이냄새 확인",
+  },
+  {
+    label: "퀴퀴한냄새",
+    aliases: ["퀴퀴한냄새", "퀴퀴한 냄새"],
+    relatedParts: ["실내", "공조 장치", "시트"],
+    inspectionTitle: "퀴퀴한냄새 확인",
+  },
+  {
+    label: "역한냄새",
+    aliases: ["역한냄새", "역한 냄새"],
+    relatedParts: ["실내", "공조 장치"],
+    inspectionTitle: "역한냄새 확인",
+  },
+  {
+    label: "찌든냄새",
+    aliases: ["찌든냄새", "찌든 냄새"],
+    relatedParts: ["실내", "시트", "천장 내장재"],
+    inspectionTitle: "찌든냄새 확인",
+  },
+  {
+    label: "방향제냄새",
+    aliases: ["방향제냄새", "방향제 냄새"],
+    relatedParts: ["실내", "공조 장치"],
+    inspectionTitle: "방향제냄새 확인",
+  },
+  {
+    label: "탈취",
+    aliases: ["탈취"],
+    relatedParts: ["실내", "공조 장치", "시트"],
+    inspectionTitle: "탈취 흔적 확인",
   },
 ];
 
