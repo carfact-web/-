@@ -2,9 +2,12 @@
 
 import { cn } from "@/utils/cn";
 import type { StructuredAiSummary } from "@/utils/aiSummary";
+import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
 
 interface AiSummaryCardProps {
   analysis?: StructuredAiSummary;
+  focusedReviewCount?: number;
+  focusedReviewKeywords?: ReviewKeywordStat[];
   summaries: string[];
   title?: string;
   emptyMessage?: string;
@@ -45,6 +48,12 @@ const maintenancePillClassName = cn(
 );
 const maxMaintenancePillCount = 12;
 
+const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
+  const subject = analysis.vehicle.generation || analysis.vehicle.modelName;
+
+  return subject.replace(/\s+\(/g, "(").trim();
+};
+
 const getKeywordIcon = (label: string) => {
   if (/냉각|워터|서모|써모/.test(label)) {
     return "🔥";
@@ -61,8 +70,8 @@ const getKeywordIcon = (label: string) => {
   return "🔧";
 };
 
-const getFocusedReviewKeywords = (analysis: StructuredAiSummary) =>
-  analysis.reviewKeywords.slice(0, 3).map((keyword) => keyword.label);
+const getFocusedReviewKeywordLabels = (keywords: ReviewKeywordStat[]) =>
+  keywords.slice(0, 3).map((keyword) => keyword.label);
 
 const normalizeMaintenancePillLabel = (label: string) =>
   label.replace(/\s*점검$/, "").trim();
@@ -82,6 +91,8 @@ const getMaintenancePillLabels = (analysis: StructuredAiSummary) => {
 
 export function AiSummaryCard({
   analysis,
+  focusedReviewCount = 0,
+  focusedReviewKeywords = [],
   summaries,
   title = "카팩트 AI 분석",
   emptyMessage = "차량 정보를 입력하면 AI 요약이 표시됩니다.",
@@ -105,8 +116,10 @@ export function AiSummaryCard({
     );
   }
 
-  const focusedReviewKeywords = getFocusedReviewKeywords(analysis);
+  const focusedReviewKeywordLabels =
+    getFocusedReviewKeywordLabels(focusedReviewKeywords);
   const maintenancePillLabels = getMaintenancePillLabels(analysis);
+  const analysisSubject = formatAnalysisSubject(analysis);
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -115,7 +128,11 @@ export function AiSummaryCard({
           <h2 id="ai-summary-title" className={titleClassName}>
             {title}
           </h2>
-          <p className={metaClassName}>{analysis.reviewAnalysisLabel}</p>
+          <p className={metaClassName}>
+            {[analysisSubject, analysis.reviewAnalysisLabel]
+              .filter(Boolean)
+              .join(" ")}
+          </p>
         </div>
       </div>
 
@@ -147,10 +164,10 @@ export function AiSummaryCard({
 
       <section className={focusReviewCardClassName}>
         <h3 className={focusReviewTitleClassName}>🔍 조회 차량 후기 기준</h3>
-        {focusedReviewKeywords.length > 0 ? (
+        {focusedReviewKeywordLabels.length > 0 ? (
           <>
             <div className={focusKeywordListClassName}>
-              {focusedReviewKeywords.map((keyword) => (
+              {focusedReviewKeywordLabels.map((keyword) => (
                 <span key={keyword} className={focusKeywordClassName}>
                   {keyword}
                 </span>
@@ -163,9 +180,13 @@ export function AiSummaryCard({
               자세한 내용은 아래 실제 후기를 참고하세요.
             </p>
           </>
+        ) : focusedReviewCount > 0 ? (
+          <p className="text-sm font-semibold leading-6 text-red-100/75">
+            현재 차량번호 후기는 등록되어 있으나 주요 키워드는 아직 확인되지 않았습니다.
+          </p>
         ) : (
           <p className="text-sm font-semibold leading-6 text-red-100/75">
-            아직 반복적으로 확인된 후기 항목은 없습니다. 아래 실제 후기를 함께 확인해 주세요.
+            현재 차량번호에 등록된 후기는 아직 없습니다.
           </p>
         )}
       </section>

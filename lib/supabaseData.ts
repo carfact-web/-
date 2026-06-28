@@ -14,6 +14,7 @@ import {
 } from "@/lib/reviewImages";
 import { fetchVerifiedDealerMap } from "@/lib/verifiedDealers";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import { hasSameVehicleModelKey } from "@/utils/vehicleModelKey";
 import type { Json } from "@/types/supabase";
 import type {
   Review,
@@ -255,6 +256,48 @@ export const fetchSupabaseReviews = async (plateNumber: string) => {
     .from("reviews")
     .select("*")
     .eq("vehicle_id", vehicle.id)
+    .eq("is_hidden", false)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const verifiedDealers = await fetchVerifiedDealerMap(
+    data.map((review) => review.author_id),
+  );
+
+  return data.map((review) => mapReviewRow(review, verifiedDealers));
+};
+
+export const fetchSupabaseReviewsByVehicleModel = async (vehicle: Vehicle) => {
+  if (!supabase || !vehicle.brand || !vehicle.model) {
+    return null;
+  }
+
+  const { data: candidateVehicles, error: vehicleError } = await supabase
+    .from("vehicles")
+    .select("*")
+    .eq("manufacturer", vehicle.brand);
+
+  if (vehicleError) {
+    throw vehicleError;
+  }
+
+  const matchedVehicleIds = (candidateVehicles ?? [])
+    .filter((candidateVehicle) =>
+      hasSameVehicleModelKey(mapVehicleRow(candidateVehicle), vehicle),
+    )
+    .map((candidateVehicle) => candidateVehicle.id);
+
+  if (matchedVehicleIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("*")
+    .in("vehicle_id", matchedVehicleIds)
     .eq("is_hidden", false)
     .order("created_at", { ascending: false });
 

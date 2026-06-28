@@ -43,8 +43,9 @@ export const getReviewKeywordStatsSummary = (
 export const getReviewKeywordStats = (
   reviews: Review[],
   limit = 5,
+  minimumReviewCount = minimumReviewsForKeywordStats,
 ): ReviewKeywordStat[] => {
-  if (reviews.length < minimumReviewsForKeywordStats) {
+  if (reviews.length < minimumReviewCount) {
     return [];
   }
 

@@ -13,12 +13,14 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { recordPageView } from "@/lib/pageViews";
+import { fetchSupabaseReviewsByVehicleModel } from "@/lib/supabaseData";
 import { fetchVehicleInspectionProfile } from "@/lib/vehicleInspectionProfiles";
 import type { VehicleInspectionProfile } from "@/data/vehicleInspectionData";
 import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { getReviewKeywordStats } from "@/utils/reviewKeywordStats";
+import { getVehicleModelKey } from "@/utils/vehicleModelKey";
 import {
   getHelpfulCountsSnapshot,
   getServerHelpfulCountsSnapshot,
@@ -87,6 +89,10 @@ export default function CarReportPage() {
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
+  const [modelReviewsSnapshot, setModelReviewsSnapshot] = useState<{
+    modelKey: string;
+    reviews: Review[];
+  } | null>(null);
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string),
   );
@@ -110,6 +116,10 @@ export default function CarReportPage() {
   const mileage = vehicle?.mileage ?? "";
   const fuelType = vehicle?.fuelType ?? "";
   const hasVehicleInfo = Boolean(brand && model && generation && year);
+  const currentVehicleModelKey = useMemo(
+    () => (vehicle ? getVehicleModelKey(vehicle) : ""),
+    [vehicle],
+  );
 
   const helpfulCountsSnapshot = useSyncExternalStore(
     subscribeToHelpfulChanges,
@@ -152,8 +162,19 @@ export default function CarReportPage() {
       }),
     [carNumber, helpfulCounts, reviewSort, reviews],
   );
-  const reviewKeywordStats = useMemo(
-    () => getReviewKeywordStats(reviews),
+  const modelReviews = useMemo(
+    () =>
+      modelReviewsSnapshot?.modelKey === currentVehicleModelKey
+        ? modelReviewsSnapshot.reviews
+        : [],
+    [currentVehicleModelKey, modelReviewsSnapshot],
+  );
+  const modelReviewKeywordStats = useMemo(
+    () => getReviewKeywordStats(modelReviews, 5, 1),
+    [modelReviews],
+  );
+  const focusedReviewKeywordStats = useMemo(
+    () => getReviewKeywordStats(reviews, 5, 1),
     [reviews],
   );
   const aiAnalysis = useMemo(
@@ -162,8 +183,8 @@ export default function CarReportPage() {
         fuelType,
         generation,
         inspectionProfile,
-        reviewCount: reviews.length,
-        reviewKeywordStats,
+        reviewCount: modelReviews.length,
+        reviewKeywordStats: modelReviewKeywordStats,
         vehicleNumber: carNumber,
       }),
     [
@@ -174,8 +195,8 @@ export default function CarReportPage() {
       inspectionProfile,
       mileage,
       model,
-      reviews.length,
-      reviewKeywordStats,
+      modelReviews.length,
+      modelReviewKeywordStats,
       year,
     ],
   );
@@ -282,6 +303,43 @@ export default function CarReportPage() {
       isActive = false;
     };
   }, [brand, generation, model]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!vehicle || !currentVehicleModelKey) {
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setModelReviewsSnapshot(null);
+        }
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchSupabaseReviewsByVehicleModel(vehicle)
+      .then((modelReviewsResult) => {
+        if (isActive) {
+          setModelReviewsSnapshot({
+            modelKey: currentVehicleModelKey,
+            reviews: modelReviewsResult ?? [],
+          });
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setModelReviewsSnapshot({
+            modelKey: currentVehicleModelKey,
+            reviews: [],
+          });
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentVehicleModelKey, vehicle]);
 
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
@@ -390,7 +448,12 @@ export default function CarReportPage() {
                 </Link>
               </section>
 
-              <AiSummaryCard analysis={aiAnalysis} summaries={[]} />
+              <AiSummaryCard
+                analysis={aiAnalysis}
+                focusedReviewCount={reviews.length}
+                focusedReviewKeywords={focusedReviewKeywordStats}
+                summaries={[]}
+              />
 
               <div className={reviewHeaderClassName}>
                 <h2 className="text-3xl font-bold">등록된 팩트/후기</h2>
