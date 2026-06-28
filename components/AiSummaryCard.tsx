@@ -3,6 +3,7 @@
 import { cn } from "@/utils/cn";
 import type { StructuredAiSummary } from "@/utils/aiSummary";
 import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
+import { formatVehiclePlateNumberForDisplay } from "@/utils/vehiclePlateValidation";
 
 interface AiSummaryCardProps {
   analysis?: StructuredAiSummary;
@@ -28,19 +29,12 @@ const sectionTitleClassName = cn(
 const overviewClassName = cn(
   "text-sm font-semibold leading-6 text-zinc-300 sm:text-[15px]",
 );
-const keywordListClassName = cn("grid grid-cols-2 gap-2 sm:grid-cols-3");
+const keywordListClassName = cn("flex flex-wrap gap-2");
 const keywordTagClassName = cn(
-  "flex items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-sm font-black text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+  "rounded-full border border-white/[0.08] bg-white/[0.05] px-3 py-1.5 text-sm font-black text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
 );
 const focusReviewCardClassName = cn(
-  "my-3 rounded-2xl border border-red-400/25 bg-[linear-gradient(135deg,rgba(127,29,29,0.54),rgba(24,24,27,0.94))] p-4 shadow-[0_18px_42px_rgba(127,29,29,0.26),inset_0_1px_0_rgba(255,255,255,0.08)]",
-);
-const focusReviewTitleClassName = cn(
-  "mb-3 text-[15px] font-black tracking-normal text-white",
-);
-const focusKeywordListClassName = cn("mb-3 flex flex-wrap gap-2");
-const focusKeywordClassName = cn(
-  "rounded-full border border-red-200/25 bg-black/28 px-3 py-1.5 text-xs font-black text-red-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:text-sm",
+  "my-3 rounded-2xl border border-red-400/25 bg-[linear-gradient(135deg,rgba(127,29,29,0.44),rgba(24,24,27,0.94))] p-4 text-center shadow-[0_18px_42px_rgba(127,29,29,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]",
 );
 const maintenancePillListClassName = cn("flex flex-wrap gap-2");
 const maintenancePillClassName = cn(
@@ -52,22 +46,6 @@ const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
   const subject = analysis.vehicle.generation || analysis.vehicle.modelName;
 
   return subject.replace(/\s+\(/g, "(").trim();
-};
-
-const getKeywordIcon = (label: string) => {
-  if (/냉각|워터|서모|써모/.test(label)) {
-    return "🔥";
-  }
-
-  if (/누유|누수|오일/.test(label)) {
-    return "⚠️";
-  }
-
-  if (/하체|타이어|쇼바|로어암|부싱|브레이크/.test(label)) {
-    return "🛞";
-  }
-
-  return "🔧";
 };
 
 const getFocusedReviewKeywordLabels = (keywords: ReviewKeywordStat[]) =>
@@ -89,9 +67,32 @@ const getMaintenancePillLabels = (analysis: StructuredAiSummary) => {
   return uniqueLabels.slice(0, maxMaintenancePillCount);
 };
 
+const getAnalysisLabel = (analysis: StructuredAiSummary) => {
+  const analysisSubject = formatAnalysisSubject(analysis);
+  const reviewCount = analysis.reviewAnalysisLabel.match(/(\d[\d,]*)건/)?.[1];
+
+  return [
+    analysisSubject,
+    reviewCount ? "후기 " + reviewCount + "건 분석 결과" : "후기 분석 결과",
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
+
+const getFocusedReviewMessage = (keywordLabels: string[]) => {
+  if (keywordLabels.length === 0) {
+    return "현재 등록된 후기에서는 특별한 문제점이 확인되지 않았습니다. 😊";
+  }
+
+  return (
+    "이 차량에서는\n" +
+    keywordLabels.join(",\n") +
+    "\n관련 언급이 확인되었습니다."
+  );
+};
+
 export function AiSummaryCard({
   analysis,
-  focusedReviewCount = 0,
   focusedReviewKeywords = [],
   summaries,
   title = "카팩트 AI 분석",
@@ -119,7 +120,9 @@ export function AiSummaryCard({
   const focusedReviewKeywordLabels =
     getFocusedReviewKeywordLabels(focusedReviewKeywords);
   const maintenancePillLabels = getMaintenancePillLabels(analysis);
-  const analysisSubject = formatAnalysisSubject(analysis);
+  const plateNumber = formatVehiclePlateNumberForDisplay(
+    analysis.vehicle.vehicleNumber ?? "",
+  );
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -128,17 +131,13 @@ export function AiSummaryCard({
           <h2 id="ai-summary-title" className={titleClassName}>
             {title}
           </h2>
-          <p className={metaClassName}>
-            {[analysisSubject, analysis.reviewAnalysisLabel]
-              .filter(Boolean)
-              .join(" ")}
-          </p>
+          <p className={metaClassName}>{getAnalysisLabel(analysis)}</p>
         </div>
       </div>
 
       <section className={sectionClassName}>
         <div className={overviewClassName}>
-          <p>{analysis.overviewSentences[0]}</p>
+          <p>등록된 후기를 분석하여 자주 언급된 내용을 보여드립니다.</p>
         </div>
       </section>
 
@@ -148,47 +147,29 @@ export function AiSummaryCard({
           <ul className={keywordListClassName}>
             {analysis.reviewKeywords.map((keyword) => (
               <li key={keyword.label} className={keywordTagClassName}>
-                <span>
-                  {getKeywordIcon(keyword.label)} {keyword.label}
-                </span>
-                <span className="text-xs text-zinc-400">({keyword.count})</span>
+                {"#" + keyword.label}
               </li>
             ))}
           </ul>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
-            후기가 쌓이면 많이 언급된 항목부터 표시됩니다.
+            현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉
           </p>
         )}
       </section>
 
       <section className={focusReviewCardClassName}>
-        <h3 className={focusReviewTitleClassName}>🔍 조회 차량 후기 기준</h3>
-        {focusedReviewKeywordLabels.length > 0 ? (
-          <>
-            <div className={focusKeywordListClassName}>
-              {focusedReviewKeywordLabels.map((keyword) => (
-                <span key={keyword} className={focusKeywordClassName}>
-                  {keyword}
-                </span>
-              ))}
-            </div>
-            <p className="text-sm font-semibold leading-6 text-red-50/90">
-              이 차량에서는 위 항목과 관련된 후기가 등록되어 있습니다.
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-6 text-red-100/70">
-              자세한 내용은 아래 실제 후기를 참고하세요.
-            </p>
-          </>
-        ) : focusedReviewCount > 0 ? (
-          <p className="text-sm font-semibold leading-6 text-red-100/75">
-            현재 차량번호 후기는 등록되어 있으나 주요 키워드는 아직 확인되지 않았습니다.
-          </p>
-        ) : (
-          <p className="text-sm font-semibold leading-6 text-red-100/75">
-            현재 차량번호에 등록된 후기는 아직 없습니다.
-          </p>
-        )}
+        <div className="plate-input-frame mx-auto max-w-[320px] bg-white sm:max-w-[360px]">
+          <div className="plate-number-input flex items-center justify-center">
+            {plateNumber || "차량번호"}
+          </div>
+        </div>
+        <p className="mx-auto mt-4 max-w-[260px] whitespace-pre-line text-sm font-semibold leading-6 text-red-50/90">
+          {getFocusedReviewMessage(focusedReviewKeywordLabels)}
+        </p>
+        <p className="mt-2 text-xs font-semibold leading-5 text-red-100/70 sm:text-sm">
+          자세한 내용은 아래 실제 후기를 확인해보세요.👇
+        </p>
       </section>
 
       <section className="border-t border-zinc-800/80 pt-3">
@@ -197,13 +178,13 @@ export function AiSummaryCard({
           <div className={maintenancePillListClassName}>
             {maintenancePillLabels.map((label) => (
               <span key={label} className={maintenancePillClassName}>
-                {label}
+                {"#" + label}
               </span>
             ))}
           </div>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
-            자주 확인되는 정비 항목이 생기면 해시태그 형태로 표시됩니다.
+            현재 표시할 정비 항목이 없습니다.
           </p>
         )}
       </section>
