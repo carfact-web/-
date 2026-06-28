@@ -147,45 +147,32 @@ const joinKoreanList = (items: string[]) => {
 
 const getReviewAnalysisLabel = (reviewCount = 0) => {
   if (reviewCount <= 0) {
-    return "등록된 후기 데이터가 부족하여 차량 DB와 정비 이슈 DB를 기반으로 생성되었습니다.";
+    return "등록 후기 기반 분석 준비 중";
   }
 
-  if (reviewCount < 10) {
-    return "최근 등록된 후기 " + reviewCount.toLocaleString("ko-KR") + "건을 기반으로 생성되었습니다.";
-  }
-
-  return "최근 후기 " + reviewCount.toLocaleString("ko-KR") + "건을 분석하여 요약했습니다.";
+  return "등록 후기 " + reviewCount.toLocaleString("ko-KR") + "건 기반 분석";
 };
 
 const getDataBasedOverview = (
-  vehicle: AiSummaryVehicleSource,
   reviewKeywords: ReviewKeywordStat[],
   maintenanceIssues: AiSummaryMaintenanceIssue[],
 ) => {
-  const vehicleTitle = getVehicleTitle(vehicle);
   const keywordLabels = reviewKeywords.slice(0, 3).map((keyword) => keyword.label);
   const issueTitles = maintenanceIssues.slice(0, 3).map((issue) => issue.title);
   const sentences: string[] = [];
 
   if (keywordLabels.length > 0) {
     sentences.push(
-      vehicleTitle +
-        "는 후기에서 " +
+      "후기에서 " +
         joinKoreanList(keywordLabels) +
         " 관련 언급이 반복적으로 확인됩니다.",
     );
   } else if (issueTitles.length > 0) {
     sentences.push(
-      vehicleTitle +
-        "는 차량 DB와 정비 이슈 DB에서 " +
-        joinKoreanList(issueTitles) +
-        " 항목이 확인됩니다.",
+      "구매 전 " + joinKoreanList(issueTitles) + " 상태를 먼저 확인해 보세요.",
     );
   } else {
-    sentences.push(
-      vehicleTitle +
-        "는 현재 등록된 데이터 기준으로 확인 가능한 정비 이슈가 제한적입니다.",
-    );
+    sentences.push("등록 후기가 쌓이면 주요 언급 항목을 먼저 보여드립니다.");
   }
 
   if (issueTitles.length > 0) {
@@ -198,7 +185,7 @@ const getDataBasedOverview = (
 
   if (keywordLabels.length > 0 && issueTitles.length > 0) {
     sentences.push(
-      "후기 키워드와 정비 이슈 DB를 함께 반영해 현재 조회 중인 세대 기준으로 정리했습니다.",
+      "실제 후기와 주요 정비 항목을 함께 보고 판단해 보세요.",
     );
   }
 
@@ -949,7 +936,6 @@ export function getStructuredAiSummary(
   );
   const maintenanceIssues = getMaintenanceIssues(brand, model, mileage, options);
   const overviewSentences = getDataBasedOverview(
-    vehicle,
     reviewKeywords,
     maintenanceIssues,
   );
