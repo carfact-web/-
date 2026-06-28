@@ -454,9 +454,124 @@ const getReviewMentionScore = (stat?: ReviewKeywordStat) => {
   return 2;
 };
 
+const hasDieselFuelType = (fuelType?: string) =>
+  /디젤|diesel/i.test(fuelType ?? "");
+
+const hasCommercialDieselSignal = (...values: Array<string | undefined>) =>
+  values.some((value) =>
+    /화물|상용|트럭|카고|포터|봉고|마이티|탑차|냉동탑|윙바디|리프트/i.test(
+      value ?? "",
+    ),
+  );
+
+const hasScrSignal = (
+  inspectionProfile: VehicleInspectionProfile | null | undefined,
+  reviewKeywordStats: ReviewKeywordStat[],
+  ...values: Array<string | undefined>
+) => {
+  const vehicleText = values.join(" ");
+  const profileText = [
+    inspectionProfile?.summary,
+    ...(inspectionProfile?.checkItems.flatMap((item) => [
+      item.title,
+      item.aiSummary,
+      item.relatedParts.join(" "),
+    ]) ?? []),
+  ].join(" ");
+  const keywordText = reviewKeywordStats
+    .map((keyword) => keyword.label)
+    .join(" ");
+
+  return /요소수|SCR|AdBlue|유로6|DPF\/SCR/i.test(
+    [vehicleText, profileText, keywordText].join(" "),
+  );
+};
+
+const shouldIncludeScrMaintenance = (
+  year: string,
+  brand: string,
+  model: string,
+  options: AiSummaryOptions,
+  inspectionProfile: VehicleInspectionProfile | null | undefined,
+  reviewKeywordStats: ReviewKeywordStat[],
+) => {
+  const yearNumber = Number(year);
+
+  return (
+    (Number.isFinite(yearNumber) && yearNumber >= 2015) ||
+    hasCommercialDieselSignal(
+      brand,
+      model,
+      options.generation,
+      options.grade,
+    ) ||
+    hasScrSignal(
+      inspectionProfile,
+      reviewKeywordStats,
+      brand,
+      model,
+      options.generation,
+      options.grade,
+    )
+  );
+};
+
+const addDieselDefaultMaintenanceIssue = (
+  issues: AiSummaryMaintenanceIssue[],
+  year: string,
+  brand: string,
+  model: string,
+  options: AiSummaryOptions,
+  inspectionProfile: VehicleInspectionProfile | null | undefined,
+  reviewKeywordStats: ReviewKeywordStat[],
+) => {
+  if (!hasDieselFuelType(options.fuelType)) {
+    return issues;
+  }
+
+  const existingParts = new Set(
+    issues.flatMap((issue) => issue.replacementParts),
+  );
+  const defaultParts = ["DPF", "터보", "인젝터", "촉매"];
+
+  if (
+    shouldIncludeScrMaintenance(
+      year,
+      brand,
+      model,
+      options,
+      inspectionProfile,
+      reviewKeywordStats,
+    )
+  ) {
+    defaultParts.push("요소수/SCR");
+  }
+
+  const replacementParts = defaultParts.filter((part) => !existingParts.has(part));
+
+  if (replacementParts.length === 0) {
+    return issues;
+  }
+
+  return [
+    {
+      title: "디젤 참고 정비 항목",
+      description: "디젤 차량 기본 확인 항목",
+      estimatedRepairCost: "현장 확인",
+      reviewMentionScore: null,
+      symptoms: [],
+      causes: [],
+      replacementParts,
+      additionalDescription: "디젤 차량에서 함께 확인할 참고 정비 항목입니다.",
+    },
+    ...issues,
+  ];
+};
+
 const getMaintenanceIssues = (
   brand: string,
   model: string,
+  year: string,
   mileage: string,
   options: AiSummaryOptions,
 ) => {
@@ -493,7 +608,7 @@ const getMaintenanceIssues = (
     groupedIssues.set(category.key, group);
   });
 
-  return Array.from(groupedIssues.values())
+  const issues = Array.from(groupedIssues.values())
     .sort(
       (left, right) =>
         getMaintenanceIssueCategoryOrder(left.category.key) -
@@ -519,6 +634,16 @@ const getMaintenanceIssues = (
         additionalDescription: group.descriptions[0] ?? group.category.description,
       };
     });
+
+  return addDieselDefaultMaintenanceIssue(
+    issues,
+    year,
+    brand,
+    model,
+    options,
+    inspectionProfile,
+    reviewKeywordStats,
+  );
 };
 
 const matchesModel = (rule: ModelIssueRule | EvCheckRule, model: string) => {
@@ -934,7 +1059,13 @@ export function getStructuredAiSummary(
     0,
     MAX_SUMMARY_COUNT,
   );
-  const maintenanceIssues = getMaintenanceIssues(brand, model, mileage, options);
+  const maintenanceIssues = getMaintenanceIssues(
+    brand,
+    model,
+    year,
+    mileage,
+    options,
+  );
   const overviewSentences = getDataBasedOverview(
     reviewKeywords,
     maintenanceIssues,
