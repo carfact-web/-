@@ -1,5 +1,8 @@
 import type { Review } from "@/types/review";
-import { getGroupedVehicleIssueKeywordDefinitions } from "@/utils/vehicleIssueKeywords";
+import {
+  extractVehicleIssueKeywords,
+  getGroupedVehicleIssueKeywordDefinitions,
+} from "@/utils/vehicleIssueKeywords";
 
 export interface ReviewKeywordDefinition {
   label: string;
@@ -20,9 +23,6 @@ export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
     aliases: definition.aliases,
   })),
 ];
-
-const normalizeKeywordText = (value: string) =>
-  value.toLowerCase().replace(/[^0-9a-zㄱ-ㅎ가-힣]+/g, "");
 
 const getReviewSearchText = (review: Review) => review.content;
 
@@ -49,14 +49,13 @@ export const getReviewKeywordStats = (
     return [];
   }
 
+  const reviewKeywordLabels = reviews.map((review) =>
+    extractVehicleIssueKeywords(getReviewSearchText(review)),
+  );
   const stats = reviewKeywordDefinitions
     .map((definition) => {
-      const aliases = definition.aliases.map(normalizeKeywordText);
-      const count = reviews.reduce((total, review) => {
-        const normalizedReview = normalizeKeywordText(getReviewSearchText(review));
-        const hasKeyword = aliases.some((alias) =>
-          normalizedReview.includes(alias),
-        );
+      const count = reviewKeywordLabels.reduce((total, keywordLabels) => {
+        const hasKeyword = keywordLabels.includes(definition.label);
 
         return hasKeyword ? total + 1 : total;
       }, 0);
