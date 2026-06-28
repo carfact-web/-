@@ -1,5 +1,5 @@
 import type { Review } from "@/types/review";
-import { vehicleIssueKeywordDefinitions } from "@/utils/vehicleIssueKeywords";
+import { getGroupedVehicleIssueKeywordDefinitions } from "@/utils/vehicleIssueKeywords";
 
 export interface ReviewKeywordDefinition {
   label: string;
@@ -15,7 +15,7 @@ export interface ReviewKeywordStat {
 export const minimumReviewsForKeywordStats = 10;
 
 export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
-  ...vehicleIssueKeywordDefinitions.map((definition) => ({
+  ...getGroupedVehicleIssueKeywordDefinitions().map((definition) => ({
     label: definition.label,
     aliases: definition.aliases,
   })),

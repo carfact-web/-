@@ -1,5 +1,6 @@
 export interface VehicleIssueKeywordDefinition {
   label: string;
+  groupLabel?: string;
   aliases: string[];
   relatedParts: string[];
   inspectionTitle: string;
@@ -164,72 +165,84 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
   },
   {
     label: "냄새",
+    groupLabel: "냄새",
     aliases: ["냄새"],
     relatedParts: ["실내", "공조 장치"],
     inspectionTitle: "실내 냄새 확인",
   },
   {
     label: "흡연",
+    groupLabel: "냄새",
     aliases: ["흡연"],
     relatedParts: ["실내", "시트", "천장 내장재"],
     inspectionTitle: "흡연 흔적 확인",
   },
   {
     label: "담배",
+    groupLabel: "냄새",
     aliases: ["담배"],
     relatedParts: ["실내", "시트", "천장 내장재"],
     inspectionTitle: "담배 흔적 확인",
   },
   {
     label: "담배냄새",
+    groupLabel: "냄새",
     aliases: ["담배냄새", "담배 냄새"],
     relatedParts: ["실내", "시트", "천장 내장재"],
     inspectionTitle: "담배냄새 확인",
   },
   {
     label: "실내냄새",
+    groupLabel: "냄새",
     aliases: ["실내냄새", "실내 냄새"],
     relatedParts: ["실내", "공조 장치", "시트"],
     inspectionTitle: "실내냄새 확인",
   },
   {
     label: "악취",
+    groupLabel: "냄새",
     aliases: ["악취"],
     relatedParts: ["실내", "공조 장치"],
     inspectionTitle: "실내 악취 확인",
   },
   {
     label: "곰팡이냄새",
+    groupLabel: "냄새",
     aliases: ["곰팡이냄새", "곰팡이 냄새"],
     relatedParts: ["실내", "공조 장치", "카펫"],
     inspectionTitle: "곰팡이냄새 확인",
   },
   {
     label: "퀴퀴한냄새",
+    groupLabel: "냄새",
     aliases: ["퀴퀴한냄새", "퀴퀴한 냄새"],
     relatedParts: ["실내", "공조 장치", "시트"],
     inspectionTitle: "퀴퀴한냄새 확인",
   },
   {
     label: "역한냄새",
+    groupLabel: "냄새",
     aliases: ["역한냄새", "역한 냄새"],
     relatedParts: ["실내", "공조 장치"],
     inspectionTitle: "역한냄새 확인",
   },
   {
     label: "찌든냄새",
+    groupLabel: "냄새",
     aliases: ["찌든냄새", "찌든 냄새"],
     relatedParts: ["실내", "시트", "천장 내장재"],
     inspectionTitle: "찌든냄새 확인",
   },
   {
     label: "방향제냄새",
+    groupLabel: "냄새",
     aliases: ["방향제냄새", "방향제 냄새"],
     relatedParts: ["실내", "공조 장치"],
     inspectionTitle: "방향제냄새 확인",
   },
   {
     label: "탈취",
+    groupLabel: "냄새",
     aliases: ["탈취"],
     relatedParts: ["실내", "공조 장치", "시트"],
     inspectionTitle: "탈취 흔적 확인",
@@ -241,11 +254,47 @@ const normalizeKeywordText = (value: string) =>
 
 export const normalizeVehicleIssueKeyword = normalizeKeywordText;
 
+export const getVehicleIssueKeywordGroupLabel = (
+  definition: VehicleIssueKeywordDefinition,
+) => definition.groupLabel ?? definition.label;
+
+export const getGroupedVehicleIssueKeywordDefinitions = () => {
+  const groupedDefinitions = new Map<string, VehicleIssueKeywordDefinition>();
+
+  vehicleIssueKeywordDefinitions.forEach((definition) => {
+    const groupLabel = getVehicleIssueKeywordGroupLabel(definition);
+    const group = groupedDefinitions.get(groupLabel);
+
+    if (!group) {
+      groupedDefinitions.set(groupLabel, {
+        ...definition,
+        label: groupLabel,
+        groupLabel,
+        aliases: [...definition.aliases],
+      });
+      return;
+    }
+
+    const nextAliases = [...group.aliases, definition.label, ...definition.aliases];
+
+    group.aliases = Array.from(new Set(nextAliases));
+    group.relatedParts = Array.from(
+      new Set([...group.relatedParts, ...definition.relatedParts]),
+    );
+  });
+
+  return Array.from(groupedDefinitions.values());
+};
+
 export const findVehicleIssueKeywordDefinition = (keyword: string) => {
   const normalizedKeyword = normalizeKeywordText(keyword);
 
-  return vehicleIssueKeywordDefinitions.find(
-    (definition) => normalizeKeywordText(definition.label) === normalizedKeyword,
+  return getGroupedVehicleIssueKeywordDefinitions().find(
+    (definition) =>
+      normalizeKeywordText(definition.label) === normalizedKeyword ||
+      definition.aliases.some(
+        (alias) => normalizeKeywordText(alias) === normalizedKeyword,
+      ),
   );
 };
 
@@ -256,13 +305,15 @@ export const extractVehicleIssueKeywords = (content: string) => {
     return [] as string[];
   }
 
-  return vehicleIssueKeywordDefinitions
+  const matchedKeywords = getGroupedVehicleIssueKeywordDefinitions()
     .filter((definition) =>
       definition.aliases.some((alias) =>
         normalizedContent.includes(normalizeKeywordText(alias)),
       ),
     )
     .map((definition) => definition.label);
+
+  return Array.from(new Set(matchedKeywords));
 };
 
 export const countVehicleIssueKeywordMentions = (
