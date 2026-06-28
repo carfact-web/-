@@ -307,8 +307,8 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     inspectionTitle: "디젤계통 상태 확인",
   },
   {
-    label: "화물/상용",
-    groupLabel: "화물/상용",
+    label: "판스프링",
+    groupLabel: "판스프링",
     aliases: [
       "판스프링",
       "판 스프링",
@@ -318,6 +318,22 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
       "판스프링부식",
       "판스프링 부식",
       "판 스프링 부식",
+      "판스프링깨짐",
+      "판스프링 깨짐",
+      "판스프링교환",
+      "판스프링 교환",
+      "판스프링수리",
+      "판스프링 수리",
+      "스프링부러짐",
+      "스프링 부러짐",
+    ],
+    relatedParts: ["판스프링", "하부", "프레임"],
+    inspectionTitle: "판스프링 상태 확인",
+  },
+  {
+    label: "화물/상용",
+    groupLabel: "화물/상용",
+    aliases: [
       "적재함",
       "적재함부식",
       "적재함 부식",
@@ -337,7 +353,7 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
       "디퍼렌셜",
       "차동기어",
     ],
-    relatedParts: ["판스프링", "적재함", "탑차", "리프트", "프레임", "디퍼렌셜"],
+    relatedParts: ["적재함", "탑차", "리프트", "프레임", "디퍼렌셜"],
     inspectionTitle: "화물/상용차 상태 확인",
   },
   {
