@@ -9,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-type AiCandidateStatus = "reviewing" | "applied" | "excluded";
+type AiCandidateStatus = "pending" | "reviewing" | "applied" | "excluded";
 
 interface AiCandidateRequest {
   candidateKey?: string;
@@ -106,11 +106,16 @@ const assertAdmin = async (request: Request) => {
 };
 
 const normalizeStatus = (value: unknown): AiCandidateStatus => {
-  if (value === "applied" || value === "excluded" || value === "reviewing") {
+  if (
+    value === "pending" ||
+    value === "applied" ||
+    value === "excluded" ||
+    value === "reviewing"
+  ) {
     return value;
   }
 
-  return "reviewing";
+  return "pending";
 };
 
 const fromTable = (client: unknown, table: string) =>
@@ -329,30 +334,28 @@ export async function POST(request: Request) {
     const normalizedKeyword = normalizeVehicleIssueKeyword(keyword);
     const definition = findVehicleIssueKeywordDefinition(keyword);
 
-    if (!definition || !normalizedKeyword) {
-      return jsonError("대표 키워드로 반영할 수 없는 항목입니다.");
+    if (!normalizedKeyword) {
+      return jsonError("후보 키워드 정보가 올바르지 않습니다.");
     }
 
     let applied: Awaited<ReturnType<typeof applyCandidateToVehicleInspectionDb>> | null =
       null;
 
-    if (status === "applied") {
+    if (status === "applied" && definition) {
       const targetBrand = body.targetBrand?.trim();
       const targetModel = body.targetModel?.trim();
 
-      if (!targetBrand || !targetModel) {
-        return jsonError("차량 DB에 반영할 브랜드와 모델 정보가 필요합니다.");
+      if (targetBrand && targetModel) {
+        applied = await applyCandidateToVehicleInspectionDb(
+          authResult.clients.admin,
+          {
+            keyword,
+            targetBrand,
+            targetGeneration: body.targetGeneration,
+            targetModel,
+          },
+        );
       }
-
-      applied = await applyCandidateToVehicleInspectionDb(
-        authResult.clients.admin,
-        {
-          keyword,
-          targetBrand,
-          targetGeneration: body.targetGeneration,
-          targetModel,
-        },
-      );
     }
 
     await upsertCandidateStatus(authResult.clients.admin, {

@@ -44,7 +44,7 @@ type DashboardBoardTab =
   | "keywords"
   | "ai";
 type DashboardViewFilter = "vehicle" | "model" | "review";
-type AiCandidateStatus = "reviewing" | "applied" | "excluded";
+type AiCandidateStatus = "pending" | "reviewing" | "applied" | "excluded";
 type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
 type AiCandidateArchiveFilter = "today" | "recent3days" | "all";
 type AiManagementTab = "keywords" | "maintenance" | "candidates";
@@ -194,8 +194,11 @@ interface AdminDashboardKeywordRow {
 
 interface AdminDashboardAiCandidate {
   candidateKey: string;
+  exampleSentences?: string[];
   keyword: string;
   mentionCount: number;
+  recentMentionCount?: number;
+  recommendedCategory?: string;
   relatedModels: string[];
   reason: string;
   source: AiCandidateSource;
@@ -808,13 +811,19 @@ const createTrafficSourceDonutItems = (
   }));
 };
 
-const aiCandidateStatuses: { label: string; value: AiCandidateStatus }[] = [
+const aiCandidateStatuses: {
+  label: string;
+  value: Exclude<AiCandidateStatus, "pending">;
+}[] = [
   { label: "검토중", value: "reviewing" },
   { label: "반영완료 보관함", value: "applied" },
   { label: "제외", value: "excluded" },
 ];
 
-const aiCandidateActionStatuses: { label: string; value: AiCandidateStatus }[] = [
+const aiCandidateActionStatuses: {
+  label: string;
+  value: Exclude<AiCandidateStatus, "pending">;
+}[] = [
   { label: "검토중", value: "reviewing" },
   { label: "반영완료", value: "applied" },
   { label: "제외", value: "excluded" },
@@ -833,8 +842,79 @@ const aiCandidateArchiveReferenceTime = Date.now();
 const aiManagementTabs: { label: string; value: AiManagementTab }[] = [
   { label: "키워드 관리", value: "keywords" },
   { label: "정비항목 룰", value: "maintenance" },
-  { label: "자동 감지 후보", value: "candidates" },
+  { label: "신규 키워드 자동감지", value: "candidates" },
 ];
+
+const newKeywordCandidateStatuses: {
+  label: string;
+  value: Exclude<AiCandidateStatus, "applied">;
+}[] = [
+  { label: "신규 후보", value: "pending" },
+  { label: "보류", value: "reviewing" },
+  { label: "제외", value: "excluded" },
+];
+
+const ignoredNewKeywordTokens = new Set(
+  [
+    "가격",
+    "가능",
+    "거래",
+    "검토",
+    "결과",
+    "관리",
+    "구매",
+    "그냥",
+    "기록",
+    "기준",
+    "내용",
+    "느낌",
+    "다시",
+    "대비",
+    "동안",
+    "등록",
+    "때문",
+    "많이",
+    "매우",
+    "문제",
+    "문의",
+    "부분",
+    "상태",
+    "생각",
+    "서비스",
+    "수리",
+    "실제",
+    "아직",
+    "약간",
+    "없음",
+    "여부",
+    "오늘",
+    "완료",
+    "운행",
+    "위치",
+    "의심",
+    "이상",
+    "이슈",
+    "일반",
+    "자주",
+    "전체",
+    "점검",
+    "정도",
+    "정비",
+    "좋음",
+    "주행",
+    "주의",
+    "차량",
+    "처리",
+    "체크",
+    "추가",
+    "추천",
+    "출고",
+    "크게",
+    "필요",
+    "확인",
+    "후기",
+  ].map(normalizeVehicleIssueKeyword),
+);
 
 const reviewDateFilters: { label: string; value: ReviewDateFilter }[] = [
   { label: "전체 기간", value: "all" },
@@ -936,6 +1016,7 @@ const readStoredAdminRules = <Rule,>(key: string, fallback: Rule[]): Rule[] => {
 
 const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
   if (
+    value === "pending" ||
     value === "reviewing" ||
     value === "applied" ||
     value === "excluded"
@@ -943,7 +1024,7 @@ const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
     return value;
   }
 
-  return "reviewing";
+  return "pending";
 };
 
 const normalizeAiCandidateSource = (value: unknown): AiCandidateSource => {
@@ -1032,6 +1113,313 @@ const getReviewSnapshotValue = (review: AdminReview, keys: string[]) => {
 
 const getCandidateStatusMap = (rows: AdminAiCandidateStatusRow[]) =>
   new Map(rows.map((row) => [row.candidate_key, row]));
+
+const getRegisteredKeywordSet = (
+  keywordRules: AdminAiKeywordRule[],
+  statusRows: AdminAiCandidateStatusRow[],
+) => {
+  const registeredKeywords = new Set<string>();
+  const addKeyword = (value: string | null | undefined) => {
+    const normalizedValue = normalizeVehicleIssueKeyword(value ?? "");
+
+    if (normalizedValue) {
+      registeredKeywords.add(normalizedValue);
+    }
+  };
+
+  vehicleIssueKeywordDefinitions.forEach((definition) => {
+    addKeyword(definition.label);
+    definition.aliases.forEach(addKeyword);
+  });
+  keywordRules.forEach((rule) => {
+    addKeyword(rule.label);
+    rule.includeKeywords.forEach(addKeyword);
+    rule.excludeKeywords.forEach(addKeyword);
+  });
+  statusRows
+    .filter((row) => row.status === "applied")
+    .forEach((row) => addKeyword(row.candidate_keyword));
+
+  return registeredKeywords;
+};
+
+const getReviewVehicleKeywordBlocklist = (reviews: AdminReview[]) => {
+  const blockedKeywords = new Set<string>();
+  const addValue = (value: string | null | undefined) => {
+    const normalizedValue = normalizeVehicleIssueKeyword(value ?? "");
+
+    if (normalizedValue) {
+      blockedKeywords.add(normalizedValue);
+    }
+
+    (value ?? "")
+      .split(/[^0-9A-Za-z가-힣]+/)
+      .map(normalizeVehicleIssueKeyword)
+      .filter((item) => item.length >= 2)
+      .forEach((item) => blockedKeywords.add(item));
+  };
+
+  reviews.forEach((review) => {
+    [
+      getJsonString(review.vehicle_snapshot, "brand"),
+      getJsonString(review.vehicle_snapshot, "manufacturer"),
+      getJsonString(review.vehicle_snapshot, "model"),
+      getJsonString(review.vehicle_snapshot, "generation"),
+      getJsonString(review.vehicle_snapshot, "modelDetail"),
+      getJsonString(review.vehicle_snapshot, "year"),
+      review.author_nickname,
+      ...(Array.isArray(review.tags) ? review.tags : []),
+    ].forEach(addValue);
+  });
+
+  return blockedKeywords;
+};
+
+const normalizeCandidateToken = (value: string) => {
+  const normalizedValue = normalizeVehicleIssueKeyword(value);
+
+  if (/^[가-힣]+$/.test(normalizedValue) && normalizedValue.length > 2) {
+    return normalizedValue.replace(
+      /(으로|에서|에게|부터|까지|처럼|보다|관련|쪽은|쪽이|쪽을|쪽도|쪽|들은|들을|이나|거나|이고|이며|하고|하면|해서|되어|되는|된|은|는|이|가|을|를|과|와|도|만|로|에)$/u,
+      "",
+    );
+  }
+
+  return normalizedValue;
+};
+
+const getReviewContentTokens = (content: string) =>
+  Array.from(content.matchAll(/[A-Za-z][A-Za-z0-9+#/-]{1,}|[가-힣A-Za-z0-9]{2,}/g))
+    .map((match) => normalizeCandidateToken(match[0]))
+    .filter((token) => token.length >= 2);
+
+const getReviewExampleSentences = (content: string, keyword: string) => {
+  const normalizedKeyword = normalizeVehicleIssueKeyword(keyword);
+
+  return content
+    .split(/[.!?。！？\n]+/)
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        sentence.length > 0 &&
+        normalizeVehicleIssueKeyword(sentence).includes(normalizedKeyword),
+    )
+    .map((sentence) =>
+      sentence.length > 90 ? sentence.slice(0, 87).trim() + "..." : sentence,
+    );
+};
+
+const guessNewKeywordCategory = (keyword: string, exampleText: string) => {
+  const normalizedText = normalizeVehicleIssueKeyword(keyword + " " + exampleText);
+
+  if (/(엔진|실린더|피스톤|cvvd|밸브|오일|점화)/i.test(normalizedText)) {
+    return "엔진/구동계";
+  }
+
+  if (/(미션|변속|클러치|dct|토크)/i.test(normalizedText)) {
+    return "미션/변속";
+  }
+
+  if (/(배터리|전장|센서|경고등|모듈|ecu|전기)/i.test(normalizedText)) {
+    return "전장/전자";
+  }
+
+  if (/(하체|서스|쇼바|암|부싱|베어링|조향)/i.test(normalizedText)) {
+    return "하체/조향";
+  }
+
+  if (/(에어컨|히터|공조|냉방|난방)/i.test(normalizedText)) {
+    return "공조";
+  }
+
+  if (/(도장|외판|부식|녹|누수|유리|트렁크)/i.test(normalizedText)) {
+    return "외관/차체";
+  }
+
+  return "후기 반복 신규 키워드";
+};
+
+const createNewKeywordCandidatesFromReviewContent = (
+  reviews: AdminReview[],
+  statusRows: AdminAiCandidateStatusRow[],
+  keywordRules: AdminAiKeywordRule[],
+) => {
+  const statusMap = getCandidateStatusMap(statusRows);
+  const registeredKeywords = getRegisteredKeywordSet(keywordRules, statusRows);
+  const vehicleKeywordBlocklist = getReviewVehicleKeywordBlocklist(reviews);
+  const now = Date.now();
+  const recentStart = now - 30 * 24 * 60 * 60 * 1000;
+  const previousStart = now - 60 * 24 * 60 * 60 * 1000;
+  const aggregates = new Map<
+    string,
+    {
+      exampleSentences: string[];
+      keyword: string;
+      mentionCount: number;
+      modelReviewCounts: Map<string, number>;
+      previousReviewCount: number;
+      recentMentionCount: number;
+      recentReviewCount: number;
+      relatedModels: Set<string>;
+      targetBrand: string;
+      targetGeneration: string;
+      targetModel: string;
+      totalReviewCount: number;
+    }
+  >();
+
+  reviews
+    .filter((review) => !review.is_hidden)
+    .forEach((review) => {
+      const content = review.content ?? "";
+      const targetBrand = getReviewSnapshotValue(review, ["brand", "manufacturer"]);
+      const targetModel = getReviewSnapshotValue(review, ["model"]);
+      const targetGeneration = getReviewSnapshotValue(review, [
+        "generation",
+        "modelDetail",
+      ]);
+      const modelLabel = [targetBrand, targetModel, targetGeneration]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      const createdAt = Date.parse(review.created_at);
+      const isRecent = !Number.isNaN(createdAt) && createdAt >= recentStart;
+      const isPrevious =
+        !Number.isNaN(createdAt) &&
+        createdAt >= previousStart &&
+        createdAt < recentStart;
+      const reviewTokens = Array.from(new Set(getReviewContentTokens(content)));
+
+      reviewTokens.forEach((token) => {
+        if (
+          ignoredNewKeywordTokens.has(token) ||
+          registeredKeywords.has(token) ||
+          vehicleKeywordBlocklist.has(token) ||
+          /^\d+$/.test(token) ||
+          /^[가-힣]$/.test(token) ||
+          /^[a-z]{1,2}$/.test(token) ||
+          /^[0-9]+[a-z가-힣]+$/i.test(token)
+        ) {
+          return;
+        }
+
+        const candidateKey = "new-keyword:" + token;
+        const aggregate = aggregates.get(candidateKey) ?? {
+          exampleSentences: [],
+          keyword: /^[a-z0-9+#/-]+$/.test(token) ? token.toUpperCase() : token,
+          mentionCount: 0,
+          modelReviewCounts: new Map<string, number>(),
+          previousReviewCount: 0,
+          recentMentionCount: 0,
+          recentReviewCount: 0,
+          relatedModels: new Set<string>(),
+          targetBrand,
+          targetGeneration,
+          targetModel,
+          totalReviewCount: 0,
+        };
+        const tokenMentionCount = getReviewContentTokens(content).filter(
+          (item) => item === token,
+        ).length;
+
+        aggregate.mentionCount += tokenMentionCount;
+        aggregate.totalReviewCount += 1;
+        if (isRecent) {
+          aggregate.recentMentionCount += tokenMentionCount;
+          aggregate.recentReviewCount += 1;
+        }
+        if (isPrevious) aggregate.previousReviewCount += 1;
+        if (modelLabel) {
+          aggregate.relatedModels.add(modelLabel);
+          aggregate.modelReviewCounts.set(
+            modelLabel,
+            (aggregate.modelReviewCounts.get(modelLabel) ?? 0) + 1,
+          );
+        }
+        if (aggregate.exampleSentences.length < 3) {
+          aggregate.exampleSentences.push(
+            ...getReviewExampleSentences(content, token).slice(
+              0,
+              3 - aggregate.exampleSentences.length,
+            ),
+          );
+        }
+        aggregates.set(candidateKey, aggregate);
+      });
+    });
+
+  return Array.from(aggregates.entries())
+    .map<AdminDashboardAiCandidate | null>(([candidateKey, aggregate]) => {
+      const recentGrowthRate =
+        aggregate.previousReviewCount > 0
+          ? Math.round(
+              ((aggregate.recentReviewCount - aggregate.previousReviewCount) /
+                aggregate.previousReviewCount) *
+                100,
+            )
+          : aggregate.recentReviewCount > 0
+            ? 100
+            : null;
+      const hasSpecificModelRepeat = Array.from(
+        aggregate.modelReviewCounts.values(),
+      ).some((count) => count >= 3);
+      const isCandidate =
+        aggregate.recentReviewCount >= 3 ||
+        aggregate.totalReviewCount >= 5 ||
+        (recentGrowthRate ?? 0) >= 100 ||
+        hasSpecificModelRepeat;
+      const statusRow = statusMap.get(candidateKey);
+      const exampleText = aggregate.exampleSentences.join(" ");
+      const recommendedCategory = guessNewKeywordCategory(
+        aggregate.keyword,
+        exampleText,
+      );
+
+      if (!isCandidate && !statusRow) {
+        return null;
+      }
+
+      return {
+        candidateKey,
+        exampleSentences: Array.from(new Set(aggregate.exampleSentences)).slice(
+          0,
+          3,
+        ),
+        keyword: aggregate.keyword,
+        mentionCount: aggregate.mentionCount,
+        recentMentionCount: aggregate.recentMentionCount,
+        recommendedCategory,
+        relatedModels: Array.from(aggregate.relatedModels),
+        reason: hasSpecificModelRepeat
+          ? "특정 차종 후기 본문에서 반복적으로 등장하고 아직 키워드 사전에 없습니다."
+          : "후기 본문에서 반복적으로 등장하지만 아직 키워드 사전에 등록되지 않았습니다.",
+        source: "review" as const,
+        status: statusRow?.status ?? "pending",
+        suggestedUpdates: [],
+        evidence: {
+          keywordMentionCount: aggregate.mentionCount,
+          recentGrowthRate,
+          reviewCount: aggregate.totalReviewCount,
+          viewCount: null,
+        },
+        targetBrand: aggregate.targetBrand,
+        targetGeneration: aggregate.targetGeneration,
+        targetModel: aggregate.targetModel,
+        updatedAt: statusRow?.updated_at ?? null,
+        updatedBy: statusRow?.updated_by ?? null,
+        updatedByNickname: statusRow?.updated_by_nickname ?? null,
+      } satisfies AdminDashboardAiCandidate;
+    })
+    .filter((candidate): candidate is AdminDashboardAiCandidate => candidate !== null)
+    .filter((candidate) => candidate.status !== "applied")
+    .sort(
+      (left, right) =>
+        (right.recentMentionCount ?? 0) - (left.recentMentionCount ?? 0) ||
+        right.mentionCount - left.mentionCount ||
+        left.keyword.localeCompare(right.keyword, "ko"),
+    )
+    .slice(0, 50);
+};
 
 const createAiCandidatesFromReviewContent = (
   reviews: AdminReview[],
@@ -1250,6 +1638,9 @@ export default function AdminPage() {
   >(() =>
     readStoredAdminRules(aiMaintenanceStorageKey, initialAiMaintenanceRules),
   );
+  const [aiCandidateStatusRows, setAiCandidateStatusRows] = useState<
+    AdminAiCandidateStatusRow[]
+  >([]);
 
   const hasProfile = Boolean(profile);
   const isCheckingRole =
@@ -1584,6 +1975,15 @@ export default function AdminPage() {
       ),
     [operatorDashboardData.aiCandidates],
   );
+  const newKeywordCandidates = useMemo(
+    () =>
+      createNewKeywordCandidatesFromReviewContent(
+        reviews,
+        aiCandidateStatusRows,
+        aiKeywordRules,
+      ),
+    [aiCandidateStatusRows, aiKeywordRules, reviews],
+  );
   const globalSearchResults = useMemo(() => {
     const query = globalSearch.trim().toLowerCase();
 
@@ -1804,6 +2204,7 @@ export default function AdminPage() {
         ),
       });
       const nextReviews = (reviewsResult.data ?? []) as AdminReview[];
+      setAiCandidateStatusRows(aiCandidateStatusRows);
       setOperatorDashboardData({
         totalViews: toNumber(nextOperatorDashboard?.total_views),
         trafficRows: toOperatorTrafficRows(
@@ -1896,6 +2297,24 @@ export default function AdminPage() {
           : item,
       ),
     }));
+    setAiCandidateStatusRows((current) => {
+      const nextRow: AdminAiCandidateStatusRow = {
+        candidate_key: candidate.candidateKey,
+        candidate_keyword: candidate.keyword,
+        related_models: candidate.relatedModels,
+        source: candidate.source,
+        status: nextStatus,
+        updated_at: updatedAt,
+        updated_by: user?.id ?? null,
+        updated_by_nickname: profile?.nickname ?? user?.email ?? null,
+      };
+
+      return current.some((row) => row.candidate_key === candidate.candidateKey)
+        ? current.map((row) =>
+            row.candidate_key === candidate.candidateKey ? nextRow : row,
+          )
+        : [nextRow, ...current];
+    });
 
     const response = await fetch("/api/admin/ai-candidates", {
       body: JSON.stringify({
@@ -1928,10 +2347,81 @@ export default function AdminPage() {
 
     setActionMessage(
       nextStatus === "applied"
-        ? "AI 추천 데이터를 차량 DB에 반영했습니다."
+        ? "키워드 등록 완료 상태로 처리했습니다."
         : "AI 추천 상태를 변경했습니다.",
     );
     await loadAdminData();
+  };
+
+  const registerNewKeywordCandidate = async (
+    candidate: AdminDashboardAiCandidate,
+  ) => {
+    const label = window.prompt("대표 키워드", candidate.keyword);
+
+    if (label === null || !label.trim()) {
+      return;
+    }
+
+    const includeKeywords = window.prompt(
+      "포함 키워드(쉼표 구분)",
+      candidate.keyword,
+    );
+
+    if (includeKeywords === null) {
+      return;
+    }
+
+    const category = window.prompt(
+      "카테고리",
+      candidate.recommendedCategory ?? "후기 반복 신규 키워드",
+    );
+
+    if (category === null) {
+      return;
+    }
+
+    const normalizedLabel = normalizeVehicleIssueKeyword(label);
+    const nextIncludeKeywords = includeKeywords
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const existingRule = aiKeywordRules.find(
+      (rule) => normalizeVehicleIssueKeyword(rule.label) === normalizedLabel,
+    );
+
+    if (existingRule) {
+      setAiKeywordRules((currentRules) =>
+        currentRules.map((rule) =>
+          rule.id === existingRule.id
+            ? {
+                ...rule,
+                includeKeywords: Array.from(
+                  new Set([...rule.includeKeywords, ...nextIncludeKeywords]),
+                ),
+              }
+            : rule,
+        ),
+      );
+    } else {
+      const nextRule: AdminAiKeywordRule = {
+        category: category.trim(),
+        excludeKeywords: [],
+        fuelType: "",
+        id: "auto-keyword-" + Date.now(),
+        includeKeywords: nextIncludeKeywords.length
+          ? nextIncludeKeywords
+          : [label.trim()],
+        isDefaultMaintenance: false,
+        isVisible: true,
+        label: label.trim(),
+        memo: "신규 키워드 자동감지에서 등록",
+        targetModel: "",
+      };
+
+      setAiKeywordRules((currentRules) => [nextRule, ...currentRules]);
+    }
+
+    await updateAiCandidateStatus(candidate, "applied");
   };
 
   const updatePostState = async (
@@ -2934,13 +3424,13 @@ export default function AdminPage() {
                 ? aiKeywordRules.length
                 : activeAiManagementTab === "maintenance"
                   ? aiMaintenanceRules.length
-                  : operatorDashboardData.aiCandidates.length
+                  : newKeywordCandidates.length
             }
             title="AI DB 로드맵 / 키워드 관리"
           >
             <AiManagementPanel
               activeTab={activeAiManagementTab}
-              candidates={operatorDashboardData.aiCandidates}
+              candidates={newKeywordCandidates}
               keywordRules={aiKeywordRules}
               maintenanceRules={aiMaintenanceRules}
               onChangeCandidateStatus={(candidate, nextStatus) =>
@@ -2948,6 +3438,9 @@ export default function AdminPage() {
               }
               onChangeKeywordRules={setAiKeywordRules}
               onChangeMaintenanceRules={setAiMaintenanceRules}
+              onRegisterCandidate={(candidate) =>
+                void registerNewKeywordCandidate(candidate)
+              }
               onChangeTab={setActiveAiManagementTab}
               reviews={reviews}
             />
@@ -5653,6 +6146,7 @@ function AiManagementPanel({
   onChangeCandidateStatus,
   onChangeKeywordRules,
   onChangeMaintenanceRules,
+  onRegisterCandidate,
   onChangeTab,
   reviews,
 }: {
@@ -5666,6 +6160,7 @@ function AiManagementPanel({
   ) => void;
   onChangeKeywordRules: (rules: AdminAiKeywordRule[]) => void;
   onChangeMaintenanceRules: (rules: AdminAiMaintenanceRule[]) => void;
+  onRegisterCandidate: (candidate: AdminDashboardAiCandidate) => void;
   onChangeTab: (tab: AiManagementTab) => void;
   reviews: AdminReview[];
 }) {
@@ -5708,9 +6203,10 @@ function AiManagementPanel({
         />
       ) : null}
       {activeTab === "candidates" ? (
-        <DashboardAiCandidateTable
+        <NewKeywordCandidateDetector
           candidates={candidates}
           onChangeStatus={onChangeCandidateStatus}
+          onRegisterCandidate={onRegisterCandidate}
           reviews={reviews}
         />
       ) : null}
@@ -5988,6 +6484,215 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function NewKeywordCandidateDetector({
+  candidates,
+  onChangeStatus,
+  onRegisterCandidate,
+  reviews,
+}: {
+  candidates: AdminDashboardAiCandidate[];
+  onChangeStatus: (
+    candidate: AdminDashboardAiCandidate,
+    nextStatus: AiCandidateStatus,
+  ) => void;
+  onRegisterCandidate: (candidate: AdminDashboardAiCandidate) => void;
+  reviews: AdminReview[];
+}) {
+  const [activeStatus, setActiveStatus] =
+    useState<Exclude<AiCandidateStatus, "applied">>("pending");
+  const statusCounts = useMemo(
+    () =>
+      newKeywordCandidateStatuses.reduce(
+        (counts, status) => ({
+          ...counts,
+          [status.value]: candidates.filter(
+            (candidate) => candidate.status === status.value,
+          ).length,
+        }),
+        {} as Record<Exclude<AiCandidateStatus, "applied">, number>,
+      ),
+    [candidates],
+  );
+  const visibleCandidates = useMemo(
+    () =>
+      candidates.filter((candidate) => {
+        if (candidate.status === "applied") {
+          return false;
+        }
+
+        return candidate.status === activeStatus;
+      }),
+    [activeStatus, candidates],
+  );
+  const emptyMessage =
+    activeStatus === "pending"
+      ? "신규 자동감지 후보가 없습니다."
+      : activeStatus === "reviewing"
+        ? "보류 중인 신규 키워드 후보가 없습니다."
+        : "제외된 신규 키워드 후보가 없습니다.";
+
+  return (
+    <div className="divide-y divide-zinc-200 bg-white">
+      <div className="bg-zinc-50 px-4 py-3">
+        <h3 className="text-sm font-black text-zinc-950">
+          신규 키워드 자동감지
+        </h3>
+        <p className="mt-1 text-xs font-medium text-zinc-500">
+          후기 본문에서 반복 등장하지만 현재 키워드 사전에 없는 단어만 표시합니다.
+        </p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto bg-zinc-50 px-4 py-3">
+        {newKeywordCandidateStatuses.map((status) => (
+          <button
+            key={status.value}
+            type="button"
+            className={cn(
+              "shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-black text-zinc-600 transition hover:border-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
+              activeStatus === status.value &&
+                "border-blue-600 bg-blue-600 text-white hover:border-blue-600 hover:bg-blue-600 hover:text-white",
+            )}
+            onClick={() => setActiveStatus(status.value)}
+          >
+            {status.label} {statusCounts[status.value].toLocaleString()}
+          </button>
+        ))}
+      </div>
+      {visibleCandidates.length ? (
+        visibleCandidates.map((candidate) => {
+          const evidence = getAiCandidateEvidence(candidate, reviews);
+          const reasonItems = getAiCandidateReasonItems(candidate, reviews);
+
+          return (
+            <article
+              key={candidate.candidateKey}
+              className="grid gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_240px]"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                    후기 본문 기반
+                  </span>
+                  <NewKeywordStatusBadge status={candidate.status} />
+                </div>
+                <p className="mt-3 text-xs font-black text-zinc-500">
+                  후보 키워드
+                </p>
+                <h4 className="mt-1 break-words text-xl font-black leading-snug text-zinc-950">
+                  {candidate.keyword}
+                </h4>
+                <dl className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                  <AiEvidenceMetric
+                    label="등장 후기 수"
+                    value={formatAiEvidenceValue(evidence.reviewCount, "건")}
+                  />
+                  <AiEvidenceMetric
+                    label="최근 30일"
+                    value={formatAiEvidenceValue(
+                      candidate.recentMentionCount ?? null,
+                      "회",
+                    )}
+                  />
+                  <AiEvidenceMetric
+                    label="최근 증가율"
+                    value={formatAiEvidenceValue(
+                      evidence.recentGrowthRate,
+                      "%",
+                    )}
+                  />
+                </dl>
+                <dl className="mt-4 grid gap-2 text-xs text-zinc-600">
+                  <DetailLine
+                    label="관련 차종"
+                    value={formatModelList(candidate.relatedModels)}
+                  />
+                  <DetailLine
+                    label="추천 카테고리"
+                    value={
+                      candidate.recommendedCategory ?? "후기 반복 신규 키워드"
+                    }
+                  />
+                </dl>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                  예시 문장
+                </p>
+                {candidate.exampleSentences?.length ? (
+                  <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-700">
+                    {candidate.exampleSentences.map((sentence) => (
+                      <li
+                        key={sentence}
+                        className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      >
+                        “{sentence}”
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={cn(mutedTextClassName, "mt-2")}>
+                    예시 문장 수집 대기
+                  </p>
+                )}
+
+                <p className="mt-4 text-xs font-black uppercase tracking-wide text-zinc-500">
+                  추천 이유
+                </p>
+                <ul className="mt-2 space-y-1.5 text-sm leading-6 text-zinc-600">
+                  {reasonItems.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex flex-col gap-2 lg:items-end">
+                <p className="text-xs font-black uppercase tracking-wide text-zinc-500">
+                  관리자 액션
+                </p>
+                {activeStatus !== "excluded" ? (
+                  <button
+                    type="button"
+                    className={cn(actionButtonClassName, "w-full lg:w-auto")}
+                    onClick={() => onRegisterCandidate(candidate)}
+                  >
+                    키워드로 등록
+                  </button>
+                ) : null}
+                {activeStatus !== "excluded" ? (
+                  <button
+                    type="button"
+                    className={cn(dangerButtonClassName, "w-full lg:w-auto")}
+                    onClick={() => onChangeStatus(candidate, "excluded")}
+                  >
+                    제외
+                  </button>
+                ) : null}
+                {activeStatus !== "reviewing" ? (
+                  <button
+                    type="button"
+                    className={cn(actionButtonClassName, "w-full lg:w-auto")}
+                    onClick={() => onChangeStatus(candidate, "reviewing")}
+                  >
+                    보류
+                  </button>
+                ) : null}
+                <p className="max-w-60 text-xs leading-5 text-zinc-500 lg:text-right">
+                  등록 완료 또는 제외 처리된 키워드는 신규 후보에 다시 노출되지 않습니다.
+                </p>
+              </div>
+            </article>
+          );
+        })
+      ) : (
+        <DashboardEmptyState message={emptyMessage} />
+      )}
+    </div>
+  );
+}
+
 function DashboardAiCandidateTable({
   candidates,
   onChangeStatus,
@@ -6001,7 +6706,7 @@ function DashboardAiCandidateTable({
   reviews: AdminReview[];
 }) {
   const [activeStatus, setActiveStatus] =
-    useState<AiCandidateStatus>("reviewing");
+    useState<Exclude<AiCandidateStatus, "pending">>("reviewing");
   const [archiveFilter, setArchiveFilter] =
     useState<AiCandidateArchiveFilter>("recent3days");
   const statusCounts = useMemo(
@@ -6013,7 +6718,7 @@ function DashboardAiCandidateTable({
             (candidate) => candidate.status === status.value,
           ).length,
         }),
-        {} as Record<AiCandidateStatus, number>,
+        {} as Record<Exclude<AiCandidateStatus, "pending">, number>,
       ),
     [candidates],
   );
@@ -6337,11 +7042,41 @@ function DashboardEmptyState({ message }: { message: string }) {
   return <p className={cn(mutedTextClassName, "bg-white p-4")}>{message}</p>;
 }
 
+function NewKeywordStatusBadge({ status }: { status: AiCandidateStatus }) {
+  const label =
+    status === "pending"
+      ? "신규 후보"
+      : status === "reviewing"
+        ? "보류"
+        : status === "applied"
+          ? "키워드 등록 완료"
+          : "제외";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-h-7 items-center justify-center rounded-full border px-2.5 text-xs font-black",
+        status === "pending"
+          ? "border-blue-500/40 bg-blue-500/10 text-blue-700"
+          : status === "reviewing"
+            ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+            : status === "applied"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+              : "border-zinc-600 bg-zinc-100 text-zinc-500",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
   const effectiveStatus = status;
-  const label = aiCandidateStatuses.find(
-    (item) => item.value === effectiveStatus,
-  )?.label;
+  const label =
+    effectiveStatus === "pending"
+      ? "검토중"
+      : aiCandidateStatuses.find((item) => item.value === effectiveStatus)
+          ?.label;
 
   return (
     <span
@@ -6349,7 +7084,7 @@ function AiStatusBadge({ status }: { status: AiCandidateStatus }) {
         "inline-flex min-h-7 items-center justify-center rounded-full border px-2.5 text-xs font-black",
         effectiveStatus === "applied"
           ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-          : effectiveStatus === "reviewing"
+          : effectiveStatus === "reviewing" || effectiveStatus === "pending"
             ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
             : effectiveStatus === "excluded"
               ? "border-zinc-600 bg-zinc-100 text-zinc-400"
@@ -6550,12 +7285,33 @@ function getAiCandidateReasonItems(
   reviews: AdminReview[],
 ) {
   const evidence = getAiCandidateEvidence(candidate, reviews);
+  const isNewKeywordCandidate = candidate.candidateKey.startsWith("new-keyword:");
   const reasons = [
     candidate.reason ||
-      "후기/조회/검색 신호가 기준치 이상 반복되어 DB 업데이트 추천으로 분류됐습니다.",
+      (isNewKeywordCandidate
+        ? "후기 본문 반복 신호가 기준치 이상이며 키워드 사전에 등록되지 않았습니다."
+        : "후기/조회/검색 신호가 기준치 이상 반복되어 DB 업데이트 추천으로 분류됐습니다."),
   ];
 
-  if (evidence.reviewCount !== null && evidence.keywordMentionCount !== null) {
+  if (isNewKeywordCandidate) {
+    if (evidence.reviewCount !== null) {
+      reasons.push(
+        "전체 후기 " +
+          evidence.reviewCount.toLocaleString() +
+          "건에서 " +
+          candidate.keyword +
+          " 등장",
+      );
+    }
+
+    if (candidate.recentMentionCount !== undefined) {
+      reasons.push(
+        "최근 30일 언급 " +
+          candidate.recentMentionCount.toLocaleString() +
+          "회",
+      );
+    }
+  } else if (evidence.reviewCount !== null && evidence.keywordMentionCount !== null) {
     reasons.push(
       `최근 30일 후기 ${evidence.reviewCount.toLocaleString()}건에서 '${candidate.keyword}' 언급 ${evidence.keywordMentionCount.toLocaleString()}회`,
     );
@@ -6575,7 +7331,7 @@ function getAiCandidateReasonItems(
     reasons.push(`최근 후기 증가율 ${evidence.recentGrowthRate.toLocaleString()}%`);
   }
 
-  if ((evidence.keywordMentionCount ?? 0) >= 10) {
+  if (!isNewKeywordCandidate && (evidence.keywordMentionCount ?? 0) >= 10) {
     reasons.push("동일 키워드가 기준치 이상 반복되어 DB 업데이트 추천");
   }
 
