@@ -15,7 +15,23 @@ export interface ReviewKeywordStat {
   percentage: number;
 }
 
+interface ReviewKeywordStatsOptions {
+  fuelType?: string;
+}
+
 export const minimumReviewsForKeywordStats = 10;
+
+const dieselOnlyKeywordLabels = new Set([
+  "DPF",
+  "SCR",
+  "고압펌프",
+  "EGR",
+  "매연",
+  "촉매",
+]);
+
+const hasDieselFuelType = (fuelType?: string) =>
+  /디젤|diesel/i.test(fuelType ?? "");
 
 export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
   ...getGroupedVehicleIssueKeywordDefinitions().map((definition) => ({
@@ -44,13 +60,17 @@ export const getReviewKeywordStats = (
   reviews: Review[],
   limit = 5,
   minimumReviewCount = minimumReviewsForKeywordStats,
+  options: ReviewKeywordStatsOptions = {},
 ): ReviewKeywordStat[] => {
   if (reviews.length < minimumReviewCount) {
     return [];
   }
 
+  const isDieselVehicle = hasDieselFuelType(options.fuelType);
   const reviewKeywordLabels = reviews.map((review) =>
-    extractVehicleIssueKeywords(getReviewSearchText(review)),
+    extractVehicleIssueKeywords(getReviewSearchText(review)).filter(
+      (keyword) => isDieselVehicle || !dieselOnlyKeywordLabels.has(keyword),
+    ),
   );
   const stats = reviewKeywordDefinitions
     .map((definition) => {

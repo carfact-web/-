@@ -170,12 +170,12 @@ export default function CarReportPage() {
     [currentVehicleModelKey, modelReviewsSnapshot],
   );
   const modelReviewKeywordStats = useMemo(
-    () => getReviewKeywordStats(modelReviews, 5, 1),
-    [modelReviews],
+    () => getReviewKeywordStats(modelReviews, 5, 1, { fuelType }),
+    [fuelType, modelReviews],
   );
   const focusedReviewKeywordStats = useMemo(
-    () => getReviewKeywordStats(reviews, 5, 1),
-    [reviews],
+    () => getReviewKeywordStats(reviews, 5, 1, { fuelType }),
+    [fuelType, reviews],
   );
   const aiAnalysis = useMemo(
     () =>
