@@ -3,7 +3,7 @@
 import { cn } from "@/utils/cn";
 import type { StructuredAiSummary } from "@/utils/aiSummary";
 import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
-import { formatVehiclePlateNumberForDisplay } from "@/utils/vehiclePlateValidation";
+import { normalizeVehiclePlateNumber } from "@/utils/vehiclePlateValidation";
 
 interface AiSummaryCardProps {
   analysis?: StructuredAiSummary;
@@ -35,6 +35,12 @@ const keywordTagClassName = cn(
 );
 const focusReviewCardClassName = cn(
   "my-3 rounded-2xl border border-red-400/25 bg-[linear-gradient(135deg,rgba(127,29,29,0.44),rgba(24,24,27,0.94))] p-4 text-center shadow-[0_18px_42px_rgba(127,29,29,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]",
+);
+const compactPlateFrameClassName = cn(
+  "plate-input-frame mx-auto w-[190px] max-w-full bg-white sm:w-[240px]",
+);
+const compactPlateNumberClassName = cn(
+  "plate-number-input flex items-center justify-center whitespace-nowrap",
 );
 const maintenancePillListClassName = cn("flex flex-wrap gap-2");
 const maintenancePillClassName = cn(
@@ -79,16 +85,15 @@ const getAnalysisLabel = (analysis: StructuredAiSummary) => {
     .join(" ");
 };
 
+const hasRepeatedIssueKeyword = (keywords: ReviewKeywordStat[]) =>
+  keywords.some((keyword) => keyword.count >= 2);
+
 const getFocusedReviewMessage = (keywordLabels: string[]) => {
   if (keywordLabels.length === 0) {
     return "현재 등록된 후기에서는 특별한 문제점이 확인되지 않았습니다. 😊";
   }
 
-  return (
-    "이 차량에서는\n" +
-    keywordLabels.join(",\n") +
-    "\n관련 언급이 확인되었습니다."
-  );
+  return "이 차량에서는 " + keywordLabels.join(", ") + " 관련 언급이 확인되었습니다.";
 };
 
 export function AiSummaryCard({
@@ -120,9 +125,12 @@ export function AiSummaryCard({
   const focusedReviewKeywordLabels =
     getFocusedReviewKeywordLabels(focusedReviewKeywords);
   const maintenancePillLabels = getMaintenancePillLabels(analysis);
-  const plateNumber = formatVehiclePlateNumberForDisplay(
+  const plateNumber = normalizeVehiclePlateNumber(
     analysis.vehicle.vehicleNumber ?? "",
   );
+  const shouldShowKeywordFallback =
+    analysis.reviewKeywords.length === 0 ||
+    !hasRepeatedIssueKeyword(analysis.reviewKeywords);
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -144,13 +152,20 @@ export function AiSummaryCard({
       <section className={sectionClassName}>
         <h3 className={sectionTitleClassName}>많이 언급된 키워드</h3>
         {analysis.reviewKeywords.length > 0 ? (
-          <ul className={keywordListClassName}>
-            {analysis.reviewKeywords.map((keyword) => (
-              <li key={keyword.label} className={keywordTagClassName}>
-                {"#" + keyword.label}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className={keywordListClassName}>
+              {analysis.reviewKeywords.map((keyword) => (
+                <li key={keyword.label} className={keywordTagClassName}>
+                  {"#" + keyword.label}
+                </li>
+              ))}
+            </ul>
+            {shouldShowKeywordFallback ? (
+              <p className="mt-2 text-sm leading-6 text-zinc-500">
+                현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
             현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉
@@ -159,12 +174,32 @@ export function AiSummaryCard({
       </section>
 
       <section className={focusReviewCardClassName}>
-        <div className="plate-input-frame mx-auto max-w-[320px] bg-white sm:max-w-[360px]">
-          <div className="plate-number-input flex items-center justify-center">
+        <div className={compactPlateFrameClassName}>
+          <div
+            className={compactPlateNumberClassName}
+            style={{
+              fontSize: "20px",
+              height: "48px",
+              letterSpacing: "1px",
+              padding: "0 36px",
+            }}
+          >
             {plateNumber || "차량번호"}
           </div>
         </div>
-        <p className="mx-auto mt-4 max-w-[260px] whitespace-pre-line text-sm font-semibold leading-6 text-red-50/90">
+        <p className="mt-3 text-xs font-semibold leading-5 text-red-100/75 sm:text-sm">
+          이 차량번호로 등록된 후기를 기준으로 요약했습니다.
+        </p>
+        {focusedReviewKeywordLabels.length > 0 ? (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {focusedReviewKeywordLabels.map((keyword) => (
+              <span key={keyword} className={keywordTagClassName}>
+                {"#" + keyword}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <p className="mx-auto mt-3 max-w-[300px] text-sm font-semibold leading-6 text-red-50/90">
           {getFocusedReviewMessage(focusedReviewKeywordLabels)}
         </p>
         <p className="mt-2 text-xs font-semibold leading-5 text-red-100/70 sm:text-sm">
@@ -184,7 +219,7 @@ export function AiSummaryCard({
           </div>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
-            현재 표시할 정비 항목이 없습니다.
+            자주 확인되는 정비 항목이 아직 없습니다.
           </p>
         )}
       </section>
