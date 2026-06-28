@@ -162,6 +162,36 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     relatedParts: ["등속조인트", "부트", "드라이브 샤프트"],
     inspectionTitle: "등속조인트 부트 확인",
   },
+  {
+    label: "냄새",
+    aliases: ["냄새"],
+    relatedParts: ["실내", "공조 장치"],
+    inspectionTitle: "실내 냄새 확인",
+  },
+  {
+    label: "흡연",
+    aliases: ["흡연"],
+    relatedParts: ["실내", "시트", "천장 내장재"],
+    inspectionTitle: "흡연 흔적 확인",
+  },
+  {
+    label: "담배냄새",
+    aliases: ["담배냄새", "담배 냄새"],
+    relatedParts: ["실내", "시트", "천장 내장재"],
+    inspectionTitle: "담배냄새 확인",
+  },
+  {
+    label: "실내냄새",
+    aliases: ["실내냄새", "실내 냄새"],
+    relatedParts: ["실내", "공조 장치", "시트"],
+    inspectionTitle: "실내냄새 확인",
+  },
+  {
+    label: "악취",
+    aliases: ["악취"],
+    relatedParts: ["실내", "공조 장치"],
+    inspectionTitle: "실내 악취 확인",
+  },
 ];
 
 const normalizeKeywordText = (value: string) =>
