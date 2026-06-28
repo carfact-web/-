@@ -22,10 +22,12 @@ interface AiSummaryOptions {
   generation?: string;
   fuelType?: string;
   grade?: string;
+  hasScr?: boolean | number | string | null;
   inspectionProfile?: VehicleInspectionProfile | null;
   productUrl?: string;
   reviewCount?: number;
   reviewKeywordStats?: ReviewKeywordStat[];
+  scrType?: boolean | number | string | null;
   vehicleNumber?: string;
 }
 
@@ -41,6 +43,8 @@ export interface UsedCarProductApiResponse {
   mileage?: string | number | null;
   fuelType?: string | null;
   grade?: string | null;
+  hasScr?: boolean | number | string | null;
+  scrType?: boolean | number | string | null;
   trim?: string | null;
   reviewKeywords?: ReviewKeywordStat[];
 }
@@ -107,7 +111,8 @@ const stringifyApiValue = (value: string | number | null | undefined) =>
 
 export const mapUsedCarProductApiResponseToAiSummaryInput = (
   response: UsedCarProductApiResponse,
-): AiSummaryVehicleSource & { reviewKeywordStats?: ReviewKeywordStat[] } => ({
+): AiSummaryVehicleSource &
+  Pick<AiSummaryOptions, "hasScr" | "reviewKeywordStats" | "scrType"> => ({
   vehicleNumber: stringifyApiValue(response.vehicleNumber) || undefined,
   productUrl: stringifyApiValue(response.productUrl) || undefined,
   brand:
@@ -123,6 +128,8 @@ export const mapUsedCarProductApiResponseToAiSummaryInput = (
     stringifyApiValue(response.grade) ||
     stringifyApiValue(response.trim) ||
     undefined,
+  hasScr: response.hasScr,
+  scrType: response.scrType,
   reviewKeywordStats: response.reviewKeywords,
 });
 
@@ -475,64 +482,32 @@ const parseVehicleMileage = (mileage: string) => {
 const normalizeMaintenancePart = (part: string) =>
   part.toLowerCase().replace(/[^0-9a-z가-힣/]+/g, "");
 
-const hasCommercialDieselSignal = (...values: Array<string | undefined>) =>
-  values.some((value) =>
-    /화물|상용|트럭|카고|포터|봉고|마이티|탑차|냉동탑|윙바디|리프트/i.test(
-      value ?? "",
-    ),
-  );
-
-const hasScrSignal = (
-  inspectionProfile: VehicleInspectionProfile | null | undefined,
-  reviewKeywordStats: ReviewKeywordStat[],
-  ...values: Array<string | undefined>
+const isExplicitScrValue = (
+  value: boolean | number | string | null | undefined,
 ) => {
-  const vehicleText = values.join(" ");
-  const profileText = [
-    inspectionProfile?.summary,
-    ...(inspectionProfile?.checkItems.flatMap((item) => [
-      item.title,
-      item.aiSummary,
-      item.relatedParts.join(" "),
-    ]) ?? []),
-  ].join(" ");
-  const keywordText = reviewKeywordStats
-    .map((keyword) => keyword.label)
-    .join(" ");
+  if (value === true || value === 1) {
+    return true;
+  }
 
-  return /요소수|SCR|AdBlue|유로6|DPF\/SCR/i.test(
-    [vehicleText, profileText, keywordText].join(" "),
-  );
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (
+    !normalizedValue ||
+    /^(false|0|no|none|null|unknown|미상|없음|미적용)$/.test(normalizedValue)
+  ) {
+    return false;
+  }
+
+  return /scr|adblue|요소수|적용|true|yes/.test(normalizedValue);
 };
 
 const shouldIncludeScrMaintenance = (
-  year: string,
-  brand: string,
-  model: string,
   options: AiSummaryOptions,
-  inspectionProfile: VehicleInspectionProfile | null | undefined,
-  reviewKeywordStats: ReviewKeywordStat[],
-) => {
-  const yearNumber = parseVehicleYear(year);
-
-  return (
-    (yearNumber !== null && yearNumber >= 2015) ||
-    hasCommercialDieselSignal(
-      brand,
-      model,
-      options.generation,
-      options.grade,
-    ) ||
-    hasScrSignal(
-      inspectionProfile,
-      reviewKeywordStats,
-      brand,
-      model,
-      options.generation,
-      options.grade,
-    )
-  );
-};
+) => isExplicitScrValue(options.hasScr) || isExplicitScrValue(options.scrType);
 
 interface DefaultMaintenanceRule {
   fuelType: "gasoline-lpg";
@@ -600,11 +575,8 @@ const getExistingMaintenancePartSet = (
 const addDefaultMaintenanceIssue = (
   issues: AiSummaryMaintenanceIssue[],
   year: string,
-  brand: string,
-  model: string,
   mileage: string,
   options: AiSummaryOptions,
-  inspectionProfile: VehicleInspectionProfile | null | undefined,
   reviewKeywordStats: ReviewKeywordStat[],
 ) => {
   const existingParts = getExistingMaintenancePartSet(
@@ -647,16 +619,7 @@ const addDefaultMaintenanceIssue = (
 
   const defaultParts = ["DPF", "터보", "인젝터", "촉매"];
 
-  if (
-    shouldIncludeScrMaintenance(
-      year,
-      brand,
-      model,
-      options,
-      inspectionProfile,
-      reviewKeywordStats,
-    )
-  ) {
+  if (shouldIncludeScrMaintenance(options)) {
     defaultParts.push("요소수/SCR");
   }
 
@@ -754,11 +717,8 @@ const getMaintenanceIssues = (
   return addDefaultMaintenanceIssue(
     issues,
     year,
-    brand,
-    model,
     mileage,
     options,
-    inspectionProfile,
     reviewKeywordStats,
   );
 };
@@ -1224,8 +1184,10 @@ export function getStructuredAiSummaryFromApiResponse(
       fuelType: input.fuelType,
       generation: input.generation,
       grade: input.grade,
+      hasScr: input.hasScr,
       productUrl: input.productUrl,
       reviewKeywordStats: input.reviewKeywordStats,
+      scrType: input.scrType,
       vehicleNumber: input.vehicleNumber,
     },
   );
