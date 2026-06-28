@@ -34,10 +34,10 @@ const keywordTagClassName = cn(
   "rounded-full border border-white/[0.08] bg-white/[0.05] px-3 py-1.5 text-sm font-black text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
 );
 const focusReviewCardClassName = cn(
-  "my-3 rounded-2xl border border-red-400/25 bg-[linear-gradient(135deg,rgba(127,29,29,0.44),rgba(24,24,27,0.94))] p-4 text-center shadow-[0_18px_42px_rgba(127,29,29,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]",
+  "my-3 rounded-2xl border border-blue-400/25 bg-[rgba(45,105,255,0.10)] p-4 text-left shadow-[0_0_18px_rgba(80,140,255,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]",
 );
 const compactPlateFrameClassName = cn(
-  "plate-input-frame mx-auto w-[190px] max-w-full bg-white sm:w-[240px]",
+  "plate-input-frame w-[170px] max-w-full bg-white sm:w-[220px]",
 );
 const compactPlateNumberClassName = cn(
   "plate-number-input flex items-center justify-center whitespace-nowrap",
@@ -131,6 +131,9 @@ export function AiSummaryCard({
   const shouldShowKeywordFallback =
     analysis.reviewKeywords.length === 0 ||
     !hasRepeatedIssueKeyword(analysis.reviewKeywords);
+  const overviewMessage = shouldShowKeywordFallback
+    ? "현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉"
+    : "등록된 후기를 분석하여 자주 언급된 내용을 보여드립니다.";
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -145,53 +148,42 @@ export function AiSummaryCard({
 
       <section className={sectionClassName}>
         <div className={overviewClassName}>
-          <p>등록된 후기를 분석하여 자주 언급된 내용을 보여드립니다.</p>
+          <p>{overviewMessage}</p>
         </div>
       </section>
 
-      <section className={sectionClassName}>
-        <h3 className={sectionTitleClassName}>많이 언급된 키워드</h3>
-        {analysis.reviewKeywords.length > 0 ? (
-          <>
-            <ul className={keywordListClassName}>
-              {analysis.reviewKeywords.map((keyword) => (
-                <li key={keyword.label} className={keywordTagClassName}>
-                  {"#" + keyword.label}
-                </li>
-              ))}
-            </ul>
-            {shouldShowKeywordFallback ? (
-              <p className="mt-2 text-sm leading-6 text-zinc-500">
-                현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm leading-6 text-zinc-500">
-            현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉
-          </p>
-        )}
-      </section>
+      {analysis.reviewKeywords.length > 0 ? (
+        <section className={sectionClassName}>
+          <h3 className={sectionTitleClassName}>많이 언급된 키워드</h3>
+          <ul className={keywordListClassName}>
+            {analysis.reviewKeywords.map((keyword) => (
+              <li key={keyword.label} className={keywordTagClassName}>
+                {"#" + keyword.label}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className={focusReviewCardClassName}>
         <div className={compactPlateFrameClassName}>
           <div
             className={compactPlateNumberClassName}
             style={{
-              fontSize: "20px",
-              height: "48px",
+              fontSize: "17px",
+              height: "40px",
               letterSpacing: "1px",
-              padding: "0 36px",
+              padding: "0 28px",
             }}
           >
             {plateNumber || "차량번호"}
           </div>
         </div>
-        <p className="mt-3 text-xs font-semibold leading-5 text-red-100/75 sm:text-sm">
+        <p className="mt-3 text-xs font-semibold leading-5 text-blue-100/75 sm:text-sm">
           이 차량번호로 등록된 후기를 기준으로 요약했습니다.
         </p>
         {focusedReviewKeywordLabels.length > 0 ? (
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             {focusedReviewKeywordLabels.map((keyword) => (
               <span key={keyword} className={keywordTagClassName}>
                 {"#" + keyword}
@@ -199,10 +191,10 @@ export function AiSummaryCard({
             ))}
           </div>
         ) : null}
-        <p className="mx-auto mt-3 max-w-[300px] text-sm font-semibold leading-6 text-red-50/90">
+        <p className="mt-3 max-w-[360px] text-sm font-semibold leading-6 text-blue-50/90">
           {getFocusedReviewMessage(focusedReviewKeywordLabels)}
         </p>
-        <p className="mt-2 text-xs font-semibold leading-5 text-red-100/70 sm:text-sm">
+        <p className="mt-2 text-xs font-semibold leading-5 text-blue-100/70 sm:text-sm">
           자세한 내용은 아래 실제 후기를 확인해보세요.👇
         </p>
       </section>
