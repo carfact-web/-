@@ -1366,7 +1366,9 @@ const createNewKeywordCandidatesFromReviewContent = (
       const isCandidate =
         aggregate.recentReviewCount >= 3 ||
         aggregate.totalReviewCount >= 5 ||
-        (recentGrowthRate ?? 0) >= 100 ||
+        ((recentGrowthRate ?? 0) >= 100 &&
+          aggregate.recentReviewCount >= 2 &&
+          aggregate.mentionCount >= 2) ||
         hasSpecificModelRepeat;
       const statusRow = statusMap.get(candidateKey);
       const exampleText = aggregate.exampleSentences.join(" ");
