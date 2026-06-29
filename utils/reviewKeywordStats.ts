@@ -30,8 +30,14 @@ const dieselOnlyKeywordLabels = new Set([
   "촉매",
 ]);
 
+const dieselKeywordPriority = new Map(
+  ["DPF", "EGR", "인젝터", "고압펌프", "매연", "촉매", "SCR"].map(
+    (label, index) => [label, index],
+  ),
+);
+
 const hasDieselFuelType = (fuelType?: string) =>
-  /디젤|diesel/i.test(fuelType ?? "");
+  /디젤|경유|diesel/i.test(fuelType ?? "");
 
 export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
   ...getGroupedVehicleIssueKeywordDefinitions().map((definition) => ({
@@ -87,7 +93,20 @@ export const getReviewKeywordStats = (
       };
     })
     .filter((stat) => stat.count > 0)
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "ko"));
+    .sort((left, right) => {
+      const leftDieselPriority = isDieselVehicle
+        ? (dieselKeywordPriority.get(left.label) ?? Number.MAX_SAFE_INTEGER)
+        : Number.MAX_SAFE_INTEGER;
+      const rightDieselPriority = isDieselVehicle
+        ? (dieselKeywordPriority.get(right.label) ?? Number.MAX_SAFE_INTEGER)
+        : Number.MAX_SAFE_INTEGER;
+
+      return (
+        right.count - left.count ||
+        leftDieselPriority - rightDieselPriority ||
+        left.label.localeCompare(right.label, "ko")
+      );
+    });
 
   return stats.slice(0, limit);
 };
