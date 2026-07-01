@@ -53,7 +53,6 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
       "피스톤 스커핑",
       "보어스커핑",
       "보어 스커핑",
-      "스크래치",
       "실린더스크래치",
       "실린더 스크래치",
     ],
@@ -537,26 +536,74 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     inspectionTitle: "실내 냄새 확인",
   },
   {
-    label: "외관/사고",
-    groupLabel: "외관/사고",
+    label: "외관",
+    groupLabel: "외관",
     aliases: [
+      "외관",
       "외판",
-      "판금",
       "도색",
+      "도장",
+      "스크래치",
+      "기스",
+      "흠집",
+      "찍힘",
+      "문콕",
+      "범퍼",
+      "휀다",
+      "펜더",
+      "본넷",
+      "본네트",
+      "트렁크",
+      "트렁크리드",
+      "썬팅",
+      "선팅",
+      "틴팅",
+      "광택",
+    ],
+    relatedParts: ["외판", "도장면", "범퍼", "휀다", "본넷", "트렁크"],
+    inspectionTitle: "외관 상태 확인",
+  },
+  {
+    label: "부식",
+    groupLabel: "부식",
+    aliases: [
+      "부식",
+      "녹",
+      "녹슨",
+      "산화",
+      "백화",
+      "미세부식",
+      "미세 부식",
+    ],
+    relatedParts: ["차체", "하부", "프레임", "외판"],
+    inspectionTitle: "부식 상태 확인",
+  },
+  {
+    label: "사고",
+    groupLabel: "사고",
+    aliases: [
+      "사고",
+      "사고이력",
+      "사고 이력",
+      "보험이력",
+      "보험 이력",
+      "판금",
+      "판금도색",
+      "판금 도색",
       "교환",
       "단순교환",
       "단순 교환",
-      "사고",
-      "보험이력",
-      "보험 이력",
-      "부식",
-      "녹",
+      "골격",
+      "프레임",
       "침수",
     ],
-    relatedParts: ["외판", "도장면", "프레임", "사고 이력"],
-    inspectionTitle: "외관/사고 이력 확인",
+    relatedParts: ["외판", "골격", "프레임", "사고 이력", "보험 이력"],
+    inspectionTitle: "사고 이력 확인",
   },
 ];
+
+const appearanceFallbackLabel = "외관";
+const appearanceSpecificLabels = new Set(["부식", "사고"]);
 
 const normalizeKeywordText = (value: string) =>
   value.toLowerCase().replace(/[^0-9a-z가-힣]+/g, "");
@@ -639,7 +686,7 @@ const getMatchedVehicleIssueKeywords = (
     })
     .filter((definition) => definition.aliases.length > 0);
 
-  return matchedDefinitions.filter((definition) =>
+  const filteredDefinitions = matchedDefinitions.filter((definition) =>
     definition.aliases.some((alias) => {
       const normalizedAlias = normalizeKeywordText(alias);
 
@@ -657,6 +704,18 @@ const getMatchedVehicleIssueKeywords = (
       );
     }),
   );
+
+  if (
+    filteredDefinitions.some((definition) =>
+      appearanceSpecificLabels.has(definition.label),
+    )
+  ) {
+    return filteredDefinitions.filter(
+      (definition) => definition.label !== appearanceFallbackLabel,
+    );
+  }
+
+  return filteredDefinitions;
 };
 
 export const extractVehicleIssueKeywords = (content: string) => {
