@@ -142,6 +142,19 @@ interface AdminNewKeywordCandidateFormValues {
   registerAsRepresentative: boolean;
 }
 
+interface AdminCommunityNoticeFormValues {
+  content: string;
+  isPinned: boolean;
+  title: string;
+}
+
+interface AdminPopupNoticeFormValues {
+  content: string;
+  isActive: boolean;
+  linkUrl: string;
+  title: string;
+}
+
 interface AdminStats {
   comments: number;
   communityPosts: number;
@@ -909,6 +922,23 @@ const createKnowledgeTermFormValues = (
   relatedModels: formatAdminListInput(term?.related_models ?? []),
   representativeName: term?.representative_name ?? "",
   slug: term?.slug ?? "",
+});
+
+const createCommunityNoticeFormValues = (
+  notice?: AdminCommunityPost,
+): AdminCommunityNoticeFormValues => ({
+  content: notice?.content ?? "",
+  isPinned: notice?.is_pinned ?? false,
+  title: notice?.title ?? "",
+});
+
+const createPopupNoticeFormValues = (
+  notice?: AdminPopupNotice,
+): AdminPopupNoticeFormValues => ({
+  content: notice?.content ?? "",
+  isActive: notice?.is_active ?? true,
+  linkUrl: notice?.link_url ?? "",
+  title: notice?.title ?? "",
 });
 
 const normalizeAdminKnowledgeTerm = (
@@ -1914,6 +1944,19 @@ export default function AdminPage() {
   const [selectedPopupNoticeId, setSelectedPopupNoticeId] = useState<
     string | null
   >(null);
+  const [editingNotice, setEditingNotice] = useState<AdminCommunityPost | null>(
+    null,
+  );
+  const [noticeFormValues, setNoticeFormValues] =
+    useState<AdminCommunityNoticeFormValues>(
+      createCommunityNoticeFormValues(),
+    );
+  const [isNoticeFormOpen, setIsNoticeFormOpen] = useState(false);
+  const [editingPopupNotice, setEditingPopupNotice] =
+    useState<AdminPopupNotice | null>(null);
+  const [popupNoticeFormValues, setPopupNoticeFormValues] =
+    useState<AdminPopupNoticeFormValues>(createPopupNoticeFormValues());
+  const [isPopupNoticeFormOpen, setIsPopupNoticeFormOpen] = useState(false);
   const [selectedKnowledgeTermId, setSelectedKnowledgeTermId] = useState<
     string | null
   >(null);
@@ -2987,11 +3030,6 @@ export default function AdminPage() {
       return;
     }
 
-    if (window.prompt("영구삭제하려면 DELETE를 입력하세요.") !== "DELETE") {
-      setActionMessage("영구삭제를 취소했습니다.");
-      return;
-    }
-
     const client = supabase;
 
     setActionMessage("");
@@ -3033,11 +3071,6 @@ export default function AdminPage() {
     if (
       !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
     ) {
-      return;
-    }
-
-    if (window.prompt("영구삭제하려면 DELETE를 입력하세요.") !== "DELETE") {
-      setActionMessage("영구삭제를 취소했습니다.");
       return;
     }
 
@@ -3144,11 +3177,6 @@ export default function AdminPage() {
       return;
     }
 
-    if (window.prompt("영구삭제하려면 DELETE를 입력하세요.") !== "DELETE") {
-      setActionMessage("영구삭제를 취소했습니다.");
-      return;
-    }
-
     const client = supabase;
 
     setActionMessage("");
@@ -3190,11 +3218,6 @@ export default function AdminPage() {
     if (
       !window.confirm("영구삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?")
     ) {
-      return;
-    }
-
-    if (window.prompt("영구삭제하려면 DELETE를 입력하세요.") !== "DELETE") {
-      setActionMessage("영구삭제를 취소했습니다.");
       return;
     }
 
@@ -3445,34 +3468,36 @@ export default function AdminPage() {
   };
 
   const upsertCommunityNotice = async (notice?: AdminCommunityPost) => {
+    setEditingNotice(notice ?? null);
+    setNoticeFormValues(createCommunityNoticeFormValues(notice));
+    setIsNoticeFormOpen(true);
+  };
+
+  const closeCommunityNoticeForm = () => {
+    setIsNoticeFormOpen(false);
+    setEditingNotice(null);
+  };
+
+  const saveCommunityNotice = async () => {
     if (!supabase) {
       return;
     }
 
-    const nextTitle = window.prompt("공지 제목", notice?.title ?? "");
-
-    if (nextTitle === null) {
+    if (!noticeFormValues.title.trim()) {
+      setActionMessage("공지 제목을 입력해주세요.");
       return;
     }
-
-    const nextContent = window.prompt("공지 내용", notice?.content ?? "");
-
-    if (nextContent === null) {
-      return;
-    }
-
-    const nextPinned = window.confirm("상단고정 공지로 설정하시겠습니까?");
 
     setActionMessage("");
 
     const { data, error } = await supabase.rpc(
       "admin_upsert_community_notice",
       {
-        next_category: notice?.category ?? "news",
-        next_content: nextContent,
-        next_is_pinned: nextPinned,
-        next_title: nextTitle,
-        target_post_id: notice?.id ?? null,
+        next_category: editingNotice?.category ?? "news",
+        next_content: noticeFormValues.content,
+        next_is_pinned: noticeFormValues.isPinned,
+        next_title: noticeFormValues.title.trim(),
+        target_post_id: editingNotice?.id ?? null,
       },
     );
 
@@ -3486,7 +3511,10 @@ export default function AdminPage() {
       return;
     }
 
-    setActionMessage(notice ? "공지를 수정했습니다." : "공지를 작성했습니다.");
+    setActionMessage(
+      editingNotice ? "공지를 수정했습니다." : "공지를 작성했습니다.",
+    );
+    closeCommunityNoticeForm();
     await loadAdminData();
   };
 
@@ -3519,40 +3547,36 @@ export default function AdminPage() {
   };
 
   const upsertPopupNotice = async (notice?: AdminPopupNotice) => {
+    setEditingPopupNotice(notice ?? null);
+    setPopupNoticeFormValues(createPopupNoticeFormValues(notice));
+    setIsPopupNoticeFormOpen(true);
+  };
+
+  const closePopupNoticeForm = () => {
+    setIsPopupNoticeFormOpen(false);
+    setEditingPopupNotice(null);
+  };
+
+  const savePopupNotice = async () => {
     if (!supabase) {
       return;
     }
 
-    const nextTitle = window.prompt("팝업공지 제목", notice?.title ?? "");
-
-    if (nextTitle === null) {
+    if (!popupNoticeFormValues.title.trim()) {
+      setActionMessage("팝업공지 제목을 입력해주세요.");
       return;
     }
-
-    const nextContent = window.prompt("팝업공지 내용", notice?.content ?? "");
-
-    if (nextContent === null) {
-      return;
-    }
-
-    const nextLinkUrl = window.prompt("연결 URL", notice?.link_url ?? "");
-
-    if (nextLinkUrl === null) {
-      return;
-    }
-
-    const nextIsActive = window.confirm("팝업공지를 활성화하시겠습니까?");
 
     setActionMessage("");
 
     const { data, error } = await supabase.rpc("admin_upsert_popup_notice", {
-      next_content: nextContent,
-      next_ends_at: notice?.ends_at ?? null,
-      next_is_active: nextIsActive,
-      next_link_url: nextLinkUrl || null,
-      next_starts_at: notice?.starts_at ?? null,
-      next_title: nextTitle,
-      target_notice_id: notice?.id ?? null,
+      next_content: popupNoticeFormValues.content,
+      next_ends_at: editingPopupNotice?.ends_at ?? null,
+      next_is_active: popupNoticeFormValues.isActive,
+      next_link_url: popupNoticeFormValues.linkUrl || null,
+      next_starts_at: editingPopupNotice?.starts_at ?? null,
+      next_title: popupNoticeFormValues.title.trim(),
+      target_notice_id: editingPopupNotice?.id ?? null,
     });
 
     if (error) {
@@ -3566,8 +3590,9 @@ export default function AdminPage() {
     }
 
     setActionMessage(
-      notice ? "팝업공지를 수정했습니다." : "팝업공지를 작성했습니다.",
+      editingPopupNotice ? "팝업공지를 수정했습니다." : "팝업공지를 작성했습니다.",
     );
+    closePopupNoticeForm();
     await loadAdminData();
   };
 
@@ -5348,6 +5373,24 @@ export default function AdminPage() {
               </div>
             </section>
           </div>
+        ) : null}
+
+        {isNoticeFormOpen ? (
+          <CommunityNoticeModal
+            onChange={setNoticeFormValues}
+            onClose={closeCommunityNoticeForm}
+            onSubmit={() => void saveCommunityNotice()}
+            values={noticeFormValues}
+          />
+        ) : null}
+
+        {isPopupNoticeFormOpen ? (
+          <PopupNoticeModal
+            onChange={setPopupNoticeFormValues}
+            onClose={closePopupNoticeForm}
+            onSubmit={() => void savePopupNotice()}
+            values={popupNoticeFormValues}
+          />
         ) : null}
 
         {selectedPost ? (
@@ -7740,6 +7783,95 @@ function CheckboxField({
       />
       {label}
     </label>
+  );
+}
+
+function CommunityNoticeModal({
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  onChange: (values: AdminCommunityNoticeFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminCommunityNoticeFormValues;
+}) {
+  const updateValues = (patch: Partial<AdminCommunityNoticeFormValues>) =>
+    onChange({ ...values, ...patch });
+
+  return (
+    <AdminModal onClose={onClose} onSubmit={onSubmit} title="공지">
+      <div className="grid gap-4">
+        <FormField label="공지 제목" required>
+          <input
+            className={adminInputClassName}
+            value={values.title}
+            onChange={(event) => updateValues({ title: event.target.value })}
+          />
+        </FormField>
+        <FormField label="공지 내용">
+          <textarea
+            className={cn(adminInputClassName, "min-h-44")}
+            value={values.content}
+            onChange={(event) => updateValues({ content: event.target.value })}
+          />
+        </FormField>
+        <CheckboxField
+          checked={values.isPinned}
+          label="상단고정 공지"
+          onChange={(checked) => updateValues({ isPinned: checked })}
+        />
+      </div>
+    </AdminModal>
+  );
+}
+
+function PopupNoticeModal({
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  onChange: (values: AdminPopupNoticeFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminPopupNoticeFormValues;
+}) {
+  const updateValues = (patch: Partial<AdminPopupNoticeFormValues>) =>
+    onChange({ ...values, ...patch });
+
+  return (
+    <AdminModal onClose={onClose} onSubmit={onSubmit} title="팝업공지">
+      <div className="grid gap-4">
+        <FormField label="팝업공지 제목" required>
+          <input
+            className={adminInputClassName}
+            value={values.title}
+            onChange={(event) => updateValues({ title: event.target.value })}
+          />
+        </FormField>
+        <FormField label="팝업공지 내용">
+          <textarea
+            className={cn(adminInputClassName, "min-h-36")}
+            value={values.content}
+            onChange={(event) => updateValues({ content: event.target.value })}
+          />
+        </FormField>
+        <FormField label="연결 URL">
+          <input
+            className={adminInputClassName}
+            value={values.linkUrl}
+            onChange={(event) => updateValues({ linkUrl: event.target.value })}
+          />
+        </FormField>
+        <CheckboxField
+          checked={values.isActive}
+          label="팝업공지 활성화"
+          onChange={(checked) => updateValues({ isActive: checked })}
+        />
+      </div>
+    </AdminModal>
   );
 }
 
