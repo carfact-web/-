@@ -99,12 +99,18 @@ interface AdminAiKeywordRule {
   memo: string;
 }
 
+type AdminMaintenanceConditionOperator = "" | ">=" | "<=" | "=";
+
 interface AdminAiMaintenanceRule {
   id: string;
   title: string;
   condition: string;
   fuelType: string;
   items: string[];
+  yearOperator: AdminMaintenanceConditionOperator;
+  yearValue: number | null;
+  mileageOperator: AdminMaintenanceConditionOperator;
+  mileageValue: number | null;
   isVisible: boolean;
   memo: string;
 }
@@ -127,9 +133,11 @@ interface AdminAiMaintenanceRuleFormValues {
   isVisible: boolean;
   items: string;
   memo: string;
-  mileageCondition: string;
+  mileageOperator: AdminMaintenanceConditionOperator;
+  mileageValue: string;
   title: string;
-  yearCondition: string;
+  yearOperator: AdminMaintenanceConditionOperator;
+  yearValue: string;
 }
 
 interface AdminNewKeywordCandidateFormValues {
@@ -902,9 +910,11 @@ const createMaintenanceRuleFormValues = (
   isVisible: rule?.isVisible ?? true,
   items: formatAdminListInput(rule?.items ?? []),
   memo: rule?.memo ?? "",
-  mileageCondition: "",
+  mileageOperator: rule?.mileageOperator ?? "",
+  mileageValue: rule?.mileageValue ? String(rule.mileageValue) : "",
   title: rule?.title ?? "",
-  yearCondition: "",
+  yearOperator: rule?.yearOperator ?? "",
+  yearValue: rule?.yearValue ? String(rule.yearValue) : "",
 });
 
 const createKnowledgeTermFormValues = (
@@ -1271,15 +1281,23 @@ const initialAiMaintenanceRules: AdminAiMaintenanceRule[] = [
     condition: "유종이 디젤인 차량",
     fuelType: "디젤",
     items: ["DPF", "터보", "인젝터", "촉매"],
+    yearOperator: "",
+    yearValue: null,
+    mileageOperator: "",
+    mileageValue: null,
     isVisible: true,
     memo: "요소수/SCR은 명시 SCR 데이터가 있을 때만 별도 노출",
   },
   {
     id: "gasoline-lpg-aged",
     title: "가솔린/LPG 연식·주행거리 기본 항목",
-    condition: "5년 이상 또는 50,000km 이상",
+    condition: "가솔린/LPG 차량",
     fuelType: "가솔린/LPG",
     items: ["점화코일", "점화플러그"],
+    yearOperator: ">=",
+    yearValue: 5,
+    mileageOperator: ">=",
+    mileageValue: 50000,
     isVisible: true,
     memo: "디젤 차량에는 적용하지 않음",
   },
@@ -1289,6 +1307,10 @@ const initialAiMaintenanceRules: AdminAiMaintenanceRule[] = [
     condition: "DB에서 hasScr=true 또는 scrType이 확인된 차량",
     fuelType: "디젤",
     items: ["요소수/SCR"],
+    yearOperator: "",
+    yearValue: null,
+    mileageOperator: "",
+    mileageValue: null,
     isVisible: true,
     memo: "연식만으로 자동 노출 금지",
   },
@@ -1307,6 +1329,166 @@ const readStoredAdminRules = <Rule,>(key: string, fallback: Rule[]): Rule[] => {
     return fallback;
   }
 };
+
+const maintenanceConditionOperators: {
+  label: string;
+  value: AdminMaintenanceConditionOperator;
+}[] = [
+  { label: "없음", value: "" },
+  { label: "이상(>=)", value: ">=" },
+  { label: "이하(<=)", value: "<=" },
+  { label: "같음(=)", value: "=" },
+];
+
+const normalizeMaintenanceOperator = (
+  value: unknown,
+): AdminMaintenanceConditionOperator =>
+  value === ">=" || value === "<=" || value === "=" ? value : "";
+
+const parseMaintenanceValue = (value: unknown): number | null => {
+  const parsedValue =
+    typeof value === "number"
+      ? value
+      : Number(String(value ?? "").replace(/,/g, ""));
+
+  return Number.isFinite(parsedValue) && parsedValue > 0
+    ? Math.floor(parsedValue)
+    : null;
+};
+
+const findLegacyMaintenanceCondition = (
+  condition: string,
+  unit: "년" | "km",
+): {
+  operator: AdminMaintenanceConditionOperator;
+  value: number | null;
+} => {
+  const escapedUnit = unit === "km" ? "(?:km|KM|Km)" : "년";
+  const pattern = new RegExp(
+    "([0-9][0-9,]*)\\s*" +
+      escapedUnit +
+      "\\s*(이상|이하|같음|=|>=|<=)",
+  );
+  const match = condition.match(pattern);
+
+  if (!match) {
+    return { operator: "", value: null };
+  }
+
+  const operator =
+    match[2] === "이상" || match[2] === ">="
+      ? ">="
+      : match[2] === "이하" || match[2] === "<="
+        ? "<="
+        : "=";
+
+  return {
+    operator,
+    value: parseMaintenanceValue(match[1]),
+  };
+};
+
+const stripStructuredMaintenanceCondition = (condition: string) =>
+  condition
+    .split(" / ")
+    .filter(
+      (part) =>
+        !part.trim().startsWith("연식 ") &&
+        !part.trim().startsWith("주행거리 "),
+    )
+    .join(" / ");
+
+const normalizeAiMaintenanceRule = (
+  rule: Partial<AdminAiMaintenanceRule>,
+): AdminAiMaintenanceRule => {
+  const legacyCondition = String(rule.condition ?? "");
+  const baseCondition =
+    rule.id === "gasoline-lpg-aged" &&
+    legacyCondition === "5년 이상 또는 50,000km 이상"
+      ? "가솔린/LPG 차량"
+      : stripStructuredMaintenanceCondition(legacyCondition);
+  const legacyYear = findLegacyMaintenanceCondition(legacyCondition, "년");
+  const legacyMileage = findLegacyMaintenanceCondition(legacyCondition, "km");
+  const yearOperator =
+    normalizeMaintenanceOperator(rule.yearOperator) || legacyYear.operator;
+  const mileageOperator =
+    normalizeMaintenanceOperator(rule.mileageOperator) || legacyMileage.operator;
+  const yearValue = parseMaintenanceValue(rule.yearValue) ?? legacyYear.value;
+  const mileageValue =
+    parseMaintenanceValue(rule.mileageValue) ?? legacyMileage.value;
+
+  return {
+    id: String(rule.id ?? "custom-maintenance-" + Date.now()),
+    title: String(rule.title ?? ""),
+    condition: baseCondition,
+    fuelType: String(rule.fuelType ?? ""),
+    items: Array.isArray(rule.items)
+      ? rule.items.map((item) => String(item)).filter(Boolean)
+      : [],
+    yearOperator: yearOperator && yearValue ? yearOperator : "",
+    yearValue: yearOperator && yearValue ? yearValue : null,
+    mileageOperator: mileageOperator && mileageValue ? mileageOperator : "",
+    mileageValue: mileageOperator && mileageValue ? mileageValue : null,
+    isVisible: rule.isVisible ?? true,
+    memo: String(rule.memo ?? ""),
+  };
+};
+
+const readStoredAiMaintenanceRules = (): AdminAiMaintenanceRule[] =>
+  readStoredAdminRules<Partial<AdminAiMaintenanceRule>>(
+    aiMaintenanceStorageKey,
+    initialAiMaintenanceRules,
+  ).map(normalizeAiMaintenanceRule);
+
+const toAdminAiMaintenanceRule = (row: {
+  id?: string | null;
+  title?: string | null;
+  condition?: string | null;
+  fuel_type?: string | null;
+  items?: string[] | null;
+  year_operator?: string | null;
+  year_value?: number | null;
+  mileage_operator?: string | null;
+  mileage_value?: number | null;
+  is_visible?: boolean | null;
+  memo?: string | null;
+}): AdminAiMaintenanceRule =>
+  normalizeAiMaintenanceRule({
+    id: row.id ?? "",
+    title: row.title ?? "",
+    condition: row.condition ?? "",
+    fuelType: row.fuel_type ?? "",
+    items: row.items ?? [],
+    yearOperator: normalizeMaintenanceOperator(row.year_operator),
+    yearValue: row.year_value ?? null,
+    mileageOperator: normalizeMaintenanceOperator(row.mileage_operator),
+    mileageValue: row.mileage_value ?? null,
+    isVisible: row.is_visible ?? true,
+    memo: row.memo ?? "",
+  });
+
+const getMaintenanceOperatorLabel = (
+  operator: AdminMaintenanceConditionOperator,
+) =>
+  operator === ">="
+    ? "이상"
+    : operator === "<="
+      ? "이하"
+      : operator === "="
+        ? "같음"
+        : "";
+
+const formatMaintenanceCondition = (
+  operator: AdminMaintenanceConditionOperator,
+  value: number | null,
+  unit: "년" | "km",
+) =>
+  operator && value
+    ? value.toLocaleString("ko-KR") +
+      unit +
+      " " +
+      getMaintenanceOperatorLabel(operator)
+    : "없음";
 
 const normalizeAiCandidateStatus = (value: unknown): AiCandidateStatus => {
   if (
@@ -2008,9 +2190,7 @@ export default function AdminPage() {
   );
   const [aiMaintenanceRules, setAiMaintenanceRules] = useState<
     AdminAiMaintenanceRule[]
-  >(() =>
-    readStoredAdminRules(aiMaintenanceStorageKey, initialAiMaintenanceRules),
-  );
+  >(() => readStoredAiMaintenanceRules());
   const [aiCandidateStatusRows, setAiCandidateStatusRows] = useState<
     AdminAiCandidateStatusRow[]
   >([]);
@@ -2497,6 +2677,7 @@ export default function AdminPage() {
         noticesResult,
         popupNoticesResult,
         knowledgeTermsResult,
+        aiMaintenanceRulesResult,
         trafficStatsResult,
         operatorDashboardResult,
         verifiedDealerFeatureResult,
@@ -2525,6 +2706,7 @@ export default function AdminPage() {
           search_text: knowledgeSearch.trim(),
           sort_key: knowledgeSort,
         }),
+        supabase.rpc("admin_list_ai_maintenance_rules"),
         supabase.rpc("admin_get_traffic_stats"),
         supabase.rpc("admin_get_operator_dashboard_data"),
         supabase.rpc("list_verified_dealer_profiles", {
@@ -2548,6 +2730,17 @@ export default function AdminPage() {
 
       if (knowledgeTermsResult.error && !isKnowledgeRpcMissing) {
         throw knowledgeTermsResult.error;
+      }
+      const isAiMaintenanceRulesRpcMissing =
+        aiMaintenanceRulesResult.error?.message.includes(
+          "admin_list_ai_maintenance_rules",
+        ) ||
+        aiMaintenanceRulesResult.error?.message.includes(
+          "admin_ai_maintenance_rules",
+        );
+
+      if (aiMaintenanceRulesResult.error && !isAiMaintenanceRulesRpcMissing) {
+        throw aiMaintenanceRulesResult.error;
       }
       if (trafficStatsResult.error) throw trafficStatsResult.error;
 
@@ -2641,6 +2834,11 @@ export default function AdminPage() {
           normalizeAdminKnowledgeTerm,
         ),
       );
+      if (!aiMaintenanceRulesResult.error) {
+        setAiMaintenanceRules(
+          (aiMaintenanceRulesResult.data ?? []).map(toAdminAiMaintenanceRule),
+        );
+      }
       setSelectedPostIds([]);
       setSelectedNoticeIds([]);
       setSelectedPopupNoticeIds([]);
@@ -2820,6 +3018,132 @@ export default function AdminPage() {
     }
 
     await updateAiCandidateStatus(candidate, "applied");
+  };
+
+  const isMissingAiMaintenanceRulesRpcError = (message: string) =>
+    message.includes("admin_upsert_ai_maintenance_rule") ||
+    message.includes("admin_delete_ai_maintenance_rule") ||
+    message.includes("admin_ai_maintenance_rules");
+
+  const upsertAiMaintenanceRule = async (
+    rule: AdminAiMaintenanceRule,
+    previousRule?: AdminAiMaintenanceRule | null,
+  ) => {
+    const nextRule = normalizeAiMaintenanceRule(rule);
+
+    if (!supabase) {
+      setAiMaintenanceRules((currentRules) =>
+        previousRule
+          ? currentRules.map((item) =>
+              item.id === previousRule.id ? nextRule : item,
+            )
+          : [nextRule, ...currentRules],
+      );
+      return;
+    }
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc(
+      "admin_upsert_ai_maintenance_rule",
+      {
+        next_condition: nextRule.condition,
+        next_fuel_type: nextRule.fuelType,
+        next_is_visible: nextRule.isVisible,
+        next_items: nextRule.items,
+        next_memo: nextRule.memo,
+        next_mileage_operator: nextRule.mileageOperator || null,
+        next_mileage_value: nextRule.mileageValue,
+        next_title: nextRule.title,
+        next_year_operator: nextRule.yearOperator || null,
+        next_year_value: nextRule.yearValue,
+        target_rule_id: previousRule?.id ?? nextRule.id,
+      },
+    );
+
+    if (error) {
+      if (isMissingAiMaintenanceRulesRpcError(error.message)) {
+        setAiMaintenanceRules((currentRules) =>
+          previousRule
+            ? currentRules.map((item) =>
+                item.id === previousRule.id ? nextRule : item,
+              )
+            : [nextRule, ...currentRules],
+        );
+        setActionMessage(
+          "정비항목 룰을 임시 저장했습니다. DB 마이그레이션 적용 후 서버 저장으로 전환됩니다.",
+        );
+        return;
+      }
+
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setActionMessage("정비항목 룰을 저장하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage(
+      previousRule ? "정비항목 룰을 수정했습니다." : "정비항목 룰을 추가했습니다.",
+    );
+    await loadAdminData();
+  };
+
+  const toggleAiMaintenanceRule = async (rule: AdminAiMaintenanceRule) => {
+    await upsertAiMaintenanceRule(
+      {
+        ...rule,
+        isVisible: !rule.isVisible,
+      },
+      rule,
+    );
+  };
+
+  const deleteAiMaintenanceRule = async (rule: AdminAiMaintenanceRule) => {
+    if (!window.confirm("정비항목 룰을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    if (!supabase) {
+      setAiMaintenanceRules((currentRules) =>
+        currentRules.filter((item) => item.id !== rule.id),
+      );
+      return;
+    }
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc(
+      "admin_delete_ai_maintenance_rule",
+      {
+        target_rule_id: rule.id,
+      },
+    );
+
+    if (error) {
+      if (isMissingAiMaintenanceRulesRpcError(error.message)) {
+        setAiMaintenanceRules((currentRules) =>
+          currentRules.filter((item) => item.id !== rule.id),
+        );
+        setActionMessage(
+          "정비항목 룰을 임시 삭제했습니다. DB 마이그레이션 적용 후 서버 저장으로 전환됩니다.",
+        );
+        return;
+      }
+
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setActionMessage("대상 정비항목 룰을 찾지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("정비항목 룰을 삭제했습니다.");
+    await loadAdminData();
   };
 
   const upsertKnowledgeTerm = async (
@@ -3964,7 +4288,15 @@ export default function AdminPage() {
                 void updateAiCandidateStatus(candidate, nextStatus)
               }
               onChangeKeywordRules={setAiKeywordRules}
-              onChangeMaintenanceRules={setAiMaintenanceRules}
+              onDeleteMaintenanceRule={(rule) =>
+                void deleteAiMaintenanceRule(rule)
+              }
+              onSaveMaintenanceRule={(rule, previousRule) =>
+                void upsertAiMaintenanceRule(rule, previousRule)
+              }
+              onToggleMaintenanceRule={(rule) =>
+                void toggleAiMaintenanceRule(rule)
+              }
               onRegisterCandidate={(candidate, values) =>
                 void registerNewKeywordCandidate(candidate, values)
               }
@@ -7347,7 +7679,9 @@ function AiManagementPanel({
   maintenanceRules,
   onChangeCandidateStatus,
   onChangeKeywordRules,
-  onChangeMaintenanceRules,
+  onDeleteMaintenanceRule,
+  onSaveMaintenanceRule,
+  onToggleMaintenanceRule,
   onRegisterCandidate,
   onChangeTab,
   reviews,
@@ -7361,7 +7695,12 @@ function AiManagementPanel({
     nextStatus: AiCandidateStatus,
   ) => void;
   onChangeKeywordRules: (rules: AdminAiKeywordRule[]) => void;
-  onChangeMaintenanceRules: (rules: AdminAiMaintenanceRule[]) => void;
+  onDeleteMaintenanceRule: (rule: AdminAiMaintenanceRule) => void;
+  onSaveMaintenanceRule: (
+    rule: AdminAiMaintenanceRule,
+    previousRule?: AdminAiMaintenanceRule | null,
+  ) => void;
+  onToggleMaintenanceRule: (rule: AdminAiMaintenanceRule) => void;
   onRegisterCandidate: (
     candidate: AdminDashboardAiCandidate,
     values: AdminNewKeywordCandidateFormValues,
@@ -7404,7 +7743,9 @@ function AiManagementPanel({
       {activeTab === "maintenance" ? (
         <AiMaintenanceRuleManager
           rules={maintenanceRules}
-          onChangeRules={onChangeMaintenanceRules}
+          onDeleteRule={onDeleteMaintenanceRule}
+          onSaveRule={onSaveMaintenanceRule}
+          onToggleRule={onToggleMaintenanceRule}
         />
       ) : null}
       {activeTab === "candidates" ? (
@@ -8165,23 +8506,77 @@ function AiMaintenanceRuleModal({
           />
         </FormField>
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="연식 조건">
-            <input
-              className={adminInputClassName}
-              value={values.yearCondition}
-              onChange={(event) =>
-                updateValues({ yearCondition: event.target.value })
-              }
-            />
+          <FormField label="연식">
+            <div className="flex items-center gap-2">
+              <select
+                className={cn(adminInputClassName, "w-32 shrink-0")}
+                value={values.yearOperator}
+                onChange={(event) =>
+                  updateValues({
+                    yearOperator: normalizeMaintenanceOperator(
+                      event.target.value,
+                    ),
+                    yearValue: event.target.value ? values.yearValue : "",
+                  })
+                }
+              >
+                {maintenanceConditionOperators.map((operator) => (
+                  <option key={operator.label} value={operator.value}>
+                    {operator.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={adminInputClassName}
+                disabled={!values.yearOperator}
+                min={0}
+                placeholder="5"
+                type="number"
+                value={values.yearValue}
+                onChange={(event) =>
+                  updateValues({ yearValue: event.target.value })
+                }
+              />
+              <span className="shrink-0 text-xs font-black text-zinc-500">
+                년
+              </span>
+            </div>
           </FormField>
-          <FormField label="주행거리 조건">
-            <input
-              className={adminInputClassName}
-              value={values.mileageCondition}
-              onChange={(event) =>
-                updateValues({ mileageCondition: event.target.value })
-              }
-            />
+          <FormField label="주행거리">
+            <div className="flex items-center gap-2">
+              <select
+                className={cn(adminInputClassName, "w-32 shrink-0")}
+                value={values.mileageOperator}
+                onChange={(event) =>
+                  updateValues({
+                    mileageOperator: normalizeMaintenanceOperator(
+                      event.target.value,
+                    ),
+                    mileageValue: event.target.value ? values.mileageValue : "",
+                  })
+                }
+              >
+                {maintenanceConditionOperators.map((operator) => (
+                  <option key={operator.label} value={operator.value}>
+                    {operator.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={adminInputClassName}
+                disabled={!values.mileageOperator}
+                min={0}
+                placeholder="50000"
+                type="number"
+                value={values.mileageValue}
+                onChange={(event) =>
+                  updateValues({ mileageValue: event.target.value })
+                }
+              />
+              <span className="shrink-0 text-xs font-black text-zinc-500">
+                km
+              </span>
+            </div>
           </FormField>
         </div>
         <FormField label="표시 항목">
@@ -8446,10 +8841,17 @@ function AiKeywordRuleManager({
 }
 
 function AiMaintenanceRuleManager({
-  onChangeRules,
+  onDeleteRule,
+  onSaveRule,
+  onToggleRule,
   rules,
 }: {
-  onChangeRules: (rules: AdminAiMaintenanceRule[]) => void;
+  onDeleteRule: (rule: AdminAiMaintenanceRule) => void;
+  onSaveRule: (
+    rule: AdminAiMaintenanceRule,
+    previousRule?: AdminAiMaintenanceRule | null,
+  ) => void;
+  onToggleRule: (rule: AdminAiMaintenanceRule) => void;
   rules: AdminAiMaintenanceRule[];
 }) {
   const [editingRule, setEditingRule] = useState<AdminAiMaintenanceRule | null>(null);
@@ -8469,13 +8871,22 @@ function AiMaintenanceRuleManager({
   };
   const submitForm = () => {
     if (!formValues.title.trim()) return;
+    const yearValue = parseMaintenanceValue(formValues.yearValue);
+    const mileageValue = parseMaintenanceValue(formValues.mileageValue);
+    const yearOperator =
+      formValues.yearOperator && yearValue ? formValues.yearOperator : "";
+    const mileageOperator =
+      formValues.mileageOperator && mileageValue
+        ? formValues.mileageOperator
+        : "";
     const conditionParts = [
       formValues.condition.trim(),
-      formValues.yearCondition.trim()
-        ? "연식: " + formValues.yearCondition.trim()
+      yearOperator && yearValue
+        ? "연식 " + formatMaintenanceCondition(yearOperator, yearValue, "년")
         : "",
-      formValues.mileageCondition.trim()
-        ? "주행거리: " + formValues.mileageCondition.trim()
+      mileageOperator && mileageValue
+        ? "주행거리 " +
+          formatMaintenanceCondition(mileageOperator, mileageValue, "km")
         : "",
     ].filter(Boolean);
 
@@ -8485,15 +8896,15 @@ function AiMaintenanceRuleManager({
       condition: conditionParts.join(" / "),
       fuelType: formValues.fuelType.trim(),
       items: splitAdminListInput(formValues.items),
+      yearOperator,
+      yearValue: yearOperator ? yearValue : null,
+      mileageOperator,
+      mileageValue: mileageOperator ? mileageValue : null,
       isVisible: formValues.isVisible,
       memo: formValues.memo.trim(),
     };
 
-    onChangeRules(
-      editingRule
-        ? rules.map((item) => (item.id === editingRule.id ? nextRule : item))
-        : [nextRule, ...rules],
-    );
+    onSaveRule(nextRule, editingRule);
     closeForm();
   };
 
@@ -8521,6 +8932,22 @@ function AiMaintenanceRuleManager({
             <dl className="mt-3 grid gap-2 text-xs text-zinc-600">
               <DetailLine label="조건" value={rule.condition || "없음"} />
               <DetailLine label="유종" value={rule.fuelType || "전체"} />
+              <DetailLine
+                label="연식"
+                value={formatMaintenanceCondition(
+                  rule.yearOperator,
+                  rule.yearValue,
+                  "년",
+                )}
+              />
+              <DetailLine
+                label="주행거리"
+                value={formatMaintenanceCondition(
+                  rule.mileageOperator,
+                  rule.mileageValue,
+                  "km",
+                )}
+              />
               <DetailLine label="항목" value={rule.items.map((item) => "#" + item).join(" ") || "없음"} />
               <DetailLine label="메모" value={rule.memo || "없음"} />
             </dl>
@@ -8535,26 +8962,14 @@ function AiMaintenanceRuleManager({
               <button
                 type="button"
                 className={actionButtonClassName}
-                onClick={() =>
-                  onChangeRules(
-                    rules.map((item) =>
-                      item.id === rule.id
-                        ? { ...item, isVisible: !item.isVisible }
-                        : item,
-                    ),
-                  )
-                }
+                onClick={() => onToggleRule(rule)}
               >
                 {rule.isVisible ? "숨김" : "노출"}
               </button>
               <button
                 type="button"
                 className={dangerButtonClassName}
-                onClick={() => {
-                  if (window.confirm("정비항목 룰을 삭제하시겠습니까?")) {
-                    onChangeRules(rules.filter((item) => item.id !== rule.id));
-                  }
-                }}
+                onClick={() => onDeleteRule(rule)}
               >
                 삭제
               </button>

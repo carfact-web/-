@@ -516,6 +516,60 @@ export interface Database {
         };
         Relationships: [];
       };
+      admin_ai_maintenance_rules: {
+        Row: {
+          id: string;
+          title: string;
+          condition: string;
+          fuel_type: string;
+          items: string[];
+          year_operator: ">=" | "<=" | "=" | null;
+          year_value: number | null;
+          mileage_operator: ">=" | "<=" | "=" | null;
+          mileage_value: number | null;
+          is_visible: boolean;
+          memo: string;
+          created_by: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          title: string;
+          condition?: string;
+          fuel_type?: string;
+          items?: string[];
+          year_operator?: ">=" | "<=" | "=" | null;
+          year_value?: number | null;
+          mileage_operator?: ">=" | "<=" | "=" | null;
+          mileage_value?: number | null;
+          is_visible?: boolean;
+          memo?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          condition?: string;
+          fuel_type?: string;
+          items?: string[];
+          year_operator?: ">=" | "<=" | "=" | null;
+          year_value?: number | null;
+          mileage_operator?: ">=" | "<=" | "=" | null;
+          mileage_value?: number | null;
+          is_visible?: boolean;
+          memo?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       knowledge_terms: {
         Row: {
           id: string;
@@ -953,6 +1007,26 @@ export interface Database {
           updated_at: string;
         }[];
       };
+      admin_list_ai_maintenance_rules: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          title: string;
+          condition: string;
+          fuel_type: string;
+          items: string[];
+          year_operator: ">=" | "<=" | "=" | null;
+          year_value: number | null;
+          mileage_operator: ">=" | "<=" | "=" | null;
+          mileage_value: number | null;
+          is_visible: boolean;
+          memo: string;
+          created_by: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
       admin_list_reports: {
         Args: {
           search_text?: string;
@@ -1145,6 +1219,28 @@ export interface Database {
           next_is_visible?: boolean;
         };
         Returns: string | null;
+      };
+      admin_upsert_ai_maintenance_rule: {
+        Args: {
+          target_rule_id?: string | null;
+          next_title?: string;
+          next_condition?: string;
+          next_fuel_type?: string;
+          next_items?: string[];
+          next_year_operator?: ">=" | "<=" | "=" | null;
+          next_year_value?: number | null;
+          next_mileage_operator?: ">=" | "<=" | "=" | null;
+          next_mileage_value?: number | null;
+          next_is_visible?: boolean;
+          next_memo?: string;
+        };
+        Returns: string | null;
+      };
+      admin_delete_ai_maintenance_rule: {
+        Args: {
+          target_rule_id: string;
+        };
+        Returns: boolean;
       };
       current_user_has_admin_role: {
         Args: Record<PropertyKey, never>;
