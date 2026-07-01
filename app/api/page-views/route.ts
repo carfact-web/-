@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
   const sessionId = payload.sessionId?.trim();
 
-  if (!sessionId || (!payload.vehicleId && !payload.reviewId)) {
+  if (!sessionId) {
     return NextResponse.json({ recorded: false }, { status: 400 });
   }
 

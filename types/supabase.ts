@@ -318,6 +318,9 @@ export interface Database {
           browser: string;
           os: string;
           referrer: string | null;
+          referrer_channel: string;
+          referrer_keyword: string;
+          landing_page: string | null;
           path: string | null;
           event_type: "page_view" | "vehicle_view" | "review_view";
         };
@@ -334,6 +337,9 @@ export interface Database {
           browser?: string;
           os?: string;
           referrer?: string | null;
+          referrer_channel?: string;
+          referrer_keyword?: string;
+          landing_page?: string | null;
           path?: string | null;
           event_type?: "page_view" | "vehicle_view" | "review_view";
         };
@@ -350,6 +356,9 @@ export interface Database {
           browser?: string;
           os?: string;
           referrer?: string | null;
+          referrer_channel?: string;
+          referrer_keyword?: string;
+          landing_page?: string | null;
           path?: string | null;
           event_type?: "page_view" | "vehicle_view" | "review_view";
         };
@@ -507,6 +516,177 @@ export interface Database {
         };
         Relationships: [];
       };
+      knowledge_terms: {
+        Row: {
+          id: string;
+          category:
+            | "증상"
+            | "부품"
+            | "시스템"
+            | "정비용어"
+            | "경고등"
+            | "보험"
+            | "성능기록부"
+            | "일반";
+          representative_name: string;
+          slug: string;
+          description: string;
+          main_causes: string[];
+          main_symptoms: string[];
+          maintenance_tips: string[];
+          expected_repair_cost: string;
+          related_keywords: string[];
+          related_models: string[];
+          priority: number;
+          view_count: number;
+          is_visible: boolean;
+          created_by: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category:
+            | "증상"
+            | "부품"
+            | "시스템"
+            | "정비용어"
+            | "경고등"
+            | "보험"
+            | "성능기록부"
+            | "일반";
+          representative_name: string;
+          slug: string;
+          description?: string;
+          main_causes?: string[];
+          main_symptoms?: string[];
+          maintenance_tips?: string[];
+          expected_repair_cost?: string;
+          related_keywords?: string[];
+          related_models?: string[];
+          priority?: number;
+          view_count?: number;
+          is_visible?: boolean;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?:
+            | "증상"
+            | "부품"
+            | "시스템"
+            | "정비용어"
+            | "경고등"
+            | "보험"
+            | "성능기록부"
+            | "일반";
+          representative_name?: string;
+          slug?: string;
+          description?: string;
+          main_causes?: string[];
+          main_symptoms?: string[];
+          maintenance_tips?: string[];
+          expected_repair_cost?: string;
+          related_keywords?: string[];
+          related_models?: string[];
+          priority?: number;
+          view_count?: number;
+          is_visible?: boolean;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      external_acquisition_metrics: {
+        Row: {
+          id: string;
+          metric_date: string;
+          provider:
+            | "manual"
+            | "google_search_console"
+            | "google_analytics"
+            | "microsoft_clarity"
+            | "bing_webmaster"
+            | "naver_search_advisor"
+            | "daum_search"
+            | "geo";
+          channel: string;
+          keyword: string;
+          landing_page: string;
+          model_name: string | null;
+          symptom_keyword: string | null;
+          impressions: number;
+          clicks: number;
+          ctr: number | null;
+          average_position: number | null;
+          geo_score: number | null;
+          clarity_sessions: number;
+          source_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          metric_date: string;
+          provider?:
+            | "manual"
+            | "google_search_console"
+            | "google_analytics"
+            | "microsoft_clarity"
+            | "bing_webmaster"
+            | "naver_search_advisor"
+            | "daum_search"
+            | "geo";
+          channel?: string;
+          keyword?: string;
+          landing_page?: string;
+          model_name?: string | null;
+          symptom_keyword?: string | null;
+          impressions?: number;
+          clicks?: number;
+          ctr?: number | null;
+          average_position?: number | null;
+          geo_score?: number | null;
+          clarity_sessions?: number;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          metric_date?: string;
+          provider?:
+            | "manual"
+            | "google_search_console"
+            | "google_analytics"
+            | "microsoft_clarity"
+            | "bing_webmaster"
+            | "naver_search_advisor"
+            | "daum_search"
+            | "geo";
+          channel?: string;
+          keyword?: string;
+          landing_page?: string;
+          model_name?: string | null;
+          symptom_keyword?: string | null;
+          impressions?: number;
+          clicks?: number;
+          ctr?: number | null;
+          average_position?: number | null;
+          geo_score?: number | null;
+          clarity_sessions?: number;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       vehicle_master: {
         Row: {
           id: string;
@@ -603,6 +783,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+      admin_delete_knowledge_term: {
+        Args: {
+          target_term_id: string;
+        };
+        Returns: boolean;
+      };
       admin_delete_review: {
         Args: {
           target_review_id: string;
@@ -648,6 +834,9 @@ export interface Database {
           traffic_rows: Json;
           view_rankings: Json;
           keyword_rows: Json;
+          acquisition_rows: Json;
+          search_console_summary: Json;
+          internal_keyword_rows: Json;
           ai_candidates: Json;
         }[];
       };
@@ -726,6 +915,40 @@ export interface Database {
           report_count: number;
           like_count: number;
           comment_count: number;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
+      admin_list_knowledge_terms: {
+        Args: {
+          search_text?: string;
+          sort_key?: string;
+        };
+        Returns: {
+          id: string;
+          category:
+            | "증상"
+            | "부품"
+            | "시스템"
+            | "정비용어"
+            | "경고등"
+            | "보험"
+            | "성능기록부"
+            | "일반";
+          representative_name: string;
+          slug: string;
+          description: string;
+          main_causes: string[];
+          main_symptoms: string[];
+          maintenance_tips: string[];
+          expected_repair_cost: string;
+          related_keywords: string[];
+          related_models: string[];
+          priority: number;
+          view_count: number;
+          is_visible: boolean;
+          created_by: string | null;
+          updated_by: string | null;
           created_at: string;
           updated_at: string;
         }[];
@@ -902,6 +1125,24 @@ export interface Database {
           next_is_active?: boolean;
           next_starts_at?: string | null;
           next_ends_at?: string | null;
+        };
+        Returns: string | null;
+      };
+      admin_upsert_knowledge_term: {
+        Args: {
+          target_term_id?: string | null;
+          next_category?: string;
+          next_representative_name?: string;
+          next_slug?: string;
+          next_description?: string;
+          next_main_causes?: string[];
+          next_main_symptoms?: string[];
+          next_maintenance_tips?: string[];
+          next_expected_repair_cost?: string;
+          next_related_keywords?: string[];
+          next_related_models?: string[];
+          next_priority?: number;
+          next_is_visible?: boolean;
         };
         Returns: string | null;
       };

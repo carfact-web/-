@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import { JsonLd } from "@/components/JsonLd";
+import { PageViewTracker } from "@/components/PageViewTracker";
 import {
   createPageMetadata,
   defaultOgImageUrl,
@@ -79,6 +80,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <JsonLd data={createWebSiteJsonLd()} />
+        <PageViewTracker />
         <div className="flex-1 pb-24">{children}</div>
         <BottomTabNav />
       </body>

@@ -34,15 +34,33 @@ type AdminTab =
   | "posts"
   | "users"
   | "ai"
+  | "knowledge"
   | "reports"
   | "notices";
 type AdminRole = "user" | "admin" | "super_admin";
+type KnowledgeCategory =
+  | "증상"
+  | "부품"
+  | "시스템"
+  | "정비용어"
+  | "경고등"
+  | "보험"
+  | "성능기록부"
+  | "일반";
+type KnowledgeSortOption =
+  | "updated_desc"
+  | "updated_asc"
+  | "name_asc"
+  | "category_asc"
+  | "visible_first";
 type DashboardBoardTab =
   | "traffic"
   | "views"
   | "content"
   | "keywords"
+  | "internalKeywords"
   | "ai";
+type DashboardPeriod = "today" | "7days" | "30days" | "90days" | "all";
 type DashboardViewFilter = "vehicle" | "model" | "review";
 type AiCandidateStatus = "pending" | "reviewing" | "applied" | "excluded";
 type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
@@ -192,6 +210,36 @@ interface AdminDashboardKeywordRow {
   aiStatus: AiCandidateStatus;
 }
 
+interface AdminDashboardAcquisitionKeywordRow {
+  keyword: string;
+  channel: string;
+  visitCount: number;
+  landingPage: string;
+  recentOccurredAt: string | null;
+}
+
+interface AdminDashboardAcquisitionEventRow {
+  day: string;
+  keyword: string;
+  channel: string;
+  landingPage: string;
+  modelName: string;
+  symptomKeyword: string | null;
+  visits: number;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  geoScore: number | null;
+}
+
+interface AdminDashboardSearchConsoleSummary {
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  geoScore: number | null;
+  updatedAt: string | null;
+}
+
 interface AdminDashboardAiCandidate {
   candidateKey: string;
   exampleSentences?: string[];
@@ -233,7 +281,10 @@ interface AdminOperatorDashboardData {
   totalViews: number;
   trafficRows: AdminDashboardTrafficRow[];
   viewRankings: AdminDashboardViewRanking[];
-  keywordRows: AdminDashboardKeywordRow[];
+  keywordRows: AdminDashboardAcquisitionKeywordRow[];
+  acquisitionRows: AdminDashboardAcquisitionEventRow[];
+  searchConsoleSummary: AdminDashboardSearchConsoleSummary;
+  internalKeywordRows: AdminDashboardKeywordRow[];
   aiCandidates: AdminDashboardAiCandidate[];
 }
 
@@ -325,12 +376,34 @@ interface AdminPopupNotice {
   updated_at: string;
 }
 
+interface AdminKnowledgeTerm {
+  id: string;
+  category: KnowledgeCategory;
+  representative_name: string;
+  slug: string;
+  description: string;
+  main_causes: string[];
+  main_symptoms: string[];
+  maintenance_tips: string[];
+  expected_repair_cost: string;
+  related_keywords: string[];
+  related_models: string[];
+  priority: number;
+  view_count: number;
+  is_visible: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const tabs: { label: string; value: AdminTab }[] = [
   { label: "Dashboard", value: "dashboard" },
   { label: "후기 관리", value: "reviews" },
   { label: "게시글 관리", value: "posts" },
   { label: "회원 관리", value: "users" },
   { label: "AI 관리", value: "ai" },
+  { label: "Knowledge Center", value: "knowledge" },
   { label: "신고 관리", value: "reports" },
   { label: "공지 관리", value: "notices" },
 ];
@@ -368,6 +441,15 @@ const emptyOperatorDashboardData: AdminOperatorDashboardData = {
   trafficRows: [],
   viewRankings: [],
   keywordRows: [],
+  acquisitionRows: [],
+  searchConsoleSummary: {
+    impressions: 0,
+    clicks: 0,
+    ctr: null,
+    geoScore: null,
+    updatedAt: null,
+  },
+  internalKeywordRows: [],
   aiCandidates: [],
 };
 
@@ -450,6 +532,26 @@ const adminPostCategoryTabs = [
 ] satisfies Array<{ label: string; value: CommunityBoardFilter }>;
 const adminPostsPerPage = 10;
 const adminReviewsPerPage = 10;
+
+const knowledgeCategories: { label: KnowledgeCategory; value: KnowledgeCategory }[] =
+  [
+    { label: "증상", value: "증상" },
+    { label: "부품", value: "부품" },
+    { label: "시스템", value: "시스템" },
+    { label: "정비용어", value: "정비용어" },
+    { label: "경고등", value: "경고등" },
+    { label: "보험", value: "보험" },
+    { label: "성능기록부", value: "성능기록부" },
+    { label: "일반", value: "일반" },
+  ];
+
+const knowledgeSortOptions: { label: string; value: KnowledgeSortOption }[] = [
+  { label: "최근 수정순", value: "updated_desc" },
+  { label: "오래된 수정순", value: "updated_asc" },
+  { label: "대표명순", value: "name_asc" },
+  { label: "분류순", value: "category_asc" },
+  { label: "노출 우선", value: "visible_first" },
+];
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -679,6 +781,54 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
+const normalizeKnowledgeCategory = (value: unknown): KnowledgeCategory => {
+  const category = String(value ?? "").trim();
+  const matchedCategory = knowledgeCategories.find((item) => item.value === category);
+
+  return matchedCategory?.value ?? "일반";
+};
+
+const normalizeKnowledgeSortOption = (value: unknown): KnowledgeSortOption => {
+  const sortOption = String(value ?? "").trim();
+  const matchedOption = knowledgeSortOptions.find(
+    (item) => item.value === sortOption,
+  );
+
+  return matchedOption?.value ?? "updated_desc";
+};
+
+const normalizeKnowledgeSlug = (value: string) => value.trim().toLowerCase();
+
+const isValidKnowledgeSlug = (value: string) =>
+  /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+
+const splitAdminListInput = (value: string) =>
+  value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const formatAdminListInput = (value: string[]) => value.join(", ");
+
+const normalizeAdminKnowledgeTerm = (
+  term: AdminKnowledgeTerm,
+): AdminKnowledgeTerm => ({
+  ...term,
+  category: normalizeKnowledgeCategory(term.category),
+  slug: normalizeKnowledgeSlug(term.slug ?? ""),
+  main_causes: Array.isArray(term.main_causes) ? term.main_causes : [],
+  main_symptoms: Array.isArray(term.main_symptoms) ? term.main_symptoms : [],
+  maintenance_tips: Array.isArray(term.maintenance_tips)
+    ? term.maintenance_tips
+    : [],
+  related_keywords: Array.isArray(term.related_keywords)
+    ? term.related_keywords
+    : [],
+  related_models: Array.isArray(term.related_models) ? term.related_models : [],
+  priority: toNumber(term.priority),
+  view_count: toNumber(term.view_count),
+});
+
 const toTrafficTopVehicles = (value: Json): AdminTrafficTopVehicle[] =>
   Array.isArray(value)
     ? (value as unknown[]).filter(isRecord).map((item) => ({
@@ -753,12 +903,23 @@ const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
   { label: "조회수", value: "views" },
   { label: "콘텐츠", value: "content" },
   { label: "유입 키워드", value: "keywords" },
+  { label: "내부 키워드", value: "internalKeywords" },
   { label: "AI DB 업데이트 추천", value: "ai" },
+];
+
+const dashboardPeriods: { label: string; value: DashboardPeriod }[] = [
+  { label: "오늘", value: "today" },
+  { label: "7일", value: "7days" },
+  { label: "30일", value: "30days" },
+  { label: "90일", value: "90days" },
+  { label: "전체", value: "all" },
 ];
 
 const trafficSourceConfig = [
   { label: "Google", color: "#2563eb" },
   { label: "Naver", color: "#16a34a" },
+  { label: "Daum", color: "#f59e0b" },
+  { label: "Bing", color: "#0891b2" },
   { label: "Direct", color: "#111827" },
   { label: "SNS", color: "#e11d48" },
   { label: "기타", color: "#a855f7" },
@@ -778,6 +939,8 @@ const normalizeTrafficSourceGroup = (value: string) => {
 
   if (normalizedValue.includes("google")) return "Google";
   if (normalizedValue.includes("naver")) return "Naver";
+  if (normalizedValue.includes("daum")) return "Daum";
+  if (normalizedValue.includes("bing")) return "Bing";
   if (
     normalizedValue.includes("facebook") ||
     normalizedValue.includes("instagram") ||
@@ -1085,6 +1248,61 @@ const toOperatorViewRankings = (
         href: toNullableString(item.href),
       }))
     : [];
+
+const toOperatorAcquisitionKeywordRows = (
+  value: Json,
+): AdminDashboardAcquisitionKeywordRow[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        keyword: String(item.keyword ?? "not provided"),
+        channel: String(item.channel ?? "Direct"),
+        visitCount: toNumber(item.visit_count),
+        landingPage: String(item.landing_page ?? "/"),
+        recentOccurredAt: toNullableString(item.recent_occurred_at),
+      }))
+    : [];
+
+const toOperatorAcquisitionEventRows = (
+  value: Json,
+): AdminDashboardAcquisitionEventRow[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        day: String(item.day ?? ""),
+        keyword: String(item.keyword ?? "not provided"),
+        channel: String(item.channel ?? "Direct"),
+        landingPage: String(item.landing_page ?? "/"),
+        modelName: String(item.model_name ?? "차종 확인 불가"),
+        symptomKeyword: toNullableString(item.symptom_keyword),
+        visits: toNumber(item.visits),
+        impressions: toNumber(item.impressions),
+        clicks: toNumber(item.clicks),
+        ctr:
+          item.ctr === null || item.ctr === undefined ? null : toNumber(item.ctr),
+        geoScore:
+          item.geo_score === null || item.geo_score === undefined
+            ? null
+            : toNumber(item.geo_score),
+      }))
+    : [];
+
+const toOperatorSearchConsoleSummary = (
+  value: Json,
+): AdminDashboardSearchConsoleSummary => {
+  const item = isRecord(value) ? value : {};
+  const ctr = item.ctr === null || item.ctr === undefined ? null : toNumber(item.ctr);
+  const geoScore =
+    item.geo_score === null || item.geo_score === undefined
+      ? null
+      : toNumber(item.geo_score);
+
+  return {
+    impressions: toNumber(item.impressions),
+    clicks: toNumber(item.clicks),
+    ctr,
+    geoScore,
+    updatedAt: toNullableString(item.updated_at),
+  };
+};
 
 const toOperatorKeywordRows = (
   value: Json,
@@ -1574,6 +1792,8 @@ export default function AdminPage() {
     useState<AdminOperatorDashboardData>(emptyOperatorDashboardData);
   const [activeDashboardTab, setActiveDashboardTab] =
     useState<DashboardBoardTab>("traffic");
+  const [dashboardPeriod, setDashboardPeriod] =
+    useState<DashboardPeriod>("30days");
   const [dashboardViewFilter, setDashboardViewFilter] =
     useState<DashboardViewFilter>("vehicle");
   const [posts, setPosts] = useState<AdminCommunityPost[]>([]);
@@ -1582,6 +1802,7 @@ export default function AdminPage() {
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [notices, setNotices] = useState<AdminCommunityPost[]>([]);
   const [popupNotices, setPopupNotices] = useState<AdminPopupNotice[]>([]);
+  const [knowledgeTerms, setKnowledgeTerms] = useState<AdminKnowledgeTerm[]>([]);
   const [globalSearch, setGlobalSearch] = useState("");
   const [postSearch, setPostSearch] = useState("");
   const [postCategoryFilter, setPostCategoryFilter] =
@@ -1590,6 +1811,9 @@ export default function AdminPage() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
   const [selectedPopupNoticeId, setSelectedPopupNoticeId] = useState<
+    string | null
+  >(null);
+  const [selectedKnowledgeTermId, setSelectedKnowledgeTermId] = useState<
     string | null
   >(null);
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
@@ -1614,6 +1838,9 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [reportSearch, setReportSearch] = useState("");
   const [noticeSearch, setNoticeSearch] = useState("");
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [knowledgeSort, setKnowledgeSort] =
+    useState<KnowledgeSortOption>("updated_desc");
   const [isLoading, setIsLoading] = useState(false);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const [isVerifiedDealerFeatureReady, setIsVerifiedDealerFeatureReady] =
@@ -1715,6 +1942,11 @@ export default function AdminPage() {
       popupNotices.find((notice) => notice.id === selectedPopupNoticeId) ??
       null,
     [popupNotices, selectedPopupNoticeId],
+  );
+  const selectedKnowledgeTerm = useMemo(
+    () =>
+      knowledgeTerms.find((term) => term.id === selectedKnowledgeTermId) ?? null,
+    [knowledgeTerms, selectedKnowledgeTermId],
   );
   const selectedReviews = useMemo(
     () => reviews.filter((review) => selectedReviewIds.includes(review.id)),
@@ -1924,12 +2156,14 @@ export default function AdminPage() {
     if (activeTab === "reviews") return reviewSearch;
     if (activeTab === "users") return userSearch;
     if (activeTab === "ai") return globalSearch;
+    if (activeTab === "knowledge") return knowledgeSearch;
     if (activeTab === "reports") return reportSearch;
     if (activeTab === "notices") return noticeSearch;
     return "";
   }, [
     activeTab,
     globalSearch,
+    knowledgeSearch,
     noticeSearch,
     postSearch,
     reportSearch,
@@ -2118,6 +2352,7 @@ export default function AdminPage() {
         reportsResult,
         noticesResult,
         popupNoticesResult,
+        knowledgeTermsResult,
         trafficStatsResult,
         operatorDashboardResult,
         verifiedDealerFeatureResult,
@@ -2142,6 +2377,10 @@ export default function AdminPage() {
         supabase.rpc("admin_list_popup_notices", {
           search_text: noticeSearch.trim(),
         }),
+        supabase.rpc("admin_list_knowledge_terms", {
+          search_text: knowledgeSearch.trim(),
+          sort_key: knowledgeSort,
+        }),
         supabase.rpc("admin_get_traffic_stats"),
         supabase.rpc("admin_get_operator_dashboard_data"),
         supabase.rpc("list_verified_dealer_profiles", {
@@ -2157,6 +2396,15 @@ export default function AdminPage() {
       if (reportsResult.error) throw reportsResult.error;
       if (noticesResult.error) throw noticesResult.error;
       if (popupNoticesResult.error) throw popupNoticesResult.error;
+      const isKnowledgeRpcMissing =
+        knowledgeTermsResult.error?.message.includes(
+          "admin_list_knowledge_terms",
+        ) ||
+        knowledgeTermsResult.error?.message.includes("knowledge_terms");
+
+      if (knowledgeTermsResult.error && !isKnowledgeRpcMissing) {
+        throw knowledgeTermsResult.error;
+      }
       if (trafficStatsResult.error) throw trafficStatsResult.error;
 
       setIsVerifiedDealerFeatureReady(!verifiedDealerFeatureResult.error);
@@ -2215,8 +2463,17 @@ export default function AdminPage() {
         viewRankings: toOperatorViewRankings(
           nextOperatorDashboard?.view_rankings ?? [],
         ),
-        keywordRows: toOperatorKeywordRows(
+        keywordRows: toOperatorAcquisitionKeywordRows(
           nextOperatorDashboard?.keyword_rows ?? [],
+        ),
+        acquisitionRows: toOperatorAcquisitionEventRows(
+          nextOperatorDashboard?.acquisition_rows ?? [],
+        ),
+        searchConsoleSummary: toOperatorSearchConsoleSummary(
+          nextOperatorDashboard?.search_console_summary ?? {},
+        ),
+        internalKeywordRows: toOperatorKeywordRows(
+          nextOperatorDashboard?.internal_keyword_rows ?? [],
         ),
         aiCandidates: createAiCandidatesFromReviewContent(
           nextReviews,
@@ -2233,6 +2490,13 @@ export default function AdminPage() {
         ),
       );
       setPopupNotices((popupNoticesResult.data ?? []) as AdminPopupNotice[]);
+      setKnowledgeTerms(
+        (knowledgeTermsResult.error
+          ? []
+          : ((knowledgeTermsResult.data ?? []) as AdminKnowledgeTerm[])).map(
+          normalizeAdminKnowledgeTerm,
+        ),
+      );
       setSelectedPostIds([]);
       setSelectedNoticeIds([]);
       setSelectedPopupNoticeIds([]);
@@ -2247,6 +2511,8 @@ export default function AdminPage() {
     }
   }, [
     canAccess,
+    knowledgeSearch,
+    knowledgeSort,
     noticeSearch,
     postSearch,
     reportSearch,
@@ -2293,7 +2559,7 @@ export default function AdminPage() {
             }
           : item,
       ),
-      keywordRows: current.keywordRows.map((item) =>
+      internalKeywordRows: current.internalKeywordRows.map((item) =>
         "keyword:" + item.keyword === candidate.candidateKey
           ? { ...item, aiStatus: nextStatus }
           : item,
@@ -2424,6 +2690,215 @@ export default function AdminPage() {
     }
 
     await updateAiCandidateStatus(candidate, "applied");
+  };
+
+  const upsertKnowledgeTerm = async (term?: AdminKnowledgeTerm) => {
+    if (!supabase) {
+      return;
+    }
+
+    const category = window.prompt(
+      "분류(증상/부품/시스템/정비용어/경고등/보험/성능기록부/일반)",
+      term?.category ?? "일반",
+    );
+
+    if (category === null) {
+      return;
+    }
+
+    const nextCategory = normalizeKnowledgeCategory(category);
+    const representativeName = window.prompt(
+      "대표명",
+      term?.representative_name ?? "",
+    );
+
+    if (representativeName === null || !representativeName.trim()) {
+      return;
+    }
+
+    const slug = window.prompt("slug", term?.slug ?? "");
+
+    if (slug === null) {
+      return;
+    }
+
+    const nextSlug = normalizeKnowledgeSlug(slug);
+
+    if (!isValidKnowledgeSlug(nextSlug)) {
+      setActionMessage("slug는 소문자 영문, 숫자, 하이픈만 사용할 수 있습니다.");
+      return;
+    }
+
+    const description = window.prompt("설명", term?.description ?? "");
+
+    if (description === null) {
+      return;
+    }
+
+    const mainCauses = window.prompt(
+      "주요 원인(쉼표 또는 줄바꿈 구분)",
+      formatAdminListInput(term?.main_causes ?? []),
+    );
+
+    if (mainCauses === null) {
+      return;
+    }
+
+    const mainSymptoms = window.prompt(
+      "주요 증상(쉼표 또는 줄바꿈 구분)",
+      formatAdminListInput(term?.main_symptoms ?? []),
+    );
+
+    if (mainSymptoms === null) {
+      return;
+    }
+
+    const maintenanceTips = window.prompt(
+      "정비 팁(쉼표 또는 줄바꿈 구분)",
+      formatAdminListInput(term?.maintenance_tips ?? []),
+    );
+
+    if (maintenanceTips === null) {
+      return;
+    }
+
+    const expectedRepairCost = window.prompt(
+      "예상 수리비",
+      term?.expected_repair_cost ?? "",
+    );
+
+    if (expectedRepairCost === null) {
+      return;
+    }
+
+    const relatedKeywords = window.prompt(
+      "관련 키워드(쉼표 또는 줄바꿈 구분)",
+      formatAdminListInput(term?.related_keywords ?? []),
+    );
+
+    if (relatedKeywords === null) {
+      return;
+    }
+
+    const relatedModels = window.prompt(
+      "관련 차종(쉼표 또는 줄바꿈 구분)",
+      formatAdminListInput(term?.related_models ?? []),
+    );
+
+    if (relatedModels === null) {
+      return;
+    }
+
+    const priority = window.prompt("우선순위(priority)", String(term?.priority ?? 0));
+
+    if (priority === null) {
+      return;
+    }
+
+    const nextPriority = Math.max(0, Math.floor(Number(priority) || 0));
+
+    const isVisibleInput = window.prompt(
+      "노출 여부(true/false)",
+      String(term?.is_visible ?? true),
+    );
+
+    if (isVisibleInput === null) {
+      return;
+    }
+
+    const nextIsVisible = !/^false|0|n|no|비노출|숨김$/i.test(
+      isVisibleInput.trim(),
+    );
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc("admin_upsert_knowledge_term", {
+      next_category: nextCategory,
+      next_description: description,
+      next_expected_repair_cost: expectedRepairCost,
+      next_is_visible: nextIsVisible,
+      next_maintenance_tips: splitAdminListInput(maintenanceTips),
+      next_main_causes: splitAdminListInput(mainCauses),
+      next_main_symptoms: splitAdminListInput(mainSymptoms),
+      next_priority: nextPriority,
+      next_related_keywords: splitAdminListInput(relatedKeywords),
+      next_related_models: splitAdminListInput(relatedModels),
+      next_representative_name: representativeName.trim(),
+      next_slug: nextSlug,
+      target_term_id: term?.id ?? null,
+    });
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setActionMessage("Knowledge 항목을 저장하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage(
+      term ? "Knowledge 항목을 수정했습니다." : "Knowledge 항목을 추가했습니다.",
+    );
+    await loadAdminData();
+  };
+
+  const toggleKnowledgeTermVisible = async (term: AdminKnowledgeTerm) => {
+    if (!supabase) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const { error } = await supabase.rpc("admin_upsert_knowledge_term", {
+      next_category: term.category,
+      next_description: term.description,
+      next_expected_repair_cost: term.expected_repair_cost,
+      next_is_visible: !term.is_visible,
+      next_maintenance_tips: term.maintenance_tips,
+      next_main_causes: term.main_causes,
+      next_main_symptoms: term.main_symptoms,
+      next_priority: term.priority,
+      next_related_keywords: term.related_keywords,
+      next_related_models: term.related_models,
+      next_representative_name: term.representative_name,
+      next_slug: term.slug,
+      target_term_id: term.id,
+    });
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
+    setActionMessage("Knowledge 노출 상태를 변경했습니다.");
+    await loadAdminData();
+  };
+
+  const deleteKnowledgeTerm = async (term: AdminKnowledgeTerm) => {
+    if (!supabase || !window.confirm("Knowledge 항목을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const { data, error } = await supabase.rpc("admin_delete_knowledge_term", {
+      target_term_id: term.id,
+    });
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setActionMessage("대상 Knowledge 항목을 찾지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("Knowledge 항목을 삭제했습니다.");
+    await loadAdminData();
   };
 
   const updatePostState = async (
@@ -3221,23 +3696,56 @@ export default function AdminPage() {
             </p>
           </div>
           <nav className="mt-4 grid gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                className={cn(
-                  tabButtonClassName,
-                  "justify-start text-left",
-                  activeTab === tab.value && activeTabButtonClassName,
-                )}
-                onClick={() => {
-                  setActiveTab(tab.value);
-                  setIsNotificationOpen(false);
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map((tab) =>
+              tab.value === "knowledge" ? (
+                <div key={tab.value} className="grid gap-1">
+                  <button
+                    type="button"
+                    className={cn(
+                      tabButtonClassName,
+                      "justify-start text-left",
+                      activeTab === tab.value && "text-zinc-950",
+                    )}
+                    onClick={() => {
+                      setActiveTab(tab.value);
+                      setIsNotificationOpen(false);
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      tabButtonClassName,
+                      "ml-3 justify-start text-left text-xs",
+                      activeTab === tab.value && activeTabButtonClassName,
+                    )}
+                    onClick={() => {
+                      setActiveTab(tab.value);
+                      setIsNotificationOpen(false);
+                    }}
+                  >
+                    └ 용어/증상 DB
+                  </button>
+                </div>
+              ) : (
+                <button
+                  key={tab.value}
+                  type="button"
+                  className={cn(
+                    tabButtonClassName,
+                    "justify-start text-left",
+                    activeTab === tab.value && activeTabButtonClassName,
+                  )}
+                  onClick={() => {
+                    setActiveTab(tab.value);
+                    setIsNotificationOpen(false);
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ),
+            )}
           </nav>
           <div className="mt-5 grid gap-2 border-t border-zinc-100 pt-4">
             <button
@@ -3282,6 +3790,7 @@ export default function AdminPage() {
                     setUserSearch(value);
                     setReportSearch(value);
                     setNoticeSearch(value);
+                    setKnowledgeSearch(value);
                   }}
                 />
                 <span className="pointer-events-none absolute left-3 top-2.5 text-sm text-zinc-400">
@@ -3407,9 +3916,11 @@ export default function AdminPage() {
               void updateAiCandidateStatus(candidate, nextStatus)
             }
             onChangeDashboardTab={setActiveDashboardTab}
+            onChangePeriod={setDashboardPeriod}
             onChangeViewFilter={setDashboardViewFilter}
             operatorDashboardData={operatorDashboardData}
             onNavigate={setActiveTab}
+            period={dashboardPeriod}
             posts={posts}
             reports={reports}
             reviews={reviews}
@@ -3445,6 +3956,27 @@ export default function AdminPage() {
               }
               onChangeTab={setActiveAiManagementTab}
               reviews={reviews}
+            />
+          </AdminTablePanel>
+        ) : null}
+
+        {activeTab === "knowledge" ? (
+          <AdminTablePanel
+            count={knowledgeTerms.length}
+            title="Knowledge Center"
+          >
+            <KnowledgeCenterPanel
+              onChangeSearch={setKnowledgeSearch}
+              onChangeSort={setKnowledgeSort}
+              onCreate={() => void upsertKnowledgeTerm()}
+              onDelete={(term) => void deleteKnowledgeTerm(term)}
+              onEdit={(term) => void upsertKnowledgeTerm(term)}
+              onSelect={setSelectedKnowledgeTermId}
+              onToggleVisible={(term) => void toggleKnowledgeTermVisible(term)}
+              search={knowledgeSearch}
+              selectedTerm={selectedKnowledgeTerm}
+              sort={knowledgeSort}
+              terms={knowledgeTerms}
             />
           </AdminTablePanel>
         ) : null}
@@ -5056,6 +5588,7 @@ export default function AdminPage() {
 
 function SearchBar({
   activeTab,
+  setKnowledgeSearch,
   searchValue,
   setNoticeSearch,
   setPostSearch,
@@ -5064,6 +5597,7 @@ function SearchBar({
   setUserSearch,
 }: {
   activeTab: Exclude<AdminTab, "dashboard">;
+  setKnowledgeSearch: (value: string) => void;
   searchValue: string;
   setNoticeSearch: (value: string) => void;
   setPostSearch: (value: string) => void;
@@ -5076,6 +5610,7 @@ function SearchBar({
     reviews: "후기 내용, 작성자, 차량 정보 검색",
     users: "닉네임, 회원 ID, role 검색",
     ai: "AI 후보, 키워드, 모델명 검색",
+    knowledge: "대표명, slug, 설명, 원인, 증상, 키워드, 차종 검색",
     reports: "신고 사유, 대상 내용, 작성자 검색",
     notices: "공지 제목, 내용, 팝업 URL 검색",
   }[activeTab];
@@ -5084,6 +5619,7 @@ function SearchBar({
     if (activeTab === "posts") setPostSearch(value);
     if (activeTab === "reviews") setReviewSearch(value);
     if (activeTab === "users") setUserSearch(value);
+    if (activeTab === "knowledge") setKnowledgeSearch(value);
     if (activeTab === "reports") setReportSearch(value);
     if (activeTab === "notices") setNoticeSearch(value);
   };
@@ -5329,14 +5865,154 @@ function DashboardLineChart({
   );
 }
 
+interface DashboardSeriesRow {
+  label: string;
+  value: number;
+}
+
+interface DashboardBarRow {
+  label: string;
+  value: number;
+  detail?: string;
+}
+
+const getDashboardPeriodStartTime = (period: DashboardPeriod) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  if (period === "all") return null;
+  if (period === "today") return todayStart.getTime();
+
+  const days = period === "7days" ? 7 : period === "30days" ? 30 : 90;
+
+  return todayStart.getTime() - (days - 1) * 24 * 60 * 60 * 1000;
+};
+
+const getPreviousPeriodRange = (period: DashboardPeriod) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartTime = todayStart.getTime();
+
+  if (period === "today") {
+    return {
+      end: todayStartTime,
+      start: todayStartTime - 24 * 60 * 60 * 1000,
+    };
+  }
+
+  const days = period === "7days" ? 7 : period === "30days" ? 30 : 90;
+  const currentStart = todayStartTime - (days - 1) * 24 * 60 * 60 * 1000;
+
+  return {
+    end: currentStart,
+    start: currentStart - days * 24 * 60 * 60 * 1000,
+  };
+};
+
+const filterAcquisitionRowsByPeriod = (
+  rows: AdminDashboardAcquisitionEventRow[],
+  period: DashboardPeriod,
+) => {
+  const startTime = getDashboardPeriodStartTime(period);
+
+  if (startTime === null) {
+    return rows;
+  }
+
+  return rows.filter((row) => Date.parse(row.day) >= startTime);
+};
+
+const sumVisits = (rows: AdminDashboardAcquisitionEventRow[]) =>
+  rows.reduce((sum, row) => sum + row.visits, 0);
+
+const calculateGrowthRate = (currentValue: number, previousValue: number) => {
+  if (previousValue <= 0) {
+    return currentValue > 0 ? 100 : 0;
+  }
+
+  return ((currentValue - previousValue) / previousValue) * 100;
+};
+
+const createSearchTrendRows = (
+  rows: AdminDashboardAcquisitionEventRow[],
+): DashboardSeriesRow[] => {
+  const counts = new Map<string, number>();
+
+  rows.forEach((row) => {
+    counts.set(row.day, (counts.get(row.day) ?? 0) + row.visits);
+  });
+
+  return Array.from(counts.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([label, value]) => ({ label: label.slice(5), value }));
+};
+
+const createBarRows = (
+  rows: AdminDashboardAcquisitionEventRow[],
+  keyGetter: (row: AdminDashboardAcquisitionEventRow) => string,
+  detailGetter?: (row: AdminDashboardAcquisitionEventRow) => string,
+  limit = 7,
+): DashboardBarRow[] => {
+  const counts = new Map<string, { detail?: string; value: number }>();
+
+  rows.forEach((row) => {
+    const label = keyGetter(row).trim();
+
+    if (!label || label === "not provided" || label === "차종 확인 불가") {
+      return;
+    }
+
+    const current = counts.get(label) ?? { detail: detailGetter?.(row), value: 0 };
+    current.value += row.visits;
+    counts.set(label, current);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, item]) => ({ label, ...item }))
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label))
+    .slice(0, limit);
+};
+
+const createChannelRows = (
+  rows: AdminDashboardAcquisitionEventRow[],
+): TrafficSourceDonutItem[] => {
+  const counts = new Map(trafficSourceConfig.map((item) => [item.label, 0]));
+
+  rows.forEach((row) => {
+    const source = normalizeTrafficSourceGroup(row.channel);
+    counts.set(source, (counts.get(source) ?? 0) + row.visits);
+  });
+
+  return trafficSourceConfig.map((item) => ({
+    ...item,
+    value: counts.get(item.label) ?? 0,
+  }));
+};
+
+const formatLandingPageLabel = (path: string) => {
+  if (!path || path === "/") return "메인";
+  if (path.startsWith("/lookup")) return "차량조회";
+  if (path.startsWith("/knowledge")) return "Knowledge";
+  if (path.startsWith("/community")) return "커뮤니티";
+  if (path.startsWith("/notice") || path.includes("notice")) return "공지";
+  if (path.startsWith("/car/")) return "차량상세";
+
+  return path;
+};
+
+const formatDashboardPercent = (value: number | null) =>
+  value === null ? "연동 대기" : value.toFixed(1) + "%";
+
 function DashboardPanel({
   activeDashboardTab,
   dashboardViewFilter,
   onChangeAiCandidateStatus,
   onChangeDashboardTab,
+  onChangePeriod,
   onChangeViewFilter,
   onNavigate,
   operatorDashboardData,
+  period,
   posts,
   reports,
   reviews,
@@ -5351,9 +6027,11 @@ function DashboardPanel({
     nextStatus: AiCandidateStatus,
   ) => void;
   onChangeDashboardTab: (tab: DashboardBoardTab) => void;
+  onChangePeriod: (period: DashboardPeriod) => void;
   onChangeViewFilter: (filter: DashboardViewFilter) => void;
   onNavigate: (tab: AdminTab) => void;
   operatorDashboardData: AdminOperatorDashboardData;
+  period: DashboardPeriod;
   posts: AdminCommunityPost[];
   reports: AdminReport[];
   reviews: AdminReview[];
@@ -5460,10 +6138,157 @@ function DashboardPanel({
   const trafficSourceItems = createTrafficSourceDonutItems(
     trafficStats.referrerTop,
   );
+  const filteredAcquisitionRows = filterAcquisitionRowsByPeriod(
+    operatorDashboardData.acquisitionRows,
+    period,
+  );
+  const previousRange = period === "all" ? null : getPreviousPeriodRange(period);
+  const previousAcquisitionRows = previousRange
+    ? operatorDashboardData.acquisitionRows.filter((row) => {
+        const time = Date.parse(row.day);
+        return time >= previousRange.start && time < previousRange.end;
+      })
+    : [];
+  const currentSearchVisits = sumVisits(filteredAcquisitionRows);
+  const previousSearchVisits = sumVisits(previousAcquisitionRows);
+  const periodGrowthRate = calculateGrowthRate(
+    currentSearchVisits,
+    previousSearchVisits,
+  );
+  const weekStartRange = getPreviousPeriodRange("7days");
+  const thisWeekVisits = sumVisits(
+    operatorDashboardData.acquisitionRows.filter(
+      (row) => Date.parse(row.day) >= getDashboardPeriodStartTime("7days")!,
+    ),
+  );
+  const previousWeekVisits = sumVisits(
+    operatorDashboardData.acquisitionRows.filter((row) => {
+      const time = Date.parse(row.day);
+      return time >= weekStartRange.start && time < weekStartRange.end;
+    }),
+  );
+  const weekGrowthRate = calculateGrowthRate(thisWeekVisits, previousWeekVisits);
+  const searchTrendRows = createSearchTrendRows(filteredAcquisitionRows);
+  const searchChannelItems = createChannelRows(filteredAcquisitionRows);
+  const topKeywordRows = createBarRows(
+    filteredAcquisitionRows,
+    (row) => row.keyword,
+    (row) => row.channel,
+  );
+  const topModelRows = createBarRows(
+    filteredAcquisitionRows,
+    (row) => row.modelName,
+    (row) => row.keyword,
+  );
+  const topLandingRows = createBarRows(
+    filteredAcquisitionRows,
+    (row) => formatLandingPageLabel(row.landingPage),
+    (row) => row.landingPage,
+  );
+  const topSymptomRows = createBarRows(
+    filteredAcquisitionRows,
+    (row) => row.symptomKeyword ?? "",
+    (row) => row.keyword,
+  );
+  const searchSummary = operatorDashboardData.searchConsoleSummary;
+  const periodImpressions = filteredAcquisitionRows.reduce(
+    (sum, row) => sum + row.impressions,
+    0,
+  );
+  const periodClicks = filteredAcquisitionRows.reduce(
+    (sum, row) => sum + row.clicks,
+    0,
+  );
+  const periodCtr =
+    periodImpressions > 0 ? (periodClicks / periodImpressions) * 100 : null;
+  const geoScoreValues = filteredAcquisitionRows
+    .map((row) => row.geoScore)
+    .filter((value): value is number => value !== null);
+  const periodGeoScore = geoScoreValues.length
+    ? geoScoreValues.reduce((sum, value) => sum + value, 0) /
+      geoScoreValues.length
+    : null;
+  const periodLabel =
+    dashboardPeriods.find((item) => item.value === period)?.label ?? "30일";
+  const searchConsoleUpdatedLabel = searchSummary.updatedAt
+    ? "최근 갱신 " + formatOptionalDate(searchSummary.updatedAt)
+    : "Search Console 연동 대기";
 
   return (
     <div>
       <div className="space-y-4 md:hidden">
+        <section className={panelClassName}>
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-black text-blue-600">운영 Dashboard</p>
+              <h2 className="mt-1 text-lg font-black text-zinc-950">
+                사이트 성장 현황
+              </h2>
+              <p className="mt-1 text-xs font-medium text-zinc-500">
+                {periodLabel} 기준 검색 유입과 AI(GEO) 준비 지표입니다.
+              </p>
+            </div>
+            <DashboardPeriodSelector
+              onChange={onChangePeriod}
+              value={period}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <GrowthMetricCard
+              detail="외부 유입 기준"
+              label="검색 유입"
+              value={currentSearchVisits.toLocaleString() + "회"}
+            />
+            <GrowthMetricCard
+              detail="선택 기간 직전 대비"
+              label="성장률"
+              tone={periodGrowthRate >= 0 ? "green" : "zinc"}
+              value={(periodGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(periodGrowthRate).toFixed(1) + "%"}
+            />
+            <GrowthMetricCard
+              detail="Search Console 연동 대기"
+              label="CTR"
+              tone="purple"
+              value={formatDashboardPercent(periodCtr)}
+            />
+            <GrowthMetricCard
+              detail="AI 검색 대응 지표 준비"
+              label="AI(GEO) 점수"
+              tone="purple"
+              value={
+                periodGeoScore === null
+                  ? "준비중"
+                  : periodGeoScore.toFixed(1)
+              }
+            />
+          </div>
+        </section>
+        <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
+        <TrafficSourceDonutCard
+          description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
+          items={searchChannelItems}
+          title="검색엔진 비율"
+        />
+        <DashboardBarCard
+          emptyMessage="외부 검색 키워드 데이터가 없습니다."
+          rows={topKeywordRows}
+          title="TOP 검색 키워드"
+        />
+        <DashboardBarCard
+          emptyMessage="유입 차종 데이터가 없습니다."
+          rows={topModelRows}
+          title="인기 차종 검색"
+        />
+        <DashboardBarCard
+          emptyMessage="랜딩페이지 데이터가 없습니다."
+          rows={topLandingRows}
+          title="랜딩페이지 TOP"
+        />
+        <DashboardBarCard
+          emptyMessage="인기 증상 키워드 데이터가 없습니다."
+          rows={topSymptomRows}
+          title="인기 증상 키워드 TOP"
+        />
         <section className="grid grid-cols-2 gap-3">
           {summaryItems.slice(0, 4).map((item) => (
             <StatCard
@@ -5527,8 +6352,6 @@ function DashboardPanel({
           </div>
         </section>
 
-        <TrafficSourceDonutCard items={trafficSourceItems} />
-
         <DashboardMobileList
           emptyMessage="최근 후기가 없습니다."
           items={recentReviews.map((review) => ({
@@ -5566,6 +6389,103 @@ function DashboardPanel({
       </div>
 
       <div className="hidden space-y-4 md:block">
+      <section className={panelClassName}>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-xs font-black text-blue-600">운영 Dashboard</p>
+            <h2 className="mt-1 text-xl font-black text-zinc-950">
+              사이트 성장 현황
+            </h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              {periodLabel} 기준 검색 유입, Search Console 준비 지표, AI(GEO) 성장 현황입니다.
+            </p>
+          </div>
+          <DashboardPeriodSelector onChange={onChangePeriod} value={period} />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+          <GrowthMetricCard
+            detail="외부 유입 기준"
+            label="검색 유입"
+            value={currentSearchVisits.toLocaleString() + "회"}
+          />
+          <GrowthMetricCard
+            detail="선택 기간 직전 대비"
+            label="기간 성장률"
+            tone={periodGrowthRate >= 0 ? "green" : "zinc"}
+            value={(periodGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(periodGrowthRate).toFixed(1) + "%"}
+          />
+          <GrowthMetricCard
+            detail="지난 7일 vs 직전 7일"
+            label="지난주 대비"
+            tone={weekGrowthRate >= 0 ? "green" : "zinc"}
+            value={(weekGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(weekGrowthRate).toFixed(1) + "%"}
+          />
+          <GrowthMetricCard
+            detail="AI 검색 대응 지표 구조 준비"
+            label="AI(GEO) 점수"
+            tone="purple"
+            value={
+              periodGeoScore === null
+                ? "준비중"
+                : periodGeoScore.toFixed(1)
+            }
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+        <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
+        <TrafficSourceDonutCard
+          description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
+          items={searchChannelItems}
+          title="검색엔진 비율"
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-4">
+        <DashboardBarCard
+          emptyMessage="외부 검색 키워드 데이터가 없습니다."
+          rows={topKeywordRows}
+          title="TOP 검색 키워드"
+        />
+        <DashboardBarCard
+          emptyMessage="유입 차종 데이터가 없습니다."
+          rows={topModelRows}
+          title="인기 차종 검색"
+        />
+        <DashboardBarCard
+          emptyMessage="랜딩페이지 데이터가 없습니다."
+          rows={topLandingRows}
+          title="랜딩페이지 TOP"
+        />
+        <DashboardBarCard
+          emptyMessage="인기 증상 키워드 데이터가 없습니다."
+          rows={topSymptomRows}
+          title="인기 증상 키워드 TOP"
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <GrowthMetricCard
+          detail={searchConsoleUpdatedLabel}
+          label="노출수"
+          tone="zinc"
+          value={periodImpressions.toLocaleString()}
+        />
+        <GrowthMetricCard
+          detail="Search Console/GA 클릭 지표"
+          label="클릭수"
+          tone="zinc"
+          value={periodClicks.toLocaleString()}
+        />
+        <GrowthMetricCard
+          detail="노출수 대비 클릭률"
+          label="CTR"
+          tone="purple"
+          value={formatDashboardPercent(periodCtr)}
+        />
+      </section>
+
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
         {summaryItems.map((item) => (
           <StatCard
@@ -5696,7 +6616,14 @@ function DashboardPanel({
             />
           ) : null}
           {activeDashboardTab === "keywords" ? (
-            <DashboardKeywordTable rows={operatorDashboardData.keywordRows} />
+            <DashboardAcquisitionKeywordTable
+              rows={operatorDashboardData.keywordRows}
+            />
+          ) : null}
+          {activeDashboardTab === "internalKeywords" ? (
+            <DashboardInternalKeywordTable
+              rows={operatorDashboardData.internalKeywordRows}
+            />
           ) : null}
           {activeDashboardTab === "ai" ? (
             <DashboardAiCandidateTable
@@ -5740,10 +6667,168 @@ function StatCard({
   );
 }
 
-function TrafficSourceDonutCard({
-  items,
+function DashboardPeriodSelector({
+  onChange,
+  value,
 }: {
+  onChange: (period: DashboardPeriod) => void;
+  value: DashboardPeriod;
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {dashboardPeriods.map((item) => (
+        <button
+          key={item.value}
+          type="button"
+          className={cn(
+            categoryFilterButtonClassName,
+            value === item.value && activeCategoryFilterButtonClassName,
+          )}
+          onClick={() => onChange(item.value)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GrowthMetricCard({
+  detail,
+  label,
+  tone = "blue",
+  value,
+}: {
+  detail: string;
+  label: string;
+  tone?: "blue" | "green" | "purple" | "zinc";
+  value: string;
+}) {
+  const toneClassName =
+    tone === "green"
+      ? "text-emerald-600"
+      : tone === "purple"
+        ? "text-purple-600"
+        : tone === "zinc"
+          ? "text-zinc-600"
+          : "text-blue-600";
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-200/60">
+      <p className="text-xs font-black text-zinc-500">{label}</p>
+      <p className={cn("mt-2 text-2xl font-black tracking-tight", toneClassName)}>
+        {value}
+      </p>
+      <p className="mt-2 text-xs font-bold leading-5 text-zinc-500">{detail}</p>
+    </div>
+  );
+}
+
+function SearchTrendCard({
+  rows,
+  title,
+}: {
+  rows: DashboardSeriesRow[];
+  title: string;
+}) {
+  const maxValue = Math.max(1, ...rows.map((row) => row.value));
+  const width = 760;
+  const height = 220;
+  const padding = 28;
+  const xStep = (width - padding * 2) / Math.max(1, rows.length - 1);
+  const path = rows
+    .map((row, index) => {
+      const x = padding + index * xStep;
+      const y =
+        height - padding - (row.value / maxValue) * (height - padding * 2);
+
+      return (index === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1);
+    })
+    .join(" ");
+
+  return (
+    <section className={panelClassName}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-black text-zinc-950">{title}</h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            외부 유입 기준 일별 추이입니다.
+          </p>
+        </div>
+        <p className="text-xs font-black text-zinc-400">
+          {rows.reduce((sum, row) => sum + row.value, 0).toLocaleString()}회
+        </p>
+      </div>
+      <div className="mt-4 overflow-hidden md:overflow-x-auto">
+        {rows.length ? (
+          <svg
+            className="h-[190px] w-full min-w-0 md:min-w-[620px]"
+            viewBox={"0 0 " + width + " " + height}
+            role="img"
+            aria-label={title}
+          >
+            {[0, 1, 2, 3].map((line) => {
+              const y = padding + line * ((height - padding * 2) / 3);
+              return (
+                <line
+                  key={line}
+                  x1={padding}
+                  x2={width - padding}
+                  y1={y}
+                  y2={y}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            <path
+              d={path}
+              fill="none"
+              stroke="#2563eb"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="3"
+            />
+            {rows.map((row, index) => {
+              const x = padding + index * xStep;
+              const y =
+                height - padding - (row.value / maxValue) * (height - padding * 2);
+
+              return (
+                <g key={row.label + index}>
+                  <circle cx={x} cy={y} fill="#2563eb" r="3.5" />
+                  {index === 0 || index === rows.length - 1 ? (
+                    <text
+                      fill="#71717a"
+                      fontSize="11"
+                      fontWeight="700"
+                      textAnchor={index === 0 ? "start" : "end"}
+                      x={x}
+                      y={height - 6}
+                    >
+                      {row.label}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+        ) : (
+          <DashboardEmptyState message="검색 유입 추이 데이터가 없습니다." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TrafficSourceDonutCard({
+  description = "주요 유입 채널 비율입니다.",
+  items,
+  title = "트래픽 유입",
+}: {
+  description?: string;
   items: TrafficSourceDonutItem[];
+  title?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart<"doughnut"> | null>(null);
@@ -5807,9 +6892,9 @@ function TrafficSourceDonutCard({
     <section className={panelClassName}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-black text-zinc-950">트래픽 유입</h2>
+          <h2 className="text-base font-black text-zinc-950">{title}</h2>
           <p className="mt-1 text-xs font-medium text-zinc-500">
-            주요 유입 채널 비율입니다.
+            {description}
           </p>
         </div>
         <p className="text-xs font-black text-zinc-400">
@@ -5849,6 +6934,53 @@ function TrafficSourceDonutCard({
             );
           })}
         </dl>
+      </div>
+    </section>
+  );
+}
+
+function DashboardBarCard({
+  emptyMessage,
+  rows,
+  title,
+}: {
+  emptyMessage: string;
+  rows: DashboardBarRow[];
+  title: string;
+}) {
+  const maxValue = Math.max(1, ...rows.map((row) => row.value));
+
+  return (
+    <section className={panelClassName}>
+      <h2 className="text-base font-black text-zinc-950">{title}</h2>
+      <div className="mt-4 space-y-3">
+        {rows.length ? (
+          rows.map((row) => (
+            <div key={row.label}>
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <p className="min-w-0 truncate font-black text-zinc-800">
+                  {row.label}
+                </p>
+                <p className="shrink-0 font-black text-zinc-950">
+                  {row.value.toLocaleString()}회
+                </p>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className="h-full rounded-full bg-blue-600"
+                  style={{ width: Math.max(6, (row.value / maxValue) * 100) + "%" }}
+                />
+              </div>
+              {row.detail ? (
+                <p className="mt-1 truncate text-xs font-medium text-zinc-500">
+                  {row.detail}
+                </p>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p className={mutedTextClassName}>{emptyMessage}</p>
+        )}
       </div>
     </section>
   );
@@ -6099,14 +7231,51 @@ function DashboardContentTable({
   );
 }
 
-function DashboardKeywordTable({
+function DashboardAcquisitionKeywordTable({
+  rows,
+}: {
+  rows: AdminDashboardAcquisitionKeywordRow[];
+}) {
+  if (!rows.length) {
+    return <DashboardEmptyState message="외부 유입 키워드 데이터가 없습니다." />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-[900px] divide-y divide-zinc-200 text-sm">
+        <thead className="bg-zinc-50">
+          <tr>
+            <DashboardHeadCell>키워드명</DashboardHeadCell>
+            <DashboardHeadCell>유입 채널</DashboardHeadCell>
+            <DashboardHeadCell>유입 횟수</DashboardHeadCell>
+            <DashboardHeadCell>랜딩 페이지</DashboardHeadCell>
+            <DashboardHeadCell>최근 유입일</DashboardHeadCell>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 bg-white">
+          {rows.map((row) => (
+            <tr key={row.keyword + row.channel + row.landingPage}>
+              <DashboardCell strong>{row.keyword}</DashboardCell>
+              <DashboardCell>{row.channel}</DashboardCell>
+              <DashboardCell>{row.visitCount.toLocaleString()}회</DashboardCell>
+              <DashboardCell>{row.landingPage}</DashboardCell>
+              <DashboardCell>{formatOptionalDate(row.recentOccurredAt)}</DashboardCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DashboardInternalKeywordTable({
   rows,
 }: {
   rows: AdminDashboardKeywordRow[];
 }) {
   if (!rows.length) {
     return (
-      <DashboardEmptyState message="10회 이상 언급된 유입/후기 키워드가 없습니다." />
+      <DashboardEmptyState message="10회 이상 언급된 내부 후기 키워드가 없습니다." />
     );
   }
 
@@ -6213,6 +7382,267 @@ function AiManagementPanel({
         />
       ) : null}
     </div>
+  );
+}
+
+function KnowledgeCenterPanel({
+  onChangeSearch,
+  onChangeSort,
+  onCreate,
+  onDelete,
+  onEdit,
+  onSelect,
+  onToggleVisible,
+  search,
+  selectedTerm,
+  sort,
+  terms,
+}: {
+  onChangeSearch: (value: string) => void;
+  onChangeSort: (value: KnowledgeSortOption) => void;
+  onCreate: () => void;
+  onDelete: (term: AdminKnowledgeTerm) => void;
+  onEdit: (term: AdminKnowledgeTerm) => void;
+  onSelect: (id: string | null) => void;
+  onToggleVisible: (term: AdminKnowledgeTerm) => void;
+  search: string;
+  selectedTerm: AdminKnowledgeTerm | null;
+  sort: KnowledgeSortOption;
+  terms: AdminKnowledgeTerm[];
+}) {
+  return (
+    <div className="divide-y divide-zinc-200 bg-white">
+      <div className="bg-zinc-50 px-4 py-3">
+        <h3 className="text-sm font-black text-zinc-950">Knowledge Center</h3>
+        <p className="mt-1 text-xs font-medium text-zinc-500">
+          용어/증상 DB를 관리합니다.
+        </p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto bg-zinc-50 px-4 py-3">
+        <button
+          type="button"
+          className="shrink-0 rounded-lg border border-zinc-950 bg-zinc-950 px-3 py-1.5 text-xs font-black text-white"
+        >
+          용어/증상 DB
+        </button>
+      </div>
+      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
+        <input
+          className={inputClassName}
+          placeholder="대표명, slug, 설명, 원인, 증상, 키워드, 차종, 우선순위 검색"
+          value={search}
+          onChange={(event) => onChangeSearch(event.target.value)}
+        />
+        <select
+          className={adminInputClassName}
+          value={sort}
+          onChange={(event) =>
+            onChangeSort(normalizeKnowledgeSortOption(event.target.value))
+          }
+        >
+          {knowledgeSortOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" className={actionButtonClassName} onClick={onCreate}>
+          항목 추가
+        </button>
+      </div>
+      {selectedTerm ? (
+        <div className="border-t border-zinc-100 bg-blue-50/50 px-4 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-black text-blue-700">
+                선택 항목 · {selectedTerm.category} · {selectedTerm.slug} · 우선순위 {selectedTerm.priority}
+              </p>
+              <h4 className="mt-1 text-base font-black text-zinc-950">
+                {selectedTerm.representative_name}
+              </h4>
+              <p className="mt-1 line-clamp-3 text-sm leading-6 text-zinc-600">
+                {selectedTerm.description || "설명 없음"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={actionButtonClassName}
+              onClick={() => onSelect(null)}
+            >
+              선택 해제
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <table className={desktopTableClassName}>
+        <thead className="bg-zinc-50">
+          <tr>
+            <th className={tableHeadCellClassName}>분류</th>
+            <th className={tableHeadCellClassName}>대표명 / slug / 설명</th>
+            <th className={tableHeadCellClassName}>주요 원인 / 증상</th>
+            <th className={tableHeadCellClassName}>정비 팁 / 수리비</th>
+            <th className={tableHeadCellClassName}>키워드 / 차종</th>
+            <th className={tableHeadCellClassName}>우선순위 / 조회수</th>
+            <th className={tableHeadCellClassName}>노출</th>
+            <th className={tableHeadCellClassName}>최종 수정일</th>
+            <th className={tableHeadCellClassName}>관리</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100 bg-white">
+          {terms.length ? (
+            terms.map((term) => (
+              <tr
+                key={term.id}
+                className="cursor-pointer transition hover:bg-zinc-50"
+                onClick={() => onSelect(term.id)}
+              >
+                <td className={tableCellClassName}>
+                  <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
+                    {term.category}
+                  </span>
+                </td>
+                <td className={tableCellClassName}>
+                  <p className="font-black text-zinc-950">
+                    {term.representative_name}
+                  </p>
+                  <p className="mt-1 font-mono text-xs font-bold text-blue-600">
+                    {term.slug}
+                  </p>
+                  <p className="mt-1 line-clamp-2 max-w-[18rem] text-xs leading-5 text-zinc-500">
+                    {term.description || "설명 없음"}
+                  </p>
+                </td>
+                <td className={tableCellClassName}>
+                  <KnowledgeListPreview
+                    emptyLabel="원인 없음"
+                    items={term.main_causes}
+                  />
+                  <KnowledgeListPreview
+                    className="mt-1"
+                    emptyLabel="증상 없음"
+                    items={term.main_symptoms}
+                  />
+                </td>
+                <td className={tableCellClassName}>
+                  <p className="text-xs font-black text-zinc-950">
+                    {term.priority.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-zinc-500">
+                    조회 {term.view_count.toLocaleString()}회
+                  </p>
+                </td>
+                <td className={tableCellClassName}>
+                  <KnowledgeListPreview
+                    emptyLabel="팁 없음"
+                    items={term.maintenance_tips}
+                  />
+                  <p className="mt-1 text-xs font-bold text-zinc-500">
+                    {term.expected_repair_cost || "수리비 정보 없음"}
+                  </p>
+                </td>
+                <td className={tableCellClassName}>
+                  <KnowledgeListPreview
+                    emptyLabel="키워드 없음"
+                    items={term.related_keywords}
+                  />
+                  <KnowledgeListPreview
+                    className="mt-1"
+                    emptyLabel="차종 없음"
+                    items={term.related_models}
+                  />
+                </td>
+                <td className={tableCellClassName}>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-1 text-xs font-black",
+                      term.is_visible
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-zinc-100 text-zinc-500",
+                    )}
+                  >
+                    {term.is_visible ? "노출" : "비노출"}
+                  </span>
+                </td>
+                <td className={tableCellClassName}>
+                  {formatOptionalDate(term.updated_at)}
+                </td>
+                <td
+                  className={tableActionCellClassName}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <KnowledgeActionButtons
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    onToggleVisible={onToggleVisible}
+                    term={term}
+                  />
+                </td>
+              </tr>
+            ))
+          ) : (
+            <EmptyTableRow colSpan={9} message="Knowledge 항목이 없습니다." />
+          )}
+        </tbody>
+      </table>
+      <div className={mobileListClassName}>
+        {terms.length ? (
+          terms.map((term) => (
+            <div
+              key={term.id}
+              className={mobileCardClassName}
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelect(term.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onSelect(term.id);
+              }}
+            >
+              <div className="min-w-0">
+                <p className={mobileCardTitleClassName}>
+                  {term.representative_name}
+                </p>
+                <p className={mobileCardMetaClassName}>
+                  {term.category} · {term.slug} · 우선순위 {term.priority.toLocaleString()} · 조회 {term.view_count.toLocaleString()}회 · {term.is_visible ? "노출" : "비노출"} ·{" "}
+                  {formatOptionalDate(term.updated_at)}
+                </p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">
+                  {term.description || "설명 없음"}
+                </p>
+              </div>
+              <div onClick={(event) => event.stopPropagation()}>
+                <KnowledgeActionButtons
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onToggleVisible={onToggleVisible}
+                  term={term}
+                />
+              </div>
+            </div>
+          ))
+        ) : (
+          <EmptyMobileState message="Knowledge 항목이 없습니다." />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeListPreview({
+  className,
+  emptyLabel,
+  items,
+}: {
+  className?: string;
+  emptyLabel: string;
+  items: string[];
+}) {
+  const visibleItems = items.slice(0, 3);
+
+  return (
+    <p className={cn("line-clamp-2 text-xs leading-5 text-zinc-500", className)}>
+      {visibleItems.length ? visibleItems.join(", ") : emptyLabel}
+      {items.length > visibleItems.length ? " 외 " + (items.length - visibleItems.length) : ""}
+    </p>
   );
 }
 
@@ -7674,6 +9104,44 @@ function PopupNoticeActionButtons({
         type="button"
         className={dangerButtonClassName}
         onClick={() => onDelete(notice)}
+      >
+        삭제
+      </button>
+    </ActionMenu>
+  );
+}
+
+function KnowledgeActionButtons({
+  onDelete,
+  onEdit,
+  onToggleVisible,
+  term,
+}: {
+  onDelete: (term: AdminKnowledgeTerm) => void;
+  onEdit: (term: AdminKnowledgeTerm) => void;
+  onToggleVisible: (term: AdminKnowledgeTerm) => void;
+  term: AdminKnowledgeTerm;
+}) {
+  return (
+    <ActionMenu>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onToggleVisible(term)}
+      >
+        {term.is_visible ? "비노출" : "노출"}
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onEdit(term)}
+      >
+        수정
+      </button>
+      <button
+        type="button"
+        className={dangerButtonClassName}
+        onClick={() => onDelete(term)}
       >
         삭제
       </button>

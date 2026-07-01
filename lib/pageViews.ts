@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 
 interface RecordPageViewInput {
   eventType?: "page_view" | "vehicle_view" | "review_view";
+  path?: string | null;
+  referrer?: string | null;
   vehicleId?: string | null;
   reviewId?: string | null;
 }
@@ -35,6 +37,8 @@ const getPageViewSessionId = () => {
 
 export const recordPageView = async ({
   eventType = "page_view",
+  path,
+  referrer,
   reviewId,
   vehicleId,
 }: RecordPageViewInput) => {
@@ -42,10 +46,6 @@ export const recordPageView = async ({
     vehicleId && uuidPattern.test(vehicleId) ? vehicleId : null;
   const normalizedReviewId =
     reviewId && uuidPattern.test(reviewId) ? reviewId : null;
-
-  if (!normalizedVehicleId && !normalizedReviewId) {
-    return false;
-  }
 
   const sessionResult = await supabase?.auth.getSession();
   const accessToken = sessionResult?.data.session?.access_token;
@@ -59,8 +59,8 @@ export const recordPageView = async ({
       vehicleId: normalizedVehicleId,
       reviewId: normalizedReviewId,
       eventType,
-      path: window.location.pathname + window.location.search,
-      referrer: document.referrer || null,
+      path: path ?? window.location.pathname + window.location.search,
+      referrer: referrer ?? (document.referrer || null),
       sessionId: getPageViewSessionId(),
       userAgent: navigator.userAgent,
     }),
