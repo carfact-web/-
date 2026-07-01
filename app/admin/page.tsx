@@ -109,6 +109,39 @@ interface AdminAiMaintenanceRule {
   memo: string;
 }
 
+interface AdminAiKeywordRuleFormValues {
+  category: string;
+  excludeKeywords: string;
+  fuelType: string;
+  includeKeywords: string;
+  isDefaultMaintenance: boolean;
+  isVisible: boolean;
+  label: string;
+  memo: string;
+  targetModel: string;
+}
+
+interface AdminAiMaintenanceRuleFormValues {
+  condition: string;
+  fuelType: string;
+  isVisible: boolean;
+  items: string;
+  memo: string;
+  mileageCondition: string;
+  title: string;
+  yearCondition: string;
+}
+
+interface AdminNewKeywordCandidateFormValues {
+  excludeCandidate: boolean;
+  includeKeywords: string;
+  isVisible: boolean;
+  label: string;
+  memo: string;
+  registerAsIncludeKeyword: boolean;
+  registerAsRepresentative: boolean;
+}
+
 interface AdminStats {
   comments: number;
   communityPosts: number;
@@ -395,6 +428,21 @@ interface AdminKnowledgeTerm {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface AdminKnowledgeTermFormValues {
+  category: KnowledgeCategory;
+  description: string;
+  expectedRepairCost: string;
+  isVisible: boolean;
+  maintenanceTips: string;
+  mainCauses: string;
+  mainSymptoms: string;
+  priority: number;
+  relatedKeywords: string;
+  relatedModels: string;
+  representativeName: string;
+  slug: string;
 }
 
 const tabs: { label: string; value: AdminTab }[] = [
@@ -799,6 +847,15 @@ const normalizeKnowledgeSortOption = (value: unknown): KnowledgeSortOption => {
 
 const normalizeKnowledgeSlug = (value: string) => value.trim().toLowerCase();
 
+const createKnowledgeSlug = (value: string) =>
+  normalizeKnowledgeSlug(
+    value
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, ""),
+  );
+
 const isValidKnowledgeSlug = (value: string) =>
   /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 
@@ -809,6 +866,50 @@ const splitAdminListInput = (value: string) =>
     .filter(Boolean);
 
 const formatAdminListInput = (value: string[]) => value.join(", ");
+
+const createKeywordRuleFormValues = (
+  rule?: AdminAiKeywordRule,
+): AdminAiKeywordRuleFormValues => ({
+  category: rule?.category ?? "",
+  excludeKeywords: formatAdminListInput(rule?.excludeKeywords ?? []),
+  fuelType: rule?.fuelType ?? "",
+  includeKeywords: formatAdminListInput(rule?.includeKeywords ?? []),
+  isDefaultMaintenance: rule?.isDefaultMaintenance ?? false,
+  isVisible: rule?.isVisible ?? true,
+  label: rule?.label ?? "",
+  memo: rule?.memo ?? "",
+  targetModel: rule?.targetModel ?? "",
+});
+
+const createMaintenanceRuleFormValues = (
+  rule?: AdminAiMaintenanceRule,
+): AdminAiMaintenanceRuleFormValues => ({
+  condition: rule?.condition ?? "",
+  fuelType: rule?.fuelType ?? "",
+  isVisible: rule?.isVisible ?? true,
+  items: formatAdminListInput(rule?.items ?? []),
+  memo: rule?.memo ?? "",
+  mileageCondition: "",
+  title: rule?.title ?? "",
+  yearCondition: "",
+});
+
+const createKnowledgeTermFormValues = (
+  term?: AdminKnowledgeTerm,
+): AdminKnowledgeTermFormValues => ({
+  category: term?.category ?? "일반",
+  description: term?.description ?? "",
+  expectedRepairCost: term?.expected_repair_cost ?? "",
+  isVisible: term?.is_visible ?? true,
+  maintenanceTips: formatAdminListInput(term?.maintenance_tips ?? []),
+  mainCauses: formatAdminListInput(term?.main_causes ?? []),
+  mainSymptoms: formatAdminListInput(term?.main_symptoms ?? []),
+  priority: term?.priority ?? 0,
+  relatedKeywords: formatAdminListInput(term?.related_keywords ?? []),
+  relatedModels: formatAdminListInput(term?.related_models ?? []),
+  representativeName: term?.representative_name ?? "",
+  slug: term?.slug ?? "",
+});
 
 const normalizeAdminKnowledgeTerm = (
   term: AdminKnowledgeTerm,
@@ -2623,36 +2724,22 @@ export default function AdminPage() {
 
   const registerNewKeywordCandidate = async (
     candidate: AdminDashboardAiCandidate,
+    values: AdminNewKeywordCandidateFormValues,
   ) => {
-    const label = window.prompt("대표 키워드", candidate.keyword);
-
-    if (label === null || !label.trim()) {
+    if (values.excludeCandidate) {
+      await updateAiCandidateStatus(candidate, "excluded");
       return;
     }
 
-    const includeKeywords = window.prompt(
-      "포함 키워드(쉼표 구분)",
-      candidate.keyword,
-    );
-
-    if (includeKeywords === null) {
+    if (!values.registerAsRepresentative || !values.label.trim()) {
+      setActionMessage("대표 키워드를 입력해주세요.");
       return;
     }
 
-    const category = window.prompt(
-      "카테고리",
-      candidate.recommendedCategory ?? "후기 반복 신규 키워드",
-    );
-
-    if (category === null) {
-      return;
-    }
-
-    const normalizedLabel = normalizeVehicleIssueKeyword(label);
-    const nextIncludeKeywords = includeKeywords
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const normalizedLabel = normalizeVehicleIssueKeyword(values.label);
+    const nextIncludeKeywords = values.registerAsIncludeKeyword
+      ? splitAdminListInput(values.includeKeywords)
+      : [];
     const existingRule = aiKeywordRules.find(
       (rule) => normalizeVehicleIssueKeyword(rule.label) === normalizedLabel,
     );
@@ -2672,17 +2759,17 @@ export default function AdminPage() {
       );
     } else {
       const nextRule: AdminAiKeywordRule = {
-        category: category.trim(),
+        category: candidate.recommendedCategory ?? "후기 반복 신규 키워드",
         excludeKeywords: [],
         fuelType: "",
         id: "auto-keyword-" + Date.now(),
         includeKeywords: nextIncludeKeywords.length
           ? nextIncludeKeywords
-          : [label.trim()],
+          : [values.label.trim()],
         isDefaultMaintenance: false,
-        isVisible: true,
-        label: label.trim(),
-        memo: "신규 키워드 자동감지에서 등록",
+        isVisible: values.isVisible,
+        label: values.label.trim(),
+        memo: values.memo.trim() || "신규 키워드 자동감지에서 등록",
         targetModel: "",
       };
 
@@ -2692,138 +2779,40 @@ export default function AdminPage() {
     await updateAiCandidateStatus(candidate, "applied");
   };
 
-  const upsertKnowledgeTerm = async (term?: AdminKnowledgeTerm) => {
+  const upsertKnowledgeTerm = async (
+    values: AdminKnowledgeTermFormValues,
+    term?: AdminKnowledgeTerm,
+  ) => {
     if (!supabase) {
       return;
     }
 
-    const category = window.prompt(
-      "분류(증상/부품/시스템/정비용어/경고등/보험/성능기록부/일반)",
-      term?.category ?? "일반",
-    );
-
-    if (category === null) {
+    if (!values.representativeName.trim()) {
+      setActionMessage("대표 키워드를 입력해주세요.");
       return;
     }
 
-    const nextCategory = normalizeKnowledgeCategory(category);
-    const representativeName = window.prompt(
-      "대표명",
-      term?.representative_name ?? "",
-    );
-
-    if (representativeName === null || !representativeName.trim()) {
-      return;
-    }
-
-    const slug = window.prompt("slug", term?.slug ?? "");
-
-    if (slug === null) {
-      return;
-    }
-
-    const nextSlug = normalizeKnowledgeSlug(slug);
+    const nextSlug = normalizeKnowledgeSlug(values.slug);
 
     if (!isValidKnowledgeSlug(nextSlug)) {
       setActionMessage("slug는 소문자 영문, 숫자, 하이픈만 사용할 수 있습니다.");
       return;
     }
 
-    const description = window.prompt("설명", term?.description ?? "");
-
-    if (description === null) {
-      return;
-    }
-
-    const mainCauses = window.prompt(
-      "주요 원인(쉼표 또는 줄바꿈 구분)",
-      formatAdminListInput(term?.main_causes ?? []),
-    );
-
-    if (mainCauses === null) {
-      return;
-    }
-
-    const mainSymptoms = window.prompt(
-      "주요 증상(쉼표 또는 줄바꿈 구분)",
-      formatAdminListInput(term?.main_symptoms ?? []),
-    );
-
-    if (mainSymptoms === null) {
-      return;
-    }
-
-    const maintenanceTips = window.prompt(
-      "정비 팁(쉼표 또는 줄바꿈 구분)",
-      formatAdminListInput(term?.maintenance_tips ?? []),
-    );
-
-    if (maintenanceTips === null) {
-      return;
-    }
-
-    const expectedRepairCost = window.prompt(
-      "예상 수리비",
-      term?.expected_repair_cost ?? "",
-    );
-
-    if (expectedRepairCost === null) {
-      return;
-    }
-
-    const relatedKeywords = window.prompt(
-      "관련 키워드(쉼표 또는 줄바꿈 구분)",
-      formatAdminListInput(term?.related_keywords ?? []),
-    );
-
-    if (relatedKeywords === null) {
-      return;
-    }
-
-    const relatedModels = window.prompt(
-      "관련 차종(쉼표 또는 줄바꿈 구분)",
-      formatAdminListInput(term?.related_models ?? []),
-    );
-
-    if (relatedModels === null) {
-      return;
-    }
-
-    const priority = window.prompt("우선순위(priority)", String(term?.priority ?? 0));
-
-    if (priority === null) {
-      return;
-    }
-
-    const nextPriority = Math.max(0, Math.floor(Number(priority) || 0));
-
-    const isVisibleInput = window.prompt(
-      "노출 여부(true/false)",
-      String(term?.is_visible ?? true),
-    );
-
-    if (isVisibleInput === null) {
-      return;
-    }
-
-    const nextIsVisible = !/^false|0|n|no|비노출|숨김$/i.test(
-      isVisibleInput.trim(),
-    );
-
     setActionMessage("");
 
     const { data, error } = await supabase.rpc("admin_upsert_knowledge_term", {
-      next_category: nextCategory,
-      next_description: description,
-      next_expected_repair_cost: expectedRepairCost,
-      next_is_visible: nextIsVisible,
-      next_maintenance_tips: splitAdminListInput(maintenanceTips),
-      next_main_causes: splitAdminListInput(mainCauses),
-      next_main_symptoms: splitAdminListInput(mainSymptoms),
-      next_priority: nextPriority,
-      next_related_keywords: splitAdminListInput(relatedKeywords),
-      next_related_models: splitAdminListInput(relatedModels),
-      next_representative_name: representativeName.trim(),
+      next_category: values.category,
+      next_description: values.description,
+      next_expected_repair_cost: values.expectedRepairCost,
+      next_is_visible: values.isVisible,
+      next_maintenance_tips: splitAdminListInput(values.maintenanceTips),
+      next_main_causes: splitAdminListInput(values.mainCauses),
+      next_main_symptoms: splitAdminListInput(values.mainSymptoms),
+      next_priority: Math.max(0, Math.floor(Number(values.priority) || 0)),
+      next_related_keywords: splitAdminListInput(values.relatedKeywords),
+      next_related_models: splitAdminListInput(values.relatedModels),
+      next_representative_name: values.representativeName.trim(),
       next_slug: nextSlug,
       target_term_id: term?.id ?? null,
     });
@@ -3951,8 +3940,8 @@ export default function AdminPage() {
               }
               onChangeKeywordRules={setAiKeywordRules}
               onChangeMaintenanceRules={setAiMaintenanceRules}
-              onRegisterCandidate={(candidate) =>
-                void registerNewKeywordCandidate(candidate)
+              onRegisterCandidate={(candidate, values) =>
+                void registerNewKeywordCandidate(candidate, values)
               }
               onChangeTab={setActiveAiManagementTab}
               reviews={reviews}
@@ -3968,9 +3957,8 @@ export default function AdminPage() {
             <KnowledgeCenterPanel
               onChangeSearch={setKnowledgeSearch}
               onChangeSort={setKnowledgeSort}
-              onCreate={() => void upsertKnowledgeTerm()}
               onDelete={(term) => void deleteKnowledgeTerm(term)}
-              onEdit={(term) => void upsertKnowledgeTerm(term)}
+              onSave={(values, term) => void upsertKnowledgeTerm(values, term)}
               onSelect={setSelectedKnowledgeTermId}
               onToggleVisible={(term) => void toggleKnowledgeTermVisible(term)}
               search={knowledgeSearch}
@@ -7331,7 +7319,10 @@ function AiManagementPanel({
   ) => void;
   onChangeKeywordRules: (rules: AdminAiKeywordRule[]) => void;
   onChangeMaintenanceRules: (rules: AdminAiMaintenanceRule[]) => void;
-  onRegisterCandidate: (candidate: AdminDashboardAiCandidate) => void;
+  onRegisterCandidate: (
+    candidate: AdminDashboardAiCandidate,
+    values: AdminNewKeywordCandidateFormValues,
+  ) => void;
   onChangeTab: (tab: AiManagementTab) => void;
   reviews: AdminReview[];
 }) {
@@ -7388,9 +7379,8 @@ function AiManagementPanel({
 function KnowledgeCenterPanel({
   onChangeSearch,
   onChangeSort,
-  onCreate,
   onDelete,
-  onEdit,
+  onSave,
   onSelect,
   onToggleVisible,
   search,
@@ -7400,9 +7390,8 @@ function KnowledgeCenterPanel({
 }: {
   onChangeSearch: (value: string) => void;
   onChangeSort: (value: KnowledgeSortOption) => void;
-  onCreate: () => void;
   onDelete: (term: AdminKnowledgeTerm) => void;
-  onEdit: (term: AdminKnowledgeTerm) => void;
+  onSave: (values: AdminKnowledgeTermFormValues, term?: AdminKnowledgeTerm) => void;
   onSelect: (id: string | null) => void;
   onToggleVisible: (term: AdminKnowledgeTerm) => void;
   search: string;
@@ -7410,6 +7399,25 @@ function KnowledgeCenterPanel({
   sort: KnowledgeSortOption;
   terms: AdminKnowledgeTerm[];
 }) {
+  const [editingTerm, setEditingTerm] = useState<AdminKnowledgeTerm | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formValues, setFormValues] = useState<AdminKnowledgeTermFormValues>(
+    createKnowledgeTermFormValues(),
+  );
+  const openForm = (term?: AdminKnowledgeTerm) => {
+    setEditingTerm(term ?? null);
+    setFormValues(createKnowledgeTermFormValues(term));
+    setIsFormOpen(true);
+  };
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingTerm(null);
+  };
+  const submitForm = () => {
+    onSave(formValues, editingTerm ?? undefined);
+    closeForm();
+  };
+
   return (
     <div className="divide-y divide-zinc-200 bg-white">
       <div className="bg-zinc-50 px-4 py-3">
@@ -7446,7 +7454,7 @@ function KnowledgeCenterPanel({
             </option>
           ))}
         </select>
-        <button type="button" className={actionButtonClassName} onClick={onCreate}>
+        <button type="button" className={actionButtonClassName} onClick={() => openForm()}>
           항목 추가
         </button>
       </div>
@@ -7572,7 +7580,7 @@ function KnowledgeCenterPanel({
                 >
                   <KnowledgeActionButtons
                     onDelete={onDelete}
-                    onEdit={onEdit}
+                    onEdit={openForm}
                     onToggleVisible={onToggleVisible}
                     term={term}
                   />
@@ -7612,7 +7620,7 @@ function KnowledgeCenterPanel({
               <div onClick={(event) => event.stopPropagation()}>
                 <KnowledgeActionButtons
                   onDelete={onDelete}
-                  onEdit={onEdit}
+                  onEdit={openForm}
                   onToggleVisible={onToggleVisible}
                   term={term}
                 />
@@ -7623,6 +7631,14 @@ function KnowledgeCenterPanel({
           <EmptyMobileState message="Knowledge 항목이 없습니다." />
         )}
       </div>
+      {isFormOpen ? (
+        <KnowledgeTermModal
+          onChange={setFormValues}
+          onClose={closeForm}
+          onSubmit={submitForm}
+          values={formValues}
+        />
+      ) : null}
     </div>
   );
 }
@@ -7646,6 +7662,506 @@ function KnowledgeListPreview({
   );
 }
 
+function AdminModal({
+  children,
+  onClose,
+  onSubmit,
+  submitLabel = "저장",
+  title,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  onSubmit: () => void;
+  submitLabel?: string;
+  title: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/45 p-0 sm:items-center sm:p-4">
+      <section className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl shadow-zinc-950/30 sm:mx-auto sm:max-w-3xl sm:rounded-lg">
+        <div className="border-b border-zinc-200 px-4 py-3">
+          <h3 className="text-base font-black text-zinc-950">{title}</h3>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {children}
+        </div>
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-zinc-200 bg-white px-4 py-3">
+          <button type="button" className={actionButtonClassName} onClick={onClose}>
+            취소
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-black text-white transition hover:bg-zinc-800"
+            onClick={onSubmit}
+          >
+            {submitLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function FormField({
+  children,
+  label,
+  required = false,
+}: {
+  children: React.ReactNode;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-xs font-black text-zinc-600">
+        {label}
+        {required ? <span className="text-blue-600"> *</span> : null}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function CheckboxField({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm font-bold text-zinc-700">
+      <input
+        checked={checked}
+        className="h-4 w-4 rounded border-zinc-300"
+        type="checkbox"
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      {label}
+    </label>
+  );
+}
+
+function KnowledgeTermModal({
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  onChange: (values: AdminKnowledgeTermFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminKnowledgeTermFormValues;
+}) {
+  const [isSlugEdited, setIsSlugEdited] = useState(Boolean(values.slug));
+  const updateValues = (patch: Partial<AdminKnowledgeTermFormValues>) =>
+    onChange({ ...values, ...patch });
+  const updateRepresentativeName = (representativeName: string) => {
+    updateValues({
+      representativeName,
+      slug: isSlugEdited ? values.slug : createKnowledgeSlug(representativeName),
+    });
+  };
+
+  return (
+    <AdminModal onClose={onClose} onSubmit={onSubmit} title="용어/증상 DB">
+      <div className="grid gap-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="대표 키워드" required>
+            <input
+              className={adminInputClassName}
+              value={values.representativeName}
+              onChange={(event) => updateRepresentativeName(event.target.value)}
+            />
+          </FormField>
+          <FormField label="slug" required>
+            <input
+              className={adminInputClassName}
+              value={values.slug}
+              onChange={(event) => {
+                setIsSlugEdited(true);
+                updateValues({ slug: normalizeKnowledgeSlug(event.target.value) });
+              }}
+            />
+          </FormField>
+          <FormField label="분류" required>
+            <select
+              className={adminInputClassName}
+              value={values.category}
+              onChange={(event) =>
+                updateValues({
+                  category: normalizeKnowledgeCategory(event.target.value),
+                })
+              }
+            >
+              {knowledgeCategories.map((category) => (
+                <option key={category.value} value={category.value}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="우선순위">
+            <input
+              className={adminInputClassName}
+              min={0}
+              type="number"
+              value={values.priority}
+              onChange={(event) =>
+                updateValues({ priority: Number(event.target.value) || 0 })
+              }
+            />
+          </FormField>
+        </div>
+        <FormField label="설명">
+          <textarea
+            className={cn(adminInputClassName, "min-h-28")}
+            value={values.description}
+            onChange={(event) => updateValues({ description: event.target.value })}
+          />
+        </FormField>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="주요 원인">
+            <textarea
+              className={cn(adminInputClassName, "min-h-24")}
+              value={values.mainCauses}
+              onChange={(event) => updateValues({ mainCauses: event.target.value })}
+            />
+          </FormField>
+          <FormField label="주요 증상">
+            <textarea
+              className={cn(adminInputClassName, "min-h-24")}
+              value={values.mainSymptoms}
+              onChange={(event) => updateValues({ mainSymptoms: event.target.value })}
+            />
+          </FormField>
+          <FormField label="정비 팁 / 수리 방향">
+            <textarea
+              className={cn(adminInputClassName, "min-h-24")}
+              value={values.maintenanceTips}
+              onChange={(event) =>
+                updateValues({ maintenanceTips: event.target.value })
+              }
+            />
+          </FormField>
+          <FormField label="예상 수리비">
+            <input
+              className={adminInputClassName}
+              value={values.expectedRepairCost}
+              onChange={(event) =>
+                updateValues({ expectedRepairCost: event.target.value })
+              }
+            />
+          </FormField>
+          <FormField label="관련 키워드">
+            <textarea
+              className={cn(adminInputClassName, "min-h-20")}
+              value={values.relatedKeywords}
+              onChange={(event) =>
+                updateValues({ relatedKeywords: event.target.value })
+              }
+            />
+          </FormField>
+          <FormField label="관련 차종">
+            <textarea
+              className={cn(adminInputClassName, "min-h-20")}
+              value={values.relatedModels}
+              onChange={(event) =>
+                updateValues({ relatedModels: event.target.value })
+              }
+            />
+          </FormField>
+        </div>
+        <CheckboxField
+          checked={values.isVisible}
+          label="노출 여부"
+          onChange={(checked) => updateValues({ isVisible: checked })}
+        />
+      </div>
+    </AdminModal>
+  );
+}
+
+function AiKeywordRuleModal({
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  onChange: (values: AdminAiKeywordRuleFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminAiKeywordRuleFormValues;
+}) {
+  const updateValues = (patch: Partial<AdminAiKeywordRuleFormValues>) =>
+    onChange({ ...values, ...patch });
+
+  return (
+    <AdminModal onClose={onClose} onSubmit={onSubmit} title="AI 키워드 룰">
+      <div className="grid gap-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="대표 키워드" required>
+            <input
+              className={adminInputClassName}
+              value={values.label}
+              onChange={(event) => updateValues({ label: event.target.value })}
+            />
+          </FormField>
+          <FormField label="카테고리">
+            <input
+              className={adminInputClassName}
+              value={values.category}
+              onChange={(event) => updateValues({ category: event.target.value })}
+            />
+          </FormField>
+          <FormField label="적용 유종">
+            <select
+              className={adminInputClassName}
+              value={values.fuelType}
+              onChange={(event) => updateValues({ fuelType: event.target.value })}
+            >
+              <option value="">전체</option>
+              <option value="가솔린">가솔린</option>
+              <option value="디젤">디젤</option>
+              <option value="LPG">LPG</option>
+              <option value="하이브리드">하이브리드</option>
+              <option value="전기">전기</option>
+            </select>
+          </FormField>
+          <FormField label="적용 차종/세대">
+            <input
+              className={adminInputClassName}
+              value={values.targetModel}
+              onChange={(event) =>
+                updateValues({ targetModel: event.target.value })
+              }
+            />
+          </FormField>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="포함 키워드">
+            <textarea
+              className={cn(adminInputClassName, "min-h-28")}
+              value={values.includeKeywords}
+              onChange={(event) =>
+                updateValues({ includeKeywords: event.target.value })
+              }
+            />
+          </FormField>
+          <FormField label="제외 키워드">
+            <textarea
+              className={cn(adminInputClassName, "min-h-28")}
+              value={values.excludeKeywords}
+              onChange={(event) =>
+                updateValues({ excludeKeywords: event.target.value })
+              }
+            />
+          </FormField>
+        </div>
+        <FormField label="메모">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            value={values.memo}
+            onChange={(event) => updateValues({ memo: event.target.value })}
+          />
+        </FormField>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <CheckboxField
+            checked={values.isDefaultMaintenance}
+            label="기본 정비항목 룰"
+            onChange={(checked) =>
+              updateValues({ isDefaultMaintenance: checked })
+            }
+          />
+          <CheckboxField
+            checked={values.isVisible}
+            label="노출 여부"
+            onChange={(checked) => updateValues({ isVisible: checked })}
+          />
+        </div>
+      </div>
+    </AdminModal>
+  );
+}
+
+function AiMaintenanceRuleModal({
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  onChange: (values: AdminAiMaintenanceRuleFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminAiMaintenanceRuleFormValues;
+}) {
+  const updateValues = (patch: Partial<AdminAiMaintenanceRuleFormValues>) =>
+    onChange({ ...values, ...patch });
+
+  return (
+    <AdminModal onClose={onClose} onSubmit={onSubmit} title="정비항목 룰">
+      <div className="grid gap-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="룰명" required>
+            <input
+              className={adminInputClassName}
+              value={values.title}
+              onChange={(event) => updateValues({ title: event.target.value })}
+            />
+          </FormField>
+          <FormField label="유종">
+            <select
+              className={adminInputClassName}
+              value={values.fuelType}
+              onChange={(event) => updateValues({ fuelType: event.target.value })}
+            >
+              <option value="">전체</option>
+              <option value="가솔린">가솔린</option>
+              <option value="디젤">디젤</option>
+              <option value="LPG">LPG</option>
+              <option value="하이브리드">하이브리드</option>
+              <option value="전기">전기</option>
+            </select>
+          </FormField>
+        </div>
+        <FormField label="조건">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            value={values.condition}
+            onChange={(event) => updateValues({ condition: event.target.value })}
+          />
+        </FormField>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="연식 조건">
+            <input
+              className={adminInputClassName}
+              value={values.yearCondition}
+              onChange={(event) =>
+                updateValues({ yearCondition: event.target.value })
+              }
+            />
+          </FormField>
+          <FormField label="주행거리 조건">
+            <input
+              className={adminInputClassName}
+              value={values.mileageCondition}
+              onChange={(event) =>
+                updateValues({ mileageCondition: event.target.value })
+              }
+            />
+          </FormField>
+        </div>
+        <FormField label="표시 항목">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            value={values.items}
+            onChange={(event) => updateValues({ items: event.target.value })}
+          />
+        </FormField>
+        <FormField label="메모">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            value={values.memo}
+            onChange={(event) => updateValues({ memo: event.target.value })}
+          />
+        </FormField>
+        <CheckboxField
+          checked={values.isVisible}
+          label="노출 여부"
+          onChange={(checked) => updateValues({ isVisible: checked })}
+        />
+      </div>
+    </AdminModal>
+  );
+}
+
+function NewKeywordCandidateModal({
+  candidate,
+  onChange,
+  onClose,
+  onSubmit,
+  values,
+}: {
+  candidate: AdminDashboardAiCandidate;
+  onChange: (values: AdminNewKeywordCandidateFormValues) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  values: AdminNewKeywordCandidateFormValues;
+}) {
+  const updateValues = (patch: Partial<AdminNewKeywordCandidateFormValues>) =>
+    onChange({ ...values, ...patch });
+
+  return (
+    <AdminModal
+      onClose={onClose}
+      onSubmit={onSubmit}
+      submitLabel={values.excludeCandidate ? "제외 처리" : "등록"}
+      title="신규 키워드 자동감지"
+    >
+      <div className="grid gap-4">
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+          <p className="text-xs font-black text-blue-700">후보 키워드</p>
+          <p className="mt-1 text-lg font-black text-zinc-950">
+            {candidate.keyword}
+          </p>
+        </div>
+        <FormField label="대표 키워드" required>
+          <input
+            className={adminInputClassName}
+            disabled={values.excludeCandidate || !values.registerAsRepresentative}
+            value={values.label}
+            onChange={(event) => updateValues({ label: event.target.value })}
+          />
+        </FormField>
+        <FormField label="포함 키워드">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            disabled={values.excludeCandidate || !values.registerAsIncludeKeyword}
+            value={values.includeKeywords}
+            onChange={(event) =>
+              updateValues({ includeKeywords: event.target.value })
+            }
+          />
+        </FormField>
+        <FormField label="메모">
+          <textarea
+            className={cn(adminInputClassName, "min-h-24")}
+            value={values.memo}
+            onChange={(event) => updateValues({ memo: event.target.value })}
+          />
+        </FormField>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <CheckboxField
+            checked={values.registerAsRepresentative}
+            label="대표 키워드로 등록"
+            onChange={(checked) =>
+              updateValues({ registerAsRepresentative: checked })
+            }
+          />
+          <CheckboxField
+            checked={values.registerAsIncludeKeyword}
+            label="포함 키워드로 등록"
+            onChange={(checked) =>
+              updateValues({ registerAsIncludeKeyword: checked })
+            }
+          />
+          <CheckboxField
+            checked={values.excludeCandidate}
+            label="제외 여부"
+            onChange={(checked) => updateValues({ excludeCandidate: checked })}
+          />
+          <CheckboxField
+            checked={values.isVisible}
+            label="노출 여부"
+            onChange={(checked) => updateValues({ isVisible: checked })}
+          />
+        </div>
+      </div>
+    </AdminModal>
+  );
+}
+
 function AiKeywordRuleManager({
   onChangeRules,
   rules,
@@ -7654,6 +8170,11 @@ function AiKeywordRuleManager({
   rules: AdminAiKeywordRule[];
 }) {
   const [search, setSearch] = useState("");
+  const [editingRule, setEditingRule] = useState<AdminAiKeywordRule | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formValues, setFormValues] = useState<AdminAiKeywordRuleFormValues>(
+    createKeywordRuleFormValues(),
+  );
   const visibleRules = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -7674,54 +8195,36 @@ function AiKeywordRuleManager({
         .includes(normalizedSearch),
     );
   }, [rules, search]);
-  const upsertRule = (rule?: AdminAiKeywordRule) => {
-    const label = window.prompt("대표 키워드", rule?.label ?? "");
-    if (label === null || !label.trim()) return;
-    const includeKeywords = window.prompt(
-      "포함 키워드(쉼표 구분)",
-      rule?.includeKeywords.join(", ") ?? label,
-    );
-    if (includeKeywords === null) return;
-    const excludeKeywords = window.prompt(
-      "제외 키워드(쉼표 구분)",
-      rule?.excludeKeywords.join(", ") ?? "",
-    );
-    if (excludeKeywords === null) return;
-    const category = window.prompt("카테고리", rule?.category ?? "");
-    if (category === null) return;
-    const fuelType = window.prompt("적용 유종", rule?.fuelType ?? "");
-    if (fuelType === null) return;
-    const targetModel = window.prompt("적용 차종/세대", rule?.targetModel ?? "");
-    if (targetModel === null) return;
-    const memo = window.prompt("메모", rule?.memo ?? "");
-    if (memo === null) return;
-
+  const openForm = (rule?: AdminAiKeywordRule) => {
+    setEditingRule(rule ?? null);
+    setFormValues(createKeywordRuleFormValues(rule));
+    setIsFormOpen(true);
+  };
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingRule(null);
+  };
+  const submitForm = () => {
+    if (!formValues.label.trim()) return;
     const nextRule: AdminAiKeywordRule = {
-      id: rule?.id ?? "custom-keyword-" + Date.now(),
-      label: label.trim(),
-      includeKeywords: includeKeywords
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      excludeKeywords: excludeKeywords
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      category: category.trim(),
-      fuelType: fuelType.trim(),
-      targetModel: targetModel.trim(),
-      isDefaultMaintenance:
-        rule?.isDefaultMaintenance ??
-        window.confirm("기본 정비항목 룰로 표시하시겠습니까?"),
-      isVisible: rule?.isVisible ?? true,
-      memo: memo.trim(),
+      id: editingRule?.id ?? "custom-keyword-" + Date.now(),
+      label: formValues.label.trim(),
+      includeKeywords: splitAdminListInput(formValues.includeKeywords),
+      excludeKeywords: splitAdminListInput(formValues.excludeKeywords),
+      category: formValues.category.trim(),
+      fuelType: formValues.fuelType.trim(),
+      targetModel: formValues.targetModel.trim(),
+      isDefaultMaintenance: formValues.isDefaultMaintenance,
+      isVisible: formValues.isVisible,
+      memo: formValues.memo.trim(),
     };
 
     onChangeRules(
-      rule
-        ? rules.map((item) => (item.id === rule.id ? nextRule : item))
+      editingRule
+        ? rules.map((item) => (item.id === editingRule.id ? nextRule : item))
         : [nextRule, ...rules],
     );
+    closeForm();
   };
 
   return (
@@ -7736,7 +8239,7 @@ function AiKeywordRuleManager({
         <button
           type="button"
           className={actionButtonClassName}
-          onClick={() => upsertRule()}
+          onClick={() => openForm()}
         >
           키워드 추가
         </button>
@@ -7764,7 +8267,7 @@ function AiKeywordRuleManager({
               <button
                 type="button"
                 className={actionButtonClassName}
-                onClick={() => upsertRule(rule)}
+                onClick={() => openForm(rule)}
               >
                 수정
               </button>
@@ -7798,6 +8301,14 @@ function AiKeywordRuleManager({
           </article>
         ))}
       </div>
+      {isFormOpen ? (
+        <AiKeywordRuleModal
+          onChange={setFormValues}
+          onClose={closeForm}
+          onSubmit={submitForm}
+          values={formValues}
+        />
+      ) : null}
     </div>
   );
 }
@@ -7809,33 +8320,49 @@ function AiMaintenanceRuleManager({
   onChangeRules: (rules: AdminAiMaintenanceRule[]) => void;
   rules: AdminAiMaintenanceRule[];
 }) {
-  const upsertRule = (rule?: AdminAiMaintenanceRule) => {
-    const title = window.prompt("룰 이름", rule?.title ?? "");
-    if (title === null || !title.trim()) return;
-    const condition = window.prompt("조건", rule?.condition ?? "");
-    if (condition === null) return;
-    const fuelType = window.prompt("적용 유종", rule?.fuelType ?? "");
-    if (fuelType === null) return;
-    const items = window.prompt("정비 항목(쉼표 구분)", rule?.items.join(", ") ?? "");
-    if (items === null) return;
-    const memo = window.prompt("메모", rule?.memo ?? "");
-    if (memo === null) return;
+  const [editingRule, setEditingRule] = useState<AdminAiMaintenanceRule | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formValues, setFormValues] =
+    useState<AdminAiMaintenanceRuleFormValues>(
+      createMaintenanceRuleFormValues(),
+    );
+  const openForm = (rule?: AdminAiMaintenanceRule) => {
+    setEditingRule(rule ?? null);
+    setFormValues(createMaintenanceRuleFormValues(rule));
+    setIsFormOpen(true);
+  };
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingRule(null);
+  };
+  const submitForm = () => {
+    if (!formValues.title.trim()) return;
+    const conditionParts = [
+      formValues.condition.trim(),
+      formValues.yearCondition.trim()
+        ? "연식: " + formValues.yearCondition.trim()
+        : "",
+      formValues.mileageCondition.trim()
+        ? "주행거리: " + formValues.mileageCondition.trim()
+        : "",
+    ].filter(Boolean);
 
     const nextRule: AdminAiMaintenanceRule = {
-      id: rule?.id ?? "custom-maintenance-" + Date.now(),
-      title: title.trim(),
-      condition: condition.trim(),
-      fuelType: fuelType.trim(),
-      items: items.split(",").map((item) => item.trim()).filter(Boolean),
-      isVisible: rule?.isVisible ?? true,
-      memo: memo.trim(),
+      id: editingRule?.id ?? "custom-maintenance-" + Date.now(),
+      title: formValues.title.trim(),
+      condition: conditionParts.join(" / "),
+      fuelType: formValues.fuelType.trim(),
+      items: splitAdminListInput(formValues.items),
+      isVisible: formValues.isVisible,
+      memo: formValues.memo.trim(),
     };
 
     onChangeRules(
-      rule
-        ? rules.map((item) => (item.id === rule.id ? nextRule : item))
+      editingRule
+        ? rules.map((item) => (item.id === editingRule.id ? nextRule : item))
         : [nextRule, ...rules],
     );
+    closeForm();
   };
 
   return (
@@ -7847,7 +8374,7 @@ function AiMaintenanceRuleManager({
         <button
           type="button"
           className={actionButtonClassName}
-          onClick={() => upsertRule()}
+          onClick={() => openForm()}
         >
           룰 추가
         </button>
@@ -7869,7 +8396,7 @@ function AiMaintenanceRuleManager({
               <button
                 type="button"
                 className={actionButtonClassName}
-                onClick={() => upsertRule(rule)}
+                onClick={() => openForm(rule)}
               >
                 수정
               </button>
@@ -7903,6 +8430,14 @@ function AiMaintenanceRuleManager({
           </article>
         ))}
       </div>
+      {isFormOpen ? (
+        <AiMaintenanceRuleModal
+          onChange={setFormValues}
+          onClose={closeForm}
+          onSubmit={submitForm}
+          values={formValues}
+        />
+      ) : null}
     </div>
   );
 }
@@ -7927,11 +8462,46 @@ function NewKeywordCandidateDetector({
     candidate: AdminDashboardAiCandidate,
     nextStatus: AiCandidateStatus,
   ) => void;
-  onRegisterCandidate: (candidate: AdminDashboardAiCandidate) => void;
+  onRegisterCandidate: (
+    candidate: AdminDashboardAiCandidate,
+    values: AdminNewKeywordCandidateFormValues,
+  ) => void;
   reviews: AdminReview[];
 }) {
   const [activeStatus, setActiveStatus] =
     useState<Exclude<AiCandidateStatus, "applied">>("pending");
+  const [editingCandidate, setEditingCandidate] =
+    useState<AdminDashboardAiCandidate | null>(null);
+  const [candidateFormValues, setCandidateFormValues] =
+    useState<AdminNewKeywordCandidateFormValues>({
+      excludeCandidate: false,
+      includeKeywords: "",
+      isVisible: true,
+      label: "",
+      memo: "",
+      registerAsIncludeKeyword: true,
+      registerAsRepresentative: true,
+    });
+  const openCandidateForm = (candidate: AdminDashboardAiCandidate) => {
+    setEditingCandidate(candidate);
+    setCandidateFormValues({
+      excludeCandidate: false,
+      includeKeywords: candidate.keyword,
+      isVisible: true,
+      label: candidate.keyword,
+      memo: "신규 키워드 자동감지에서 등록",
+      registerAsIncludeKeyword: true,
+      registerAsRepresentative: true,
+    });
+  };
+  const closeCandidateForm = () => {
+    setEditingCandidate(null);
+  };
+  const submitCandidateForm = () => {
+    if (!editingCandidate) return;
+    onRegisterCandidate(editingCandidate, candidateFormValues);
+    closeCandidateForm();
+  };
   const statusCounts = useMemo(
     () =>
       newKeywordCandidateStatuses.reduce(
@@ -8088,7 +8658,7 @@ function NewKeywordCandidateDetector({
                   <button
                     type="button"
                     className={cn(actionButtonClassName, "w-full lg:w-auto")}
-                    onClick={() => onRegisterCandidate(candidate)}
+                    onClick={() => openCandidateForm(candidate)}
                   >
                     키워드로 등록
                   </button>
@@ -8121,6 +8691,15 @@ function NewKeywordCandidateDetector({
       ) : (
         <DashboardEmptyState message={emptyMessage} />
       )}
+      {editingCandidate ? (
+        <NewKeywordCandidateModal
+          candidate={editingCandidate}
+          onChange={setCandidateFormValues}
+          onClose={closeCandidateForm}
+          onSubmit={submitCandidateForm}
+          values={candidateFormValues}
+        />
+      ) : null}
     </div>
   );
 }
