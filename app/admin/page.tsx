@@ -6524,6 +6524,33 @@ const formatLandingPageLabel = (path: string) => {
 const formatDashboardPercent = (value: number | null) =>
   value === null ? "연동 대기" : value.toFixed(1) + "%";
 
+const dayMs = 24 * 60 * 60 * 1000;
+
+const countReviewsFrom = (reviews: AdminReview[], startTime: number) =>
+  reviews.filter((review) => {
+    const createdAt = Date.parse(review.created_at);
+
+    return !Number.isNaN(createdAt) && createdAt >= startTime;
+  }).length;
+
+const formatSignedReviewCount = (value: number) => {
+  if (value === 0) {
+    return "0";
+  }
+
+  return (value > 0 ? "+" : "-") + Math.abs(value).toLocaleString();
+};
+
+const formatReviewDeltaLabel = (value: number, label: string) => {
+  if (value === 0) {
+    return "변화 없음";
+  }
+
+  return value > 0
+    ? "▲ " + formatSignedReviewCount(value) + " " + label
+    : "▼ " + Math.abs(value).toLocaleString() + " 감소";
+};
+
 function DashboardPanel({
   activeDashboardTab,
   dashboardViewFilter,
@@ -6563,7 +6590,9 @@ function DashboardPanel({
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayStartTime = todayStart.getTime();
-  const yesterdayStartTime = todayStartTime - 24 * 60 * 60 * 1000;
+  const yesterdayStartTime = todayStartTime - dayMs;
+  const sevenDayStartTime = todayStartTime - 6 * dayMs;
+  const thirtyDayStartTime = todayStartTime - 29 * dayMs;
   const todayReviews = reviews.filter(
     (review) => Date.parse(review.created_at) >= todayStartTime,
   );
@@ -6587,15 +6616,39 @@ function DashboardPanel({
   const appliedAiCandidates = operatorDashboardData.aiCandidates.filter(
     (candidate) => candidate.status === "applied",
   );
-  const yesterdayDelta = todayReviews.length - yesterdayReviews.length;
+  const totalReviewCount = Math.max(
+    stats.reviews,
+    trafficStats.totalReviews,
+    reviews.length,
+  );
+  const todayReviewCount = Math.max(
+    todayReviews.length,
+    trafficStats.todayReviews,
+  );
+  const sevenDayReviewCount = countReviewsFrom(reviews, sevenDayStartTime);
+  const thirtyDayReviewCount = countReviewsFrom(reviews, thirtyDayStartTime);
+  const visibleReviewCount = reviews.filter((review) => !review.is_hidden).length;
+  const hiddenReviewCount = reviews.filter((review) => review.is_hidden).length;
+  const yesterdayDelta = todayReviewCount - yesterdayReviews.length;
+  const reviewTotalDetails = [
+    "오늘 " + formatSignedReviewCount(todayReviewCount),
+    formatReviewDeltaLabel(yesterdayDelta, "어제 대비"),
+    formatReviewDeltaLabel(sevenDayReviewCount, "최근 7일"),
+    formatReviewDeltaLabel(thirtyDayReviewCount, "최근 30일"),
+  ];
+  const reviewVisibilityLabel =
+    "노출 " +
+    visibleReviewCount.toLocaleString() +
+    " / 비노출 " +
+    hiddenReviewCount.toLocaleString();
   const summaryItems = [
     {
       label: "오늘 등록 후기",
-      value: todayReviews.length || trafficStats.todayReviews,
+      value: todayReviewCount,
       detail:
         yesterdayDelta === 0
-          ? "어제와 동일"
-          : (yesterdayDelta > 0 ? "+" : "") + yesterdayDelta.toLocaleString() + " 어제 대비",
+          ? "변화 없음"
+          : formatReviewDeltaLabel(yesterdayDelta, "어제 대비"),
       tab: "reviews" as AdminTab,
     },
     {
@@ -6654,7 +6707,7 @@ function DashboardPanel({
     { label: "AI 반영 후보", count: reviewingAiCandidates.length, tab: "ai" as AdminTab, tone: "red" },
     { label: "신고 대기", count: pendingReports.length, tab: "reports" as AdminTab, tone: "yellow" },
     { label: "신규 회원", count: todayUsers.length, tab: "users" as AdminTab, tone: "green" },
-    { label: "오늘 등록 후기", count: todayReviews.length || trafficStats.todayReviews, tab: "reviews" as AdminTab, tone: "blue" },
+    { label: "오늘 등록 후기", count: todayReviewCount, tab: "reviews" as AdminTab, tone: "blue" },
   ];
   const trafficSourceItems = createTrafficSourceDonutItems(
     trafficStats.referrerTop,
@@ -6767,6 +6820,16 @@ function DashboardPanel({
               value={(periodGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(periodGrowthRate).toFixed(1) + "%"}
             />
             <GrowthMetricCard
+              detail={"최근 30일 " + formatSignedReviewCount(thirtyDayReviewCount) + "건"}
+              label="후기 성장"
+              tone={sevenDayReviewCount > 0 ? "green" : "zinc"}
+              value={
+                sevenDayReviewCount > 0
+                  ? "▲ " + formatSignedReviewCount(sevenDayReviewCount) + "건"
+                  : "변화 없음"
+              }
+            />
+            <GrowthMetricCard
               detail="Search Console 연동 대기"
               label="CTR"
               tone="purple"
@@ -6811,6 +6874,12 @@ function DashboardPanel({
           title="인기 증상 키워드 TOP"
         />
         <section className="grid grid-cols-2 gap-3">
+          <ReviewTotalStatCard
+            detailLines={reviewTotalDetails}
+            visibilityLabel={reviewVisibilityLabel}
+            value={totalReviewCount}
+            onClick={() => onNavigate("reviews")}
+          />
           {summaryItems.slice(0, 4).map((item) => (
             <StatCard
               key={item.label}
@@ -6923,7 +6992,7 @@ function DashboardPanel({
           </div>
           <DashboardPeriodSelector onChange={onChangePeriod} value={period} />
         </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 lg:grid-cols-5">
           <GrowthMetricCard
             detail="외부 유입 기준"
             label="검색 유입"
@@ -6940,6 +7009,16 @@ function DashboardPanel({
             label="지난주 대비"
             tone={weekGrowthRate >= 0 ? "green" : "zinc"}
             value={(weekGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(weekGrowthRate).toFixed(1) + "%"}
+          />
+          <GrowthMetricCard
+            detail={"최근 30일 " + formatSignedReviewCount(thirtyDayReviewCount) + "건"}
+            label="후기 성장"
+            tone={sevenDayReviewCount > 0 ? "green" : "zinc"}
+            value={
+              sevenDayReviewCount > 0
+                ? "▲ " + formatSignedReviewCount(sevenDayReviewCount) + "건"
+                : "변화 없음"
+            }
           />
           <GrowthMetricCard
             detail="AI 검색 대응 지표 구조 준비"
@@ -7007,7 +7086,13 @@ function DashboardPanel({
         />
       </section>
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 2xl:grid-cols-7">
+        <ReviewTotalStatCard
+          detailLines={reviewTotalDetails}
+          visibilityLabel={reviewVisibilityLabel}
+          value={totalReviewCount}
+          onClick={() => onNavigate("reviews")}
+        />
         {summaryItems.map((item) => (
           <StatCard
             key={item.label}
@@ -7184,6 +7269,39 @@ function StatCard({
       {detail ? (
         <p className="mt-2 truncate text-xs font-bold text-blue-600">{detail}</p>
       ) : null}
+    </button>
+  );
+}
+
+function ReviewTotalStatCard({
+  detailLines,
+  onClick,
+  value,
+  visibilityLabel,
+}: {
+  detailLines: string[];
+  onClick?: () => void;
+  value: number;
+  visibilityLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="rounded-lg border border-blue-200 bg-white p-3 text-left shadow-sm shadow-blue-100/80 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md sm:p-4"
+      onClick={onClick}
+    >
+      <p className="truncate text-xs font-black text-blue-600">전체 후기</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
+        {value.toLocaleString()}건
+      </p>
+      <div className="mt-3 grid gap-1 text-xs font-bold leading-5 text-zinc-600">
+        {detailLines.map((line) => (
+          <span key={line}>{line}</span>
+        ))}
+      </div>
+      <p className="mt-2 truncate text-xs font-bold text-zinc-400">
+        {visibilityLabel}
+      </p>
     </button>
   );
 }
