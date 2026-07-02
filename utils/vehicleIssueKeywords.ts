@@ -2,8 +2,24 @@ export interface VehicleIssueKeywordDefinition {
   label: string;
   groupLabel?: string;
   aliases: string[];
+  excludeAliases?: string[];
+  fuelType?: string;
+  targetModel?: string;
   relatedParts: string[];
   inspectionTitle: string;
+}
+
+export interface VehicleIssueKeywordRule {
+  id?: string;
+  label: string;
+  includeKeywords: string[];
+  excludeKeywords?: string[];
+  category?: string;
+  fuelType?: string;
+  targetModel?: string;
+  isDefaultMaintenance?: boolean;
+  isVisible?: boolean;
+  memo?: string;
 }
 
 export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
@@ -536,6 +552,23 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
     inspectionTitle: "실내 냄새 확인",
   },
   {
+    label: "썬팅",
+    groupLabel: "썬팅",
+    aliases: [
+      "썬팅",
+      "선팅",
+      "틴팅",
+      "썬팅재시공",
+      "썬팅 재시공",
+      "선팅재시공",
+      "선팅 재시공",
+      "틴팅재시공",
+      "틴팅 재시공",
+    ],
+    relatedParts: ["유리", "썬팅 필름"],
+    inspectionTitle: "썬팅 상태 확인",
+  },
+  {
     label: "외관",
     groupLabel: "외관",
     aliases: [
@@ -555,9 +588,6 @@ export const vehicleIssueKeywordDefinitions: VehicleIssueKeywordDefinition[] = [
       "본네트",
       "트렁크",
       "트렁크리드",
-      "썬팅",
-      "선팅",
-      "틴팅",
       "광택",
     ],
     relatedParts: ["외판", "도장면", "범퍼", "휀다", "본넷", "트렁크"],
@@ -610,14 +640,62 @@ const normalizeKeywordText = (value: string) =>
 
 export const normalizeVehicleIssueKeyword = normalizeKeywordText;
 
+const toVehicleIssueKeywordDefinition = (
+  rule: VehicleIssueKeywordRule,
+): VehicleIssueKeywordDefinition | null => {
+  const label = rule.label.trim();
+
+  if (!label || rule.isVisible === false) {
+    return null;
+  }
+
+  const aliases = Array.from(
+    new Set(
+      [label, ...rule.includeKeywords]
+        .map((alias) => alias.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (aliases.length === 0) {
+    return null;
+  }
+
+  return {
+    label,
+    groupLabel: label,
+    aliases,
+    excludeAliases: rule.excludeKeywords ?? [],
+    fuelType: rule.fuelType?.trim(),
+    targetModel: rule.targetModel?.trim(),
+    relatedParts: [label],
+    inspectionTitle: rule.category?.trim()
+      ? rule.category.trim() + " 확인"
+      : label + " 상태 확인",
+  };
+};
+
+export const getVehicleIssueKeywordDefinitions = (
+  customRules: VehicleIssueKeywordRule[] = [],
+) => [
+  ...vehicleIssueKeywordDefinitions,
+  ...customRules
+    .map(toVehicleIssueKeywordDefinition)
+    .filter((definition): definition is VehicleIssueKeywordDefinition =>
+      Boolean(definition),
+    ),
+];
+
 export const getVehicleIssueKeywordGroupLabel = (
   definition: VehicleIssueKeywordDefinition,
 ) => definition.groupLabel ?? definition.label;
 
-export const getGroupedVehicleIssueKeywordDefinitions = () => {
+export const getGroupedVehicleIssueKeywordDefinitions = (
+  customRules: VehicleIssueKeywordRule[] = [],
+) => {
   const groupedDefinitions = new Map<string, VehicleIssueKeywordDefinition>();
 
-  vehicleIssueKeywordDefinitions.forEach((definition) => {
+  getVehicleIssueKeywordDefinitions(customRules).forEach((definition) => {
     const groupLabel = getVehicleIssueKeywordGroupLabel(definition);
     const group = groupedDefinitions.get(groupLabel);
 
@@ -627,13 +705,24 @@ export const getGroupedVehicleIssueKeywordDefinitions = () => {
         label: groupLabel,
         groupLabel,
         aliases: [...definition.aliases],
+        excludeAliases: [...(definition.excludeAliases ?? [])],
       });
       return;
     }
 
-    const nextAliases = [...group.aliases, definition.label, ...definition.aliases];
+    const nextAliases = [
+      ...group.aliases,
+      definition.label,
+      ...definition.aliases,
+    ];
 
     group.aliases = Array.from(new Set(nextAliases));
+    group.excludeAliases = Array.from(
+      new Set([
+        ...(group.excludeAliases ?? []),
+        ...(definition.excludeAliases ?? []),
+      ]),
+    );
     group.relatedParts = Array.from(
       new Set([...group.relatedParts, ...definition.relatedParts]),
     );
@@ -642,10 +731,13 @@ export const getGroupedVehicleIssueKeywordDefinitions = () => {
   return Array.from(groupedDefinitions.values());
 };
 
-export const findVehicleIssueKeywordDefinition = (keyword: string) => {
+export const findVehicleIssueKeywordDefinition = (
+  keyword: string,
+  customRules: VehicleIssueKeywordRule[] = [],
+) => {
   const normalizedKeyword = normalizeKeywordText(keyword);
 
-  return getGroupedVehicleIssueKeywordDefinitions().find(
+  return getGroupedVehicleIssueKeywordDefinitions(customRules).find(
     (definition) =>
       normalizeKeywordText(definition.label) === normalizedKeyword ||
       definition.aliases.some(
@@ -661,6 +753,7 @@ interface MatchedVehicleIssueKeyword {
 
 const getMatchedVehicleIssueKeywords = (
   content: string,
+  customRules: VehicleIssueKeywordRule[] = [],
 ): MatchedVehicleIssueKeyword[] => {
   const normalizedContent = normalizeKeywordText(content);
 
@@ -668,8 +761,24 @@ const getMatchedVehicleIssueKeywords = (
     return [];
   }
 
-  const matchedDefinitions = getGroupedVehicleIssueKeywordDefinitions()
+  const matchedDefinitions = getGroupedVehicleIssueKeywordDefinitions(customRules)
     .map((definition) => {
+      const hasExcludedAlias = (definition.excludeAliases ?? []).some((alias) => {
+        const normalizedAlias = normalizeKeywordText(alias);
+
+        return (
+          normalizedAlias.length > 0 &&
+          normalizedContent.includes(normalizedAlias)
+        );
+      });
+
+      if (hasExcludedAlias) {
+        return {
+          label: definition.label,
+          aliases: [],
+        };
+      }
+
       const aliases = definition.aliases.filter((alias) => {
         const normalizedAlias = normalizeKeywordText(alias);
 
@@ -718,8 +827,11 @@ const getMatchedVehicleIssueKeywords = (
   return filteredDefinitions;
 };
 
-export const extractVehicleIssueKeywords = (content: string) => {
-  const matchedKeywords = getMatchedVehicleIssueKeywords(content).map(
+export const extractVehicleIssueKeywords = (
+  content: string,
+  customRules: VehicleIssueKeywordRule[] = [],
+) => {
+  const matchedKeywords = getMatchedVehicleIssueKeywords(content, customRules).map(
     (definition) => definition.label,
   );
 
@@ -729,8 +841,9 @@ export const extractVehicleIssueKeywords = (content: string) => {
 export const countVehicleIssueKeywordMentions = (
   content: string,
   keyword: string,
+  customRules: VehicleIssueKeywordRule[] = [],
 ) => {
-  const definition = findVehicleIssueKeywordDefinition(keyword);
+  const definition = findVehicleIssueKeywordDefinition(keyword, customRules);
   const aliases = definition?.aliases ?? [keyword];
   const normalizedContent = normalizeKeywordText(content);
 

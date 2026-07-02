@@ -944,6 +944,23 @@ export interface Database {
           recent_view_count: number;
         }[];
       };
+      public_list_ai_keyword_rules: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          label: string;
+          include_keywords: string[];
+          exclude_keywords: string[];
+          category: string;
+          fuel_type: string;
+          target_model: string;
+          is_default_maintenance: boolean;
+          is_visible: boolean;
+          memo: string;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
       admin_list_community_posts: {
         Args: {
           search_text?: string;
@@ -1019,6 +1036,25 @@ export interface Database {
           year_value: number | null;
           mileage_operator: ">=" | "<=" | "=" | null;
           mileage_value: number | null;
+          is_visible: boolean;
+          memo: string;
+          created_by: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
+      admin_list_ai_keyword_rules: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          label: string;
+          include_keywords: string[];
+          exclude_keywords: string[];
+          category: string;
+          fuel_type: string;
+          target_model: string;
+          is_default_maintenance: boolean;
           is_visible: boolean;
           memo: string;
           created_by: string | null;
@@ -1236,7 +1272,28 @@ export interface Database {
         };
         Returns: string | null;
       };
+      admin_upsert_ai_keyword_rule: {
+        Args: {
+          target_rule_id?: string | null;
+          next_label?: string;
+          next_include_keywords?: string[];
+          next_exclude_keywords?: string[];
+          next_category?: string;
+          next_fuel_type?: string;
+          next_target_model?: string;
+          next_is_default_maintenance?: boolean;
+          next_is_visible?: boolean;
+          next_memo?: string;
+        };
+        Returns: string | null;
+      };
       admin_delete_ai_maintenance_rule: {
+        Args: {
+          target_rule_id: string;
+        };
+        Returns: boolean;
+      };
+      admin_delete_ai_keyword_rule: {
         Args: {
           target_rule_id: string;
         };

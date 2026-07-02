@@ -2,6 +2,9 @@ import type { Review } from "@/types/review";
 import {
   extractVehicleIssueKeywords,
   getGroupedVehicleIssueKeywordDefinitions,
+  normalizeVehicleIssueKeyword,
+  type VehicleIssueKeywordDefinition,
+  type VehicleIssueKeywordRule,
 } from "@/utils/vehicleIssueKeywords";
 
 export interface ReviewKeywordDefinition {
@@ -17,6 +20,9 @@ export interface ReviewKeywordStat {
 
 interface ReviewKeywordStatsOptions {
   fuelType?: string;
+  keywordRules?: VehicleIssueKeywordRule[];
+  modelName?: string;
+  generation?: string;
 }
 
 export const minimumReviewsForKeywordStats = 10;
@@ -39,12 +45,52 @@ const dieselKeywordPriority = new Map(
 const hasDieselFuelType = (fuelType?: string) =>
   /디젤|경유|diesel/i.test(fuelType ?? "");
 
-export const reviewKeywordDefinitions: ReviewKeywordDefinition[] = [
-  ...getGroupedVehicleIssueKeywordDefinitions().map((definition) => ({
-    label: definition.label,
-    aliases: definition.aliases,
-  })),
-];
+const matchesRuleFuelType = (
+  definition: VehicleIssueKeywordDefinition,
+  fuelType?: string,
+) => {
+  const requiredFuelType = normalizeVehicleIssueKeyword(definition.fuelType ?? "");
+
+  if (!requiredFuelType) {
+    return true;
+  }
+
+  return normalizeVehicleIssueKeyword(fuelType ?? "").includes(requiredFuelType);
+};
+
+const matchesRuleTargetModel = (
+  definition: VehicleIssueKeywordDefinition,
+  options: ReviewKeywordStatsOptions,
+) => {
+  const targetModel = normalizeVehicleIssueKeyword(definition.targetModel ?? "");
+
+  if (!targetModel) {
+    return true;
+  }
+
+  const vehicleText = normalizeVehicleIssueKeyword(
+    [options.modelName, options.generation].filter(Boolean).join(" "),
+  );
+
+  return vehicleText.includes(targetModel);
+};
+
+const getReviewKeywordDefinitions = (
+  options: ReviewKeywordStatsOptions = {},
+): ReviewKeywordDefinition[] =>
+  getGroupedVehicleIssueKeywordDefinitions(options.keywordRules)
+    .filter(
+      (definition) =>
+        matchesRuleFuelType(definition, options.fuelType) &&
+        matchesRuleTargetModel(definition, options),
+    )
+    .map((definition) => ({
+      label: definition.label,
+      aliases: definition.aliases,
+    }));
+
+export const reviewKeywordDefinitions: ReviewKeywordDefinition[] =
+  getReviewKeywordDefinitions();
 
 const getReviewSearchText = (review: Review) => review.content;
 
@@ -74,11 +120,12 @@ export const getReviewKeywordStats = (
 
   const isDieselVehicle = hasDieselFuelType(options.fuelType);
   const reviewKeywordLabels = reviews.map((review) =>
-    extractVehicleIssueKeywords(getReviewSearchText(review)).filter(
-      (keyword) => isDieselVehicle || !dieselOnlyKeywordLabels.has(keyword),
-    ),
+    extractVehicleIssueKeywords(
+      getReviewSearchText(review),
+      options.keywordRules,
+    ).filter((keyword) => isDieselVehicle || !dieselOnlyKeywordLabels.has(keyword)),
   );
-  const stats = reviewKeywordDefinitions
+  const stats = getReviewKeywordDefinitions(options)
     .map((definition) => {
       const count = reviewKeywordLabels.reduce((total, keywordLabels) => {
         const hasKeyword = keywordLabels.includes(definition.label);

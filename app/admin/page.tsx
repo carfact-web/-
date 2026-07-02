@@ -902,6 +902,50 @@ const createKeywordRuleFormValues = (
   targetModel: rule?.targetModel ?? "",
 });
 
+const normalizeAiKeywordRule = (
+  rule: Partial<AdminAiKeywordRule>,
+): AdminAiKeywordRule => ({
+  id: String(rule.id ?? "custom-keyword-" + Date.now()),
+  label: String(rule.label ?? ""),
+  includeKeywords: Array.isArray(rule.includeKeywords)
+    ? rule.includeKeywords.map((item) => String(item)).filter(Boolean)
+    : [],
+  excludeKeywords: Array.isArray(rule.excludeKeywords)
+    ? rule.excludeKeywords.map((item) => String(item)).filter(Boolean)
+    : [],
+  category: String(rule.category ?? ""),
+  fuelType: String(rule.fuelType ?? ""),
+  targetModel: String(rule.targetModel ?? ""),
+  isDefaultMaintenance: rule.isDefaultMaintenance ?? false,
+  isVisible: rule.isVisible ?? true,
+  memo: String(rule.memo ?? ""),
+});
+
+const toAdminAiKeywordRule = (row: {
+  id?: string | null;
+  label?: string | null;
+  include_keywords?: string[] | null;
+  exclude_keywords?: string[] | null;
+  category?: string | null;
+  fuel_type?: string | null;
+  target_model?: string | null;
+  is_default_maintenance?: boolean | null;
+  is_visible?: boolean | null;
+  memo?: string | null;
+}): AdminAiKeywordRule =>
+  normalizeAiKeywordRule({
+    id: row.id ?? "",
+    label: row.label ?? "",
+    includeKeywords: row.include_keywords ?? [],
+    excludeKeywords: row.exclude_keywords ?? [],
+    category: row.category ?? "",
+    fuelType: row.fuel_type ?? "",
+    targetModel: row.target_model ?? "",
+    isDefaultMaintenance: row.is_default_maintenance ?? false,
+    isVisible: row.is_visible ?? true,
+    memo: row.memo ?? "",
+  });
+
 const createMaintenanceRuleFormValues = (
   rule?: AdminAiMaintenanceRule,
 ): AdminAiMaintenanceRuleFormValues => ({
@@ -1273,6 +1317,24 @@ const createInitialAiKeywordRules = (): AdminAiKeywordRule[] =>
     isVisible: true,
     memo: "코드 사전 기준 초기값",
   }));
+
+const mergeAiKeywordRules = (
+  persistedRules: AdminAiKeywordRule[],
+): AdminAiKeywordRule[] => {
+  const initialRules = createInitialAiKeywordRules();
+  const initialIds = new Set(initialRules.map((rule) => rule.id));
+  const persistedById = new Map(
+    persistedRules.map((rule) => [rule.id, normalizeAiKeywordRule(rule)]),
+  );
+  const customRules = persistedRules
+    .filter((rule) => !initialIds.has(rule.id))
+    .map(normalizeAiKeywordRule);
+
+  return [
+    ...customRules,
+    ...initialRules.map((rule) => persistedById.get(rule.id) ?? rule),
+  ];
+};
 
 const initialAiMaintenanceRules: AdminAiMaintenanceRule[] = [
   {
@@ -2678,6 +2740,7 @@ export default function AdminPage() {
         popupNoticesResult,
         knowledgeTermsResult,
         aiMaintenanceRulesResult,
+        aiKeywordRulesResult,
         trafficStatsResult,
         operatorDashboardResult,
         verifiedDealerFeatureResult,
@@ -2707,6 +2770,7 @@ export default function AdminPage() {
           sort_key: knowledgeSort,
         }),
         supabase.rpc("admin_list_ai_maintenance_rules"),
+        supabase.rpc("admin_list_ai_keyword_rules"),
         supabase.rpc("admin_get_traffic_stats"),
         supabase.rpc("admin_get_operator_dashboard_data"),
         supabase.rpc("list_verified_dealer_profiles", {
@@ -2741,6 +2805,15 @@ export default function AdminPage() {
 
       if (aiMaintenanceRulesResult.error && !isAiMaintenanceRulesRpcMissing) {
         throw aiMaintenanceRulesResult.error;
+      }
+      const isAiKeywordRulesRpcMissing =
+        aiKeywordRulesResult.error?.message.includes(
+          "admin_list_ai_keyword_rules",
+        ) ||
+        aiKeywordRulesResult.error?.message.includes("admin_ai_keyword_rules");
+
+      if (aiKeywordRulesResult.error && !isAiKeywordRulesRpcMissing) {
+        throw aiKeywordRulesResult.error;
       }
       if (trafficStatsResult.error) throw trafficStatsResult.error;
 
@@ -2837,6 +2910,13 @@ export default function AdminPage() {
       if (!aiMaintenanceRulesResult.error) {
         setAiMaintenanceRules(
           (aiMaintenanceRulesResult.data ?? []).map(toAdminAiMaintenanceRule),
+        );
+      }
+      if (!aiKeywordRulesResult.error) {
+        setAiKeywordRules(
+          mergeAiKeywordRules(
+            (aiKeywordRulesResult.data ?? []).map(toAdminAiKeywordRule),
+          ),
         );
       }
       setSelectedPostIds([]);
@@ -2963,6 +3043,89 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
+  const isMissingAiMaintenanceRulesRpcError = (message: string) =>
+    message.includes("admin_upsert_ai_maintenance_rule") ||
+    message.includes("admin_delete_ai_maintenance_rule") ||
+    message.includes("admin_ai_maintenance_rules");
+
+  const isMissingAiKeywordRulesRpcError = (message: string) =>
+    message.includes("admin_upsert_ai_keyword_rule") ||
+    message.includes("admin_delete_ai_keyword_rule") ||
+    message.includes("admin_ai_keyword_rules");
+
+  const syncAiKeywordRules = async (nextRules: AdminAiKeywordRule[]) => {
+    const normalizedNextRules = nextRules.map(normalizeAiKeywordRule);
+
+    if (!supabase) {
+      setAiKeywordRules(normalizedNextRules);
+      return true;
+    }
+
+    setActionMessage("");
+
+    const currentById = new Map(aiKeywordRules.map((rule) => [rule.id, rule]));
+    const nextById = new Map(normalizedNextRules.map((rule) => [rule.id, rule]));
+    const deletedRules = aiKeywordRules.filter((rule) => !nextById.has(rule.id));
+    const changedRules = normalizedNextRules.filter((rule) => {
+      const currentRule = currentById.get(rule.id);
+
+      return JSON.stringify(currentRule) !== JSON.stringify(rule);
+    });
+
+    setAiKeywordRules(normalizedNextRules);
+
+    for (const rule of changedRules) {
+      const { error } = await supabase.rpc("admin_upsert_ai_keyword_rule", {
+        next_category: rule.category,
+        next_exclude_keywords: rule.excludeKeywords,
+        next_fuel_type: rule.fuelType,
+        next_include_keywords: rule.includeKeywords,
+        next_is_default_maintenance: rule.isDefaultMaintenance,
+        next_is_visible: rule.isVisible,
+        next_label: rule.label,
+        next_memo: rule.memo,
+        next_target_model: rule.targetModel,
+        target_rule_id: rule.id,
+      });
+
+      if (error) {
+        if (isMissingAiKeywordRulesRpcError(error.message)) {
+          setActionMessage(
+            "키워드 룰을 임시 저장했습니다. DB 마이그레이션 적용 후 서버 저장으로 전환됩니다.",
+          );
+          return true;
+        }
+
+        setActionMessage(error.message);
+        await loadAdminData();
+        return false;
+      }
+    }
+
+    for (const rule of deletedRules) {
+      const { error } = await supabase.rpc("admin_delete_ai_keyword_rule", {
+        target_rule_id: rule.id,
+      });
+
+      if (error) {
+        if (isMissingAiKeywordRulesRpcError(error.message)) {
+          setActionMessage(
+            "키워드 룰을 임시 삭제했습니다. DB 마이그레이션 적용 후 서버 저장으로 전환됩니다.",
+          );
+          return true;
+        }
+
+        setActionMessage(error.message);
+        await loadAdminData();
+        return false;
+      }
+    }
+
+    setActionMessage("AI 키워드 룰을 저장했습니다. 차량 상세 분석에 즉시 반영됩니다.");
+    await loadAdminData();
+    return true;
+  };
+
   const registerNewKeywordCandidate = async (
     candidate: AdminDashboardAiCandidate,
     values: AdminNewKeywordCandidateFormValues,
@@ -2984,10 +3147,8 @@ export default function AdminPage() {
     const existingRule = aiKeywordRules.find(
       (rule) => normalizeVehicleIssueKeyword(rule.label) === normalizedLabel,
     );
-
-    if (existingRule) {
-      setAiKeywordRules((currentRules) =>
-        currentRules.map((rule) =>
+    const nextRules = existingRule
+      ? aiKeywordRules.map((rule) =>
           rule.id === existingRule.id
             ? {
                 ...rule,
@@ -2996,34 +3157,31 @@ export default function AdminPage() {
                 ),
               }
             : rule,
-        ),
-      );
-    } else {
-      const nextRule: AdminAiKeywordRule = {
-        category: candidate.recommendedCategory ?? "후기 반복 신규 키워드",
-        excludeKeywords: [],
-        fuelType: "",
-        id: "auto-keyword-" + Date.now(),
-        includeKeywords: nextIncludeKeywords.length
-          ? nextIncludeKeywords
-          : [values.label.trim()],
-        isDefaultMaintenance: false,
-        isVisible: values.isVisible,
-        label: values.label.trim(),
-        memo: values.memo.trim() || "신규 키워드 자동감지에서 등록",
-        targetModel: "",
-      };
+        )
+      : [
+          {
+            category: candidate.recommendedCategory ?? "후기 반복 신규 키워드",
+            excludeKeywords: [],
+            fuelType: "",
+            id: "auto-keyword-" + Date.now(),
+            includeKeywords: nextIncludeKeywords.length
+              ? nextIncludeKeywords
+              : [values.label.trim()],
+            isDefaultMaintenance: false,
+            isVisible: values.isVisible,
+            label: values.label.trim(),
+            memo: values.memo.trim() || "신규 키워드 자동감지에서 등록",
+            targetModel: "",
+          },
+          ...aiKeywordRules,
+        ];
 
-      setAiKeywordRules((currentRules) => [nextRule, ...currentRules]);
+    const saved = await syncAiKeywordRules(nextRules);
+
+    if (saved) {
+      await updateAiCandidateStatus(candidate, "applied");
     }
-
-    await updateAiCandidateStatus(candidate, "applied");
   };
-
-  const isMissingAiMaintenanceRulesRpcError = (message: string) =>
-    message.includes("admin_upsert_ai_maintenance_rule") ||
-    message.includes("admin_delete_ai_maintenance_rule") ||
-    message.includes("admin_ai_maintenance_rules");
 
   const upsertAiMaintenanceRule = async (
     rule: AdminAiMaintenanceRule,
@@ -4287,7 +4445,7 @@ export default function AdminPage() {
               onChangeCandidateStatus={(candidate, nextStatus) =>
                 void updateAiCandidateStatus(candidate, nextStatus)
               }
-              onChangeKeywordRules={setAiKeywordRules}
+              onChangeKeywordRules={(rules) => void syncAiKeywordRules(rules)}
               onDeleteMaintenanceRule={(rule) =>
                 void deleteAiMaintenanceRule(rule)
               }

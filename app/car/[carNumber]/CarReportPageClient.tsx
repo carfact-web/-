@@ -12,6 +12,7 @@ import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
+import { fetchPublicAiKeywordRules } from "@/lib/aiKeywordRules";
 import { recordPageView } from "@/lib/pageViews";
 import { fetchSupabaseReviewsByVehicleModel } from "@/lib/supabaseData";
 import { fetchVehicleInspectionProfile } from "@/lib/vehicleInspectionProfiles";
@@ -28,6 +29,7 @@ import {
   subscribeToHelpfulChanges,
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
+import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
@@ -89,6 +91,9 @@ export default function CarReportPage() {
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
+  const [aiKeywordRules, setAiKeywordRules] = useState<
+    VehicleIssueKeywordRule[]
+  >([]);
   const [modelReviewsSnapshot, setModelReviewsSnapshot] = useState<{
     modelKey: string;
     reviews: Review[];
@@ -170,12 +175,24 @@ export default function CarReportPage() {
     [currentVehicleModelKey, modelReviewsSnapshot],
   );
   const modelReviewKeywordStats = useMemo(
-    () => getReviewKeywordStats(modelReviews, 5, 1, { fuelType }),
-    [fuelType, modelReviews],
+    () =>
+      getReviewKeywordStats(modelReviews, 5, 1, {
+        fuelType,
+        generation,
+        keywordRules: aiKeywordRules,
+        modelName: model,
+      }),
+    [aiKeywordRules, fuelType, generation, model, modelReviews],
   );
   const focusedReviewKeywordStats = useMemo(
-    () => getReviewKeywordStats(reviews, 5, 1, { fuelType }),
-    [fuelType, reviews],
+    () =>
+      getReviewKeywordStats(reviews, 5, 1, {
+        fuelType,
+        generation,
+        keywordRules: aiKeywordRules,
+        modelName: model,
+      }),
+    [aiKeywordRules, fuelType, generation, model, reviews],
   );
   const aiAnalysis = useMemo(
     () =>
@@ -272,6 +289,26 @@ export default function CarReportPage() {
       // Traffic analytics should never block the vehicle report page.
     });
   }, [isGuestReportAllowed, vehicle?.id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetchPublicAiKeywordRules()
+      .then((rules) => {
+        if (isActive) {
+          setAiKeywordRules(rules);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setAiKeywordRules([]);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
