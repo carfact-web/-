@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KotsaLoginRequiredModal } from "@/components/KotsaLoginRequiredModal";
 import { KotsaLookupProgress } from "@/components/KotsaLookupProgress";
@@ -41,9 +41,22 @@ const delay = (ms: number) =>
 
 type LookupModalType = "not_business" | "error";
 
+const getInitialVehicleNumberFromQuery = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return normalizeVehiclePlateNumber(
+    sanitizeVehiclePlateNumber(searchParams.get("carNumber") ?? ""),
+  );
+};
+
 export default function LookupPage() {
   const router = useRouter();
-  const [carNumber, setCarNumber] = useState("");
+  const autoLookupVehicleRef = useRef<string | null>(null);
+  const [carNumber, setCarNumber] = useState(getInitialVehicleNumberFromQuery);
+  const queryCarNumberRef = useRef(carNumber);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isKotsaMaintenance, setIsKotsaMaintenance] = useState(false);
   const [lookupModalType, setLookupModalType] =
@@ -60,15 +73,14 @@ export default function LookupPage() {
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
   const showPlateValidationError = hasCarNumberInput && !isCarNumberValid;
   const isLookupBusy = isKotsaLookupLoading || progressStep >= 0;
+  const loginRedirectTo = normalizedCarNumber
+    ? `/lookup?carNumber=${encodeURIComponent(normalizedCarNumber)}`
+    : "/lookup";
 
-  const goToReport = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const runKotsaLookup = useCallback(async (value: string) => {
     if (isKotsaMaintenance || isLookupBusy) {
       return;
     }
-
-    const value = normalizeVehiclePlateNumber(carNumber);
 
     if (!isValidVehiclePlateNumber(value)) {
       return;
@@ -139,6 +151,20 @@ export default function LookupPage() {
     } finally {
       setProgressStep(-1);
     }
+  }, [
+    isAuthReady,
+    isAuthenticated,
+    isKotsaMaintenance,
+    isLookupBusy,
+    lookup,
+    router,
+    saveVehicle,
+    session,
+  ]);
+
+  const goToReport = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await runKotsaLookup(normalizeVehiclePlateNumber(carNumber));
   };
 
   useEffect(() => {
@@ -170,6 +196,39 @@ export default function LookupPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const queryCarNumber = queryCarNumberRef.current;
+
+    if (!queryCarNumber) {
+      return;
+    }
+
+    if (autoLookupVehicleRef.current === queryCarNumber) {
+      return;
+    }
+
+    if (normalizedCarNumber !== queryCarNumber) {
+      return;
+    }
+
+    if (!isAuthReady || isKotsaMaintenance || isLookupBusy) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      autoLookupVehicleRef.current = queryCarNumber;
+      void runKotsaLookup(queryCarNumber);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    isAuthReady,
+    isKotsaMaintenance,
+    isLookupBusy,
+    normalizedCarNumber,
+    runKotsaLookup,
+  ]);
 
   return (
     <main className={pageClassName}>
@@ -234,7 +293,7 @@ export default function LookupPage() {
       <KotsaLoginRequiredModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
-        redirectTo="/lookup"
+        redirectTo={loginRedirectTo}
       />
       <KotsaLookupResultModal
         isOpen={lookupModalType !== null}

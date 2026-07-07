@@ -1088,7 +1088,7 @@ export default function Home() {
       return;
     }
 
-    router.push(`/car/${encodeURIComponent(value)}/setup`);
+    router.push(`/lookup?carNumber=${encodeURIComponent(value)}`);
   };
 
   return (
