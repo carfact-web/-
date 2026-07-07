@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { KotsaLoginRequiredModal } from "@/components/KotsaLoginRequiredModal";
+import { KotsaLookupProgress } from "@/components/KotsaLookupProgress";
+import { KotsaLookupResultModal } from "@/components/KotsaLookupResultModal";
+import { useAuth } from "@/hooks/useAuth";
+import { useKotsaVehicleHistory } from "@/hooks/useKotsaVehicleHistory";
+import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
@@ -28,23 +34,37 @@ const primaryButtonClassName = cn(
 const formMessageClassName = cn(
   "mt-2 px-1 text-xs font-semibold text-[#FF3B30]"
 );
+const delay = (ms: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
+type LookupModalType = "not_business" | "error";
 
 export default function LookupPage() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isKotsaMaintenance, setIsKotsaMaintenance] = useState(false);
+  const [lookupModalType, setLookupModalType] =
+    useState<LookupModalType | null>(null);
+  const [progressStep, setProgressStep] = useState(-1);
   const [maintenanceMessage, setMaintenanceMessage] = useState(
     "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
   );
   const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
+  const { isAuthReady, isAuthenticated, session } = useAuth();
+  const { isLoading: isKotsaLookupLoading, lookup } = useKotsaVehicleHistory();
+  const { saveVehicle } = useVehicle(normalizedCarNumber);
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
   const showPlateValidationError = hasCarNumberInput && !isCarNumberValid;
+  const isLookupBusy = isKotsaLookupLoading || progressStep >= 0;
 
-  const goToReport = (event: FormEvent<HTMLFormElement>) => {
+  const goToReport = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (isKotsaMaintenance) {
+    if (isKotsaMaintenance || isLookupBusy) {
       return;
     }
 
@@ -54,7 +74,71 @@ export default function LookupPage() {
       return;
     }
 
-    router.push(`/car/${encodeURIComponent(value)}`);
+    if (!isAuthReady) {
+      return;
+    }
+
+    if (!isAuthenticated || !session?.access_token) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    setLookupModalType(null);
+    setProgressStep(0);
+
+    try {
+      await delay(180);
+      setProgressStep(1);
+      const result = await lookup({
+        accessToken: session.access_token,
+        vehicleNumber: value,
+      });
+
+      if (result.status === 401 || result.code === "LOGIN_REQUIRED") {
+        setIsLoginModalOpen(true);
+        return;
+      }
+
+      if (!result.ok) {
+        setLookupModalType("error");
+        return;
+      }
+
+      if (!result.businessVehicle || !result.display) {
+        setLookupModalType("not_business");
+        return;
+      }
+
+      setProgressStep(2);
+      await delay(180);
+      setProgressStep(3);
+      await delay(180);
+      setProgressStep(4);
+
+      const display = result.display;
+      const now = new Date().toISOString();
+      const carName = display.carName || "KOTSA 확인 차량";
+      const vehicleType = display.vehicleType || "상품용 차량";
+
+      await saveVehicle({
+        brand: carName,
+        createdAt: now,
+        fuelType: display.fuelType ?? "",
+        generation: vehicleType,
+        mileage: display.latestPerformanceMileage ?? "",
+        model: carName,
+        plateNumber: value,
+        updatedAt: now,
+        year: display.year ?? "확인필요",
+      });
+
+      await delay(220);
+      router.push(`/car/${encodeURIComponent(value)}`);
+    } catch {
+      setLookupModalType("error");
+    } finally {
+      setProgressStep(-1);
+    }
   };
 
   useEffect(() => {
@@ -131,12 +215,32 @@ export default function LookupPage() {
           <button
             type="submit"
             className={primaryButtonClassName}
-            disabled={!isCarNumberValid || isKotsaMaintenance}
+            disabled={
+              !isCarNumberValid ||
+              isKotsaMaintenance ||
+              isLookupBusy ||
+              !isAuthReady
+            }
           >
-            차량 이야기 보기
+            {isLookupBusy ? "조회 중..." : "차량 이야기 보기"}
           </button>
+
+          <KotsaLookupProgress
+            activeStep={progressStep}
+            isVisible={progressStep >= 0}
+          />
         </form>
       </div>
+      <KotsaLoginRequiredModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        redirectTo="/lookup"
+      />
+      <KotsaLookupResultModal
+        isOpen={lookupModalType !== null}
+        onClose={() => setLookupModalType(null)}
+        type={lookupModalType ?? "error"}
+      />
     </main>
   );
 }

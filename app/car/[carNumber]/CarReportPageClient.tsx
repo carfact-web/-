@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
+import { KotsaVehicleHistoryCard } from "@/components/KotsaVehicleHistoryCard";
 import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
+import { useKotsaVehicleHistory } from "@/hooks/useKotsaVehicleHistory";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
@@ -29,6 +31,7 @@ import {
   subscribeToHelpfulChanges,
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
+import type { KotsaVehicleDisplayInfo } from "@/types/kotsa";
 import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -91,6 +94,9 @@ export default function CarReportPage() {
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
+  const [kotsaDisplay, setKotsaDisplay] =
+    useState<KotsaVehicleDisplayInfo | null>(null);
+  const [kotsaMessage, setKotsaMessage] = useState("");
   const [aiKeywordRules, setAiKeywordRules] = useState<
     VehicleIssueKeywordRule[]
   >([]);
@@ -110,7 +116,9 @@ export default function CarReportPage() {
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isAuthReady, session, user } = useAuth();
+  const { isLoading: isKotsaLoading, lookup: lookupKotsaHistory } =
+    useKotsaVehicleHistory();
   const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -293,6 +301,57 @@ export default function CarReportPage() {
   useEffect(() => {
     let isActive = true;
 
+    if (!isGuestReportAllowed || !isAuthReady || !session?.access_token) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    lookupKotsaHistory({
+      accessToken: session.access_token,
+      vehicleNumber: carNumber,
+    })
+      .then((result) => {
+        if (!isActive) {
+          return;
+        }
+
+        if (!result.ok) {
+          setKotsaDisplay(null);
+          setKotsaMessage("조회 정보를 불러오지 못했습니다.");
+          return;
+        }
+
+        if (!result.businessVehicle || !result.display) {
+          setKotsaDisplay(null);
+          setKotsaMessage("사업용 차량 이력이 확인되지 않습니다.");
+          return;
+        }
+
+        setKotsaDisplay(result.display);
+        setKotsaMessage("");
+      })
+      .catch(() => {
+        if (isActive) {
+          setKotsaDisplay(null);
+          setKotsaMessage("조회 정보를 불러오지 못했습니다.");
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    carNumber,
+    isAuthReady,
+    isGuestReportAllowed,
+    lookupKotsaHistory,
+    session?.access_token,
+  ]);
+
+  useEffect(() => {
+    let isActive = true;
+
     fetchPublicAiKeywordRules()
       .then((rules) => {
         if (isActive) {
@@ -439,6 +498,12 @@ export default function CarReportPage() {
         </p>
 
         <CarViewEventToast carNumber={carNumber} />
+
+        <KotsaVehicleHistoryCard
+          display={kotsaDisplay}
+          isLoading={isKotsaLoading}
+          message={kotsaMessage}
+        />
 
         <div className={panelClassName}>
           {!hasVehicleInfo ? (

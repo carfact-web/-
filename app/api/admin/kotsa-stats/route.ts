@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
       "created_at,status,response_time_ms,error_type,user_tier,counted_against_quota,vehicle_number_masked,vehicle_number_hash",
     )
     .gte("created_at", thirtyDaysStartIso)
+    .order("created_at", { ascending: false })
     .limit(20000);
 
   if (error) {
@@ -100,6 +101,7 @@ export async function GET(request: NextRequest) {
   const actualCalls = todayRows.filter(
     (row) => row.status === "success" || row.status === "error",
   );
+  const cacheMisses = actualCalls.length;
   const responseTimes = todayRows
     .map((row) => row.response_time_ms)
     .filter((value): value is number => typeof value === "number");
@@ -207,6 +209,17 @@ export async function GET(request: NextRequest) {
     0,
   ).getDate();
   const estimatedMonthlyCalls = actualCalls.length * daysInMonth;
+  const latestSuccessAt =
+    rows.find((row) => row.status === "success" || row.status === "cache_hit")
+      ?.created_at ?? null;
+  const latestFailureAt =
+    rows.find((row) =>
+      ["error", "circuit_open", "configuration_error"].includes(row.status),
+    )?.created_at ?? null;
+  const recentFailureStatus =
+    rows.find((row) =>
+      ["error", "circuit_open", "configuration_error"].includes(row.status),
+    )?.status ?? null;
 
   return NextResponse.json({
     stats: {
@@ -219,13 +232,20 @@ export async function GET(request: NextRequest) {
         : null,
       cacheHitRate: totalQueries ? Math.round((cacheHits / totalQueries) * 1000) / 10 : 0,
       cacheHits,
+      cacheMisses,
+      cacheSavingsRate: totalQueries
+        ? Math.round((cacheHits / totalQueries) * 1000) / 10
+        : 0,
       circuitOpenCount: todayRows.filter((row) => row.status === "circuit_open").length,
       dailySeries: [...dailyMap.values()],
       estimatedMonthlyCalls,
       estimatedMonthlyCostKrw: estimatedMonthlyCalls * unitCostKrw,
       failureCount,
+      latestFailureAt,
+      latestSuccessAt,
       maxResponseMs: responseTimes.length ? Math.max(...responseTimes) : null,
       p95ResponseMs: getResponsePercentile(responseTimes, 95),
+      recentFailureStatus,
       successCount,
       successRate: totalQueries
         ? Math.round((successCount / totalQueries) * 1000) / 10

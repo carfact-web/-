@@ -44,7 +44,7 @@ export function KotsaLoginRequiredModal({
             "mt-4 flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-black text-white no-underline",
             "bg-[#FF3B30] hover:bg-[#f52f25]",
           )}
-          href={"/login?redirect=" + encodeURIComponent(redirectTo)}
+          href={"/login?redirectTo=" + encodeURIComponent(redirectTo)}
         >
           로그인 / 회원가입
         </Link>

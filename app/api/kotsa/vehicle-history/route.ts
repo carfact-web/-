@@ -6,8 +6,10 @@ import { fetchKotsaVehicleHistory, KotsaApiError } from "@/lib/server/kotsa/clie
 import { KotsaCircuitOpenError } from "@/lib/server/kotsa/circuitBreaker";
 import {
   getCachedVehicleHistory,
+  getCachedVehicleHistoryFromDb,
   hashVehicleNumber,
   setCachedVehicleHistory,
+  setCachedVehicleHistoryInDb,
 } from "@/lib/server/kotsa/cache";
 import {
   checkKotsaDailyQuota,
@@ -24,6 +26,11 @@ import {
   maskVehicleNumber,
   normalizeVehicleNumber,
 } from "@/lib/server/kotsa/vehicleNumber";
+import {
+  getKotsaVehicleDisplayInfo,
+  isKotsaBusinessVehicle,
+  type KotsaVehicleHistory,
+} from "@/types/kotsa";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,6 +39,19 @@ const endpoint = "/api/kotsa/vehicle-history";
 
 const jsonError = (message: string, status: number) =>
   NextResponse.json({ ok: false, error: message }, { status });
+
+const createSuccessPayload = (
+  result: KotsaVehicleHistory,
+  cached: boolean,
+  requestId: string,
+) => ({
+  ok: true,
+  businessVehicle: isKotsaBusinessVehicle(result),
+  cached,
+  data: result,
+  display: getKotsaVehicleDisplayInfo(result),
+  requestId,
+});
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
@@ -144,70 +164,6 @@ export async function POST(request: NextRequest) {
     isVerifiedDealer: authResult.isVerifiedDealer,
   });
 
-  if (emergencyStop) {
-    await writeKotsaAuditLog({
-      endpoint,
-      errorMessage: "KOTSA emergency stop is enabled.",
-      requestIp,
-      requestId,
-      responseTimeMs: Date.now() - startedAt,
-      status: "emergency_stop",
-      userAgent,
-      userId: authResult.userId,
-      userTier,
-      vehicleNumberHash: null,
-      vehicleNumberMasked: null,
-    });
-    await evaluateKotsaSecuritySignals({
-      endpoint,
-      requestId,
-      requestIp,
-      status: "emergency_stop",
-      statusCode: 503,
-      userId: authResult.userId,
-    });
-
-    const response = NextResponse.json(
-      {
-        ok: false,
-        code: "KOTSA_EMERGENCY_STOP",
-        error: "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
-        requestId,
-      },
-      { status: 503 },
-    );
-    response.headers.set("x-request-id", requestId);
-    return response;
-  }
-
-  if (maintenanceMode.enabled && !authResult.isAdmin) {
-    await writeKotsaAuditLog({
-      endpoint,
-      errorMessage: "Maintenance mode is enabled.",
-      requestIp,
-      requestId,
-      responseTimeMs: Date.now() - startedAt,
-      status: "maintenance_mode",
-      userAgent,
-      userId: authResult.userId,
-      userTier,
-      vehicleNumberHash: null,
-      vehicleNumberMasked: null,
-    });
-
-    const response = NextResponse.json(
-      {
-        ok: false,
-        code: "MAINTENANCE_MODE",
-        error: maintenanceMode.message,
-        requestId,
-      },
-      { status: 503 },
-    );
-    response.headers.set("x-request-id", requestId);
-    return response;
-  }
-
   let payload: { vehicleNumber?: unknown };
 
   try {
@@ -263,9 +219,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const cachedResult = getCachedVehicleHistory(vehicleNumber);
+    const cachedResult =
+      (await getCachedVehicleHistoryFromDb(vehicleNumber)) ??
+      getCachedVehicleHistory(vehicleNumber);
 
     if (cachedResult) {
+      setCachedVehicleHistory(vehicleNumber, cachedResult);
+
       await writeKotsaAuditLog({
         endpoint,
         requestIp,
@@ -288,12 +248,73 @@ export async function POST(request: NextRequest) {
         userId: authResult.userId,
       });
 
-      const response = NextResponse.json({
-        ok: true,
-        cached: true,
-        data: cachedResult,
+      const response = NextResponse.json(
+        createSuccessPayload(cachedResult, true, requestId),
+      );
+      response.headers.set("x-request-id", requestId);
+      return response;
+    }
+
+    if (emergencyStop) {
+      await writeKotsaAuditLog({
+        endpoint,
+        errorMessage: "KOTSA emergency stop is enabled. Cache miss.",
+        requestIp,
         requestId,
+        responseTimeMs: Date.now() - startedAt,
+        status: "emergency_stop",
+        userAgent,
+        userId: authResult.userId,
+        userTier,
+        vehicleNumberHash,
+        vehicleNumberMasked,
       });
+      await evaluateKotsaSecuritySignals({
+        endpoint,
+        requestId,
+        requestIp,
+        status: "emergency_stop",
+        statusCode: 503,
+        userId: authResult.userId,
+      });
+
+      const response = NextResponse.json(
+        {
+          ok: false,
+          code: "KOTSA_EMERGENCY_STOP",
+          error: "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
+          requestId,
+        },
+        { status: 503 },
+      );
+      response.headers.set("x-request-id", requestId);
+      return response;
+    }
+
+    if (maintenanceMode.enabled) {
+      await writeKotsaAuditLog({
+        endpoint,
+        errorMessage: "Maintenance mode is enabled. Cache miss.",
+        requestIp,
+        requestId,
+        responseTimeMs: Date.now() - startedAt,
+        status: "maintenance_mode",
+        userAgent,
+        userId: authResult.userId,
+        userTier,
+        vehicleNumberHash,
+        vehicleNumberMasked,
+      });
+
+      const response = NextResponse.json(
+        {
+          ok: false,
+          code: "MAINTENANCE_MODE",
+          error: maintenanceMode.message,
+          requestId,
+        },
+        { status: 503 },
+      );
       response.headers.set("x-request-id", requestId);
       return response;
     }
@@ -343,6 +364,7 @@ export async function POST(request: NextRequest) {
 
     const result = await fetchKotsaVehicleHistory({ vehicleNumber });
     setCachedVehicleHistory(vehicleNumber, result);
+    await setCachedVehicleHistoryInDb(vehicleNumber, result);
 
     await writeKotsaAuditLog({
       endpoint,
@@ -367,12 +389,9 @@ export async function POST(request: NextRequest) {
       userId: authResult.userId,
     });
 
-    const response = NextResponse.json({
-      ok: true,
-      cached: false,
-      data: result,
-      requestId,
-    });
+    const response = NextResponse.json(
+      createSuccessPayload(result, false, requestId),
+    );
     response.headers.set("x-request-id", requestId);
     return response;
   } catch (error) {

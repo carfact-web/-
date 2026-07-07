@@ -1,30 +1,4 @@
-export interface KotsaInspectionRecord {
-  inspectionDate: string | null;
-  inspectionSequence: string | null;
-  inspectionType: string | null;
-}
-
-export interface KotsaVehicleHistory {
-  carName: string | null;
-  firstRegistrationDate: string | null;
-  inspectionRecords: KotsaInspectionRecord[];
-  insuranceActive: boolean | null;
-  insuranceYn: string | null;
-  mortgageCount: number | null;
-  overdueTaxCount: number | null;
-  performanceCheckCount: number | null;
-  responseCode: string | null;
-  responseMessage: string | null;
-  scrapped: boolean | null;
-  scrappedYn: string | null;
-  seizureCount: number | null;
-  transferDate: string | null;
-  usage: string | null;
-  vehicleNumber: string | null;
-  vehicleType: string | null;
-  maintenanceHistoryCount: number | null;
-  raw: unknown;
-}
+import type { KotsaVehicleHistory } from "@/types/kotsa";
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)

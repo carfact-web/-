@@ -288,6 +288,8 @@ interface AdminKotsaStats {
   averageResponseMs: number | null;
   cacheHitRate: number;
   cacheHits: number;
+  cacheMisses: number;
+  cacheSavingsRate: number;
   circuitOpenCount: number;
   dailySeries: {
     actualCalls: number;
@@ -299,8 +301,11 @@ interface AdminKotsaStats {
   estimatedMonthlyCalls: number;
   estimatedMonthlyCostKrw: number;
   failureCount: number;
+  latestFailureAt: string | null;
+  latestSuccessAt: string | null;
   maxResponseMs: number | null;
   p95ResponseMs: number | null;
+  recentFailureStatus: string | null;
   successCount: number;
   successRate: number;
   tierCounts: Record<string, number>;
@@ -317,6 +322,22 @@ interface AdminKotsaStats {
   }[];
   totalQueries: number;
   unitCostKrw: number;
+}
+
+interface AdminKotsaCacheStatus {
+  expiredRows: number;
+  latestCreatedAt: string | null;
+  nearestExpiresAt: string | null;
+  recentRows: {
+    createdAt: string | null;
+    expiresAt: string | null;
+    hashPrefix: string;
+    masked: string | null;
+    responseCode: string | null;
+    updatedAt: string | null;
+  }[];
+  totalRows: number;
+  validRows: number;
 }
 
 interface AdminKotsaPolicy {
@@ -395,13 +416,18 @@ const emptyKotsaStats: AdminKotsaStats = {
   averageResponseMs: null,
   cacheHitRate: 0,
   cacheHits: 0,
+  cacheMisses: 0,
+  cacheSavingsRate: 0,
   circuitOpenCount: 0,
   dailySeries: [],
   estimatedMonthlyCalls: 0,
   estimatedMonthlyCostKrw: 0,
   failureCount: 0,
+  latestFailureAt: null,
+  latestSuccessAt: null,
   maxResponseMs: null,
   p95ResponseMs: null,
+  recentFailureStatus: null,
   successCount: 0,
   successRate: 0,
   tierCounts: {},
@@ -410,6 +436,15 @@ const emptyKotsaStats: AdminKotsaStats = {
   topVehicles30d: [],
   totalQueries: 0,
   unitCostKrw: 0,
+};
+
+const emptyKotsaCacheStatus: AdminKotsaCacheStatus = {
+  expiredRows: 0,
+  latestCreatedAt: null,
+  nearestExpiresAt: null,
+  recentRows: [],
+  totalRows: 0,
+  validRows: 0,
 };
 
 interface AdminTrafficTopVehicle {
@@ -2424,7 +2459,10 @@ export default function AdminPage() {
     useState<AdminKotsaHealth>(emptyKotsaHealth);
   const [kotsaStats, setKotsaStats] =
     useState<AdminKotsaStats>(emptyKotsaStats);
+  const [kotsaCacheStatus, setKotsaCacheStatus] =
+    useState<AdminKotsaCacheStatus>(emptyKotsaCacheStatus);
   const [kotsaPolicies, setKotsaPolicies] = useState<AdminKotsaPolicy[]>([]);
+  const [kotsaCacheDeleteValue, setKotsaCacheDeleteValue] = useState("");
   const [maintenanceExpectedEndAt, setMaintenanceExpectedEndAt] = useState("");
   const [maintenanceMessage, setMaintenanceMessage] = useState(
     "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.",
@@ -3034,6 +3072,20 @@ export default function AdminPage() {
             )
             .catch(() => emptyKotsaStats)
         : Promise.resolve(emptyKotsaStats);
+      const kotsaCachePromise = accessToken
+        ? fetch("/api/admin/kotsa-cache", {
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              payload?.cache
+                ? (payload.cache as AdminKotsaCacheStatus)
+                : emptyKotsaCacheStatus,
+            )
+            .catch(() => emptyKotsaCacheStatus)
+        : Promise.resolve(emptyKotsaCacheStatus);
       const kotsaPoliciesPromise = accessToken
         ? fetch("/api/admin/kotsa-policy", {
             headers: {
@@ -3066,6 +3118,7 @@ export default function AdminPage() {
         nextKotsaAuditLogs,
         nextKotsaHealth,
         nextKotsaStats,
+        nextKotsaCacheStatus,
         nextKotsaPolicies,
       ] = await Promise.all([
         supabase.rpc("admin_get_dashboard_stats"),
@@ -3102,6 +3155,7 @@ export default function AdminPage() {
         kotsaAuditLogsPromise,
         kotsaHealthPromise,
         kotsaStatsPromise,
+        kotsaCachePromise,
         kotsaPoliciesPromise,
       ]);
 
@@ -3223,6 +3277,7 @@ export default function AdminPage() {
       setKotsaAuditLogs(nextKotsaAuditLogs);
       setKotsaHealth(nextKotsaHealth);
       setKotsaStats(nextKotsaStats);
+      setKotsaCacheStatus(nextKotsaCacheStatus);
       setKotsaPolicies(nextKotsaPolicies);
       setMaintenanceExpectedEndAt(
         nextKotsaHealth.security.maintenanceMode.expectedEndAt ?? "",
@@ -3539,6 +3594,60 @@ export default function AdminPage() {
     }
 
     setActionMessage("보안 운영 작업을 실행했습니다.");
+    await loadAdminData();
+  };
+
+  const deleteKotsaCache = async (mode: "all" | "vehicle") => {
+    const accessToken = sessionAccessToken;
+    const vehicleNumber = kotsaCacheDeleteValue.trim();
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    if (mode === "vehicle" && !vehicleNumber) {
+      setActionMessage("삭제할 차량번호를 입력해주세요.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        mode === "all"
+          ? "KOTSA DB Cache 전체를 삭제하시겠습니까?"
+          : "해당 차량의 KOTSA Cache를 삭제하시겠습니까?",
+      )
+    ) {
+      return;
+    }
+
+    const response = await fetch("/api/admin/kotsa-cache", {
+      body: JSON.stringify(
+        mode === "all" ? { mode: "all" } : { vehicleNumber },
+      ),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      setActionMessage("KOTSA Cache 삭제에 실패했습니다.");
+      return;
+    }
+
+    const payload = (await response.json().catch(() => null)) as {
+      deletedCount?: number;
+    } | null;
+
+    if (mode === "vehicle") {
+      setKotsaCacheDeleteValue("");
+    }
+
+    setActionMessage(
+      `KOTSA Cache를 삭제했습니다. (${(payload?.deletedCount ?? 0).toLocaleString()}건)`,
+    );
     await loadAdminData();
   };
 
@@ -6467,6 +6576,11 @@ export default function AdminPage() {
                 tone="blue"
               />
               <MetricCard
+                label="Cache miss"
+                value={kotsaStats.cacheMisses.toLocaleString()}
+                tone="neutral"
+              />
+              <MetricCard
                 label="실패/Timeout/Circuit"
                 value={
                   kotsaStats.failureCount.toLocaleString() +
@@ -6508,6 +6622,18 @@ export default function AdminPage() {
                 tone={kotsaStats.maxResponseMs && kotsaStats.maxResponseMs > 8000 ? "red" : "neutral"}
               />
               <MetricCard
+                label="최근 성공"
+                value={formatOptionalDate(kotsaStats.latestSuccessAt)}
+                tone="neutral"
+              />
+              <MetricCard
+                label="최근 실패"
+                value={formatOptionalDate(kotsaStats.latestFailureAt)}
+                tone={kotsaStats.latestFailureAt ? "orange" : "neutral"}
+              />
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
                 label="예상 월 호출/비용"
                 value={
                   kotsaStats.estimatedMonthlyCalls.toLocaleString() +
@@ -6517,6 +6643,124 @@ export default function AdminPage() {
                 }
                 tone="neutral"
               />
+              <MetricCard
+                label="Cache 절감률"
+                value={kotsaStats.cacheSavingsRate.toLocaleString() + "%"}
+                tone="blue"
+              />
+              <MetricCard
+                label="최근 장애 여부"
+                value={kotsaStats.recentFailureStatus ?? "없음"}
+                tone={kotsaStats.recentFailureStatus ? "orange" : "neutral"}
+              />
+              <MetricCard
+                label="Cache TTL"
+                value="24시간"
+                tone="neutral"
+              />
+            </div>
+            <div className="mb-4 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+              <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-black text-zinc-500">
+                    KOTSA Cache 상태
+                  </p>
+                  <p className={mutedTextClassName}>
+                    원문 차량번호는 표시하지 않고 masked/hash prefix만 표시합니다.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <input
+                    className={inputClassName}
+                    placeholder="차량 1건 Cache 삭제용 차량번호"
+                    value={kotsaCacheDeleteValue}
+                    onChange={(event) =>
+                      setKotsaCacheDeleteValue(event.target.value)
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={actionButtonClassName}
+                    onClick={() => void deleteKotsaCache("vehicle")}
+                  >
+                    1건 삭제
+                  </button>
+                  <button
+                    type="button"
+                    className={actionButtonClassName}
+                    onClick={() => void deleteKotsaCache("all")}
+                  >
+                    전체 삭제
+                  </button>
+                </div>
+              </div>
+              <div className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                  label="전체 Cache"
+                  value={kotsaCacheStatus.totalRows.toLocaleString()}
+                  tone="neutral"
+                />
+                <MetricCard
+                  label="유효 Cache"
+                  value={kotsaCacheStatus.validRows.toLocaleString()}
+                  tone="blue"
+                />
+                <MetricCard
+                  label="만료 Cache"
+                  value={kotsaCacheStatus.expiredRows.toLocaleString()}
+                  tone={kotsaCacheStatus.expiredRows ? "orange" : "neutral"}
+                />
+                <MetricCard
+                  label="최근 생성/가까운 만료"
+                  value={
+                    formatOptionalDate(kotsaCacheStatus.latestCreatedAt) +
+                    " / " +
+                    formatOptionalDate(kotsaCacheStatus.nearestExpiresAt)
+                  }
+                  tone="neutral"
+                />
+              </div>
+              {kotsaCacheStatus.recentRows.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-left text-xs">
+                    <thead className="text-zinc-500">
+                      <tr>
+                        <th className="px-2 py-2">Masked</th>
+                        <th className="px-2 py-2">Hash</th>
+                        <th className="px-2 py-2">Code</th>
+                        <th className="px-2 py-2">Created</th>
+                        <th className="px-2 py-2">Expires</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kotsaCacheStatus.recentRows.map((row) => (
+                        <tr
+                          className="border-t border-zinc-100 text-zinc-700"
+                          key={row.hashPrefix + String(row.updatedAt)}
+                        >
+                          <td className="px-2 py-2 font-mono">
+                            {row.masked ?? "-"}
+                          </td>
+                          <td className="px-2 py-2 font-mono">
+                            {row.hashPrefix}
+                          </td>
+                          <td className="px-2 py-2 font-mono">
+                            {row.responseCode ?? "-"}
+                          </td>
+                          <td className="px-2 py-2">
+                            {formatOptionalDate(row.createdAt)}
+                          </td>
+                          <td className="px-2 py-2">
+                            {formatOptionalDate(row.expiresAt)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className={mutedTextClassName}>Cache 데이터가 없습니다.</p>
+              )}
             </div>
             <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
               <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">

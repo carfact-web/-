@@ -5,8 +5,8 @@ import {
 } from "@/lib/server/kotsa/security";
 import {
   normalizeKotsaVehicleHistory,
-  type KotsaVehicleHistory,
 } from "@/lib/server/kotsa/normalize";
+import type { KotsaVehicleHistory } from "@/types/kotsa";
 import {
   assertKotsaCircuitAllowsRequest,
   recordCircuitFailure,
