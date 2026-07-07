@@ -4,6 +4,7 @@ import { resetKotsaCircuitBreaker } from "@/lib/server/kotsa/circuitBreaker";
 import {
   getClientIpFromRequest,
   logSecurityAlert,
+  setKotsaMaintenanceMode,
 } from "@/lib/server/kotsa/securityMonitor";
 import { assertAdminRequest } from "@/lib/server/kotsa/supabaseAdmin";
 
@@ -52,6 +53,31 @@ export async function POST(request: NextRequest) {
     await logSecurityAlert({
       alertType: "kotsa_circuit_reset",
       endpoint,
+      requestIp: getClientIpFromRequest(request),
+      severity: "high",
+      statusCode: 200,
+      userId: adminResult.userId,
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (
+    payload.action === "enable_maintenance" ||
+    payload.action === "disable_maintenance"
+  ) {
+    const enabled = payload.action === "enable_maintenance";
+
+    await setKotsaMaintenanceMode({
+      enabled,
+      reason: "admin one-click security action",
+    });
+    await logSecurityAlert({
+      alertType: enabled
+        ? "maintenance_mode_enabled"
+        : "maintenance_mode_disabled",
+      endpoint,
+      metadata: { maintenance_reason: "admin one-click security action" },
       requestIp: getClientIpFromRequest(request),
       severity: "high",
       statusCode: 200,

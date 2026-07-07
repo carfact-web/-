@@ -17,6 +17,15 @@ interface SecurityAlertInput {
   userId?: string | null;
 }
 
+export interface KotsaMaintenanceMode {
+  enabled: boolean;
+  expectedEndAt: string | null;
+  message: string;
+  reason: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const alertCooldownMs = 5 * 60 * 1000;
@@ -48,6 +57,7 @@ const sendTelegramSecurityAlert = async ({
   alertType,
   blocked,
   endpoint,
+  metadata,
   recentFailureCount,
   requestId,
   requestIp,
@@ -79,6 +89,12 @@ const sendTelegramSecurityAlert = async ({
         `recent_5m_failures: ${recentFailureCount ?? 0}`,
         `blocked: ${blocked ? "yes" : "no"}`,
         `circuit_state: ${getKotsaHealth().circuitState}`,
+        ...(metadata?.maintenance_expected_end_at
+          ? [`maintenance_expected_end_at: ${metadata.maintenance_expected_end_at}`]
+          : []),
+        ...(metadata?.maintenance_reason
+          ? [`maintenance_reason: ${String(metadata.maintenance_reason).slice(0, 120)}`]
+          : []),
       ].join("\n"),
     }),
     headers: { "Content-Type": "application/json" },
@@ -155,6 +171,119 @@ export const isKotsaEmergencyStopped = async () => {
     .maybeSingle();
 
   return Number(data?.numeric_value ?? 0) === 1;
+};
+
+export const getKotsaMaintenanceMode = async (): Promise<KotsaMaintenanceMode> => {
+  const admin = getSecuritySupabaseAdmin();
+  const fallbackMessage =
+    "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.";
+
+  if (!admin) {
+    return {
+      enabled: false,
+      expectedEndAt: null,
+      message: fallbackMessage,
+      reason: null,
+      startedAt: null,
+      updatedAt: null,
+    };
+  }
+
+  const { data } = await admin
+    .from("kotsa_operation_settings")
+    .select("setting_key,numeric_value,text_value,updated_at")
+    .in("setting_key", [
+      "maintenance_mode_enabled",
+      "maintenance_expected_end_at",
+      "maintenance_message",
+      "maintenance_reason",
+      "maintenance_started_at",
+    ]);
+
+  const settings = new Map(
+    ((data as {
+      numeric_value: number | null;
+      setting_key: string;
+      text_value: string | null;
+      updated_at: string | null;
+    }[]) ?? []).map((row) => [row.setting_key, row]),
+  );
+  const enabledRow = settings.get("maintenance_mode_enabled");
+
+  return {
+    enabled: Number(enabledRow?.numeric_value ?? 0) === 1,
+    expectedEndAt: settings.get("maintenance_expected_end_at")?.text_value ?? null,
+    message: settings.get("maintenance_message")?.text_value || fallbackMessage,
+    reason: settings.get("maintenance_reason")?.text_value ?? null,
+    startedAt: settings.get("maintenance_started_at")?.text_value ?? null,
+    updatedAt: enabledRow?.updated_at ?? null,
+  };
+};
+
+export const setKotsaMaintenanceMode = async ({
+  enabled,
+  expectedEndAt,
+  message,
+  reason,
+}: {
+  enabled: boolean;
+  expectedEndAt?: string | null;
+  message?: string | null;
+  reason?: string | null;
+}) => {
+  const admin = getSecuritySupabaseAdmin();
+
+  if (!admin) {
+    throw new Error("Supabase server configuration is missing.");
+  }
+
+  const now = new Date().toISOString();
+  const rows = [
+    {
+      label: "Maintenance Mode 활성화 여부",
+      numeric_value: enabled ? 1 : 0,
+      setting_key: "maintenance_mode_enabled",
+      text_value: null,
+      updated_at: now,
+    },
+    {
+      label: "Maintenance Mode 시작 시간",
+      numeric_value: null,
+      setting_key: "maintenance_started_at",
+      text_value: enabled ? now : null,
+      updated_at: now,
+    },
+    {
+      label: "Maintenance Mode 예상 종료 시간",
+      numeric_value: null,
+      setting_key: "maintenance_expected_end_at",
+      text_value: enabled ? expectedEndAt ?? null : null,
+      updated_at: now,
+    },
+    {
+      label: "Maintenance Mode 안내 문구",
+      numeric_value: null,
+      setting_key: "maintenance_message",
+      text_value:
+        message?.trim() ||
+        "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.",
+      updated_at: now,
+    },
+    {
+      label: "Maintenance Mode 사유",
+      numeric_value: null,
+      setting_key: "maintenance_reason",
+      text_value: enabled ? reason?.trim() || null : null,
+      updated_at: now,
+    },
+  ];
+  const { error } = await admin
+    .from("kotsa_operation_settings")
+    .upsert(rows, { onConflict: "setting_key" });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 };
 
 export const setKotsaEmergencyStop = async (enabled: boolean) => {
@@ -590,7 +719,15 @@ export const getKotsaSecuritySummary = async () => {
         enabled: process.env.TRUST_CLOUDFLARE === "true",
         proxyDetected: false,
       },
-      emergencyStop: false,
+    emergencyStop: false,
+    maintenanceMode: {
+      enabled: false,
+      expectedEndAt: null,
+      message: "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.",
+      reason: null,
+      startedAt: null,
+      updatedAt: null,
+    },
       fail2banRecentBlocks: 0,
       firewallStatus: "22 SSH / 80 HTTP / 443 HTTPS / others DROP",
       recentAlerts: [],
@@ -608,6 +745,7 @@ export const getKotsaSecuritySummary = async () => {
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const [
     emergencyStop,
+    maintenanceMode,
     alertsResult,
     blockedIpsResult,
     backupResult,
@@ -624,6 +762,7 @@ export const getKotsaSecuritySummary = async () => {
     last30dStats,
   ] = await Promise.all([
     isKotsaEmergencyStopped(),
+    getKotsaMaintenanceMode(),
     admin
       .from("security_alert_logs")
       .select("alert_type,severity,endpoint,request_ip,blocked,created_at")
@@ -717,6 +856,7 @@ export const getKotsaSecuritySummary = async () => {
   if (!pitrEnabled) deductions.push("PITR 미확인");
   if (process.env.TRUST_CLOUDFLARE !== "true") deductions.push("Cloudflare 미신뢰");
   if (emergencyStop) deductions.push("Emergency Stop ON");
+  if (maintenanceMode.enabled) deductions.push("Maintenance Mode ON");
   if (!alertsResult.data) deductions.push("Audit 확인 실패");
   const securityScore = Math.max(100 - deductions.length * 2, 0);
 
@@ -749,6 +889,7 @@ export const getKotsaSecuritySummary = async () => {
       proxyDetected: false,
     },
     emergencyStop,
+    maintenanceMode,
     fail2banRecentBlocks: todayStats.fail2ban,
     firewallStatus: "22 SSH / 80 HTTP / 443 HTTPS / others DROP",
     recentAlerts: alertsResult.data ?? [],

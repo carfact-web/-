@@ -7,6 +7,7 @@ export type KotsaAuditStatus =
   | "error"
   | "emergency_stop"
   | "ip_blocked"
+  | "maintenance_mode"
   | "quota_reset"
   | "rate_limited"
   | "success"

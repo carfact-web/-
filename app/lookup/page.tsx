@@ -33,6 +33,9 @@ export default function LookupPage() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
   const [isKotsaMaintenance, setIsKotsaMaintenance] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState(
+    "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
+  );
   const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
@@ -59,11 +62,24 @@ export default function LookupPage() {
 
     fetch("/api/kotsa/status")
       .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { emergencyStop?: boolean } | null) => {
+      .then(
+        (payload: {
+          emergencyStop?: boolean;
+          maintenanceMode?: { enabled: boolean; message: string };
+          message?: string | null;
+        } | null) => {
         if (isMounted) {
-          setIsKotsaMaintenance(Boolean(payload?.emergencyStop));
+          setIsKotsaMaintenance(
+            Boolean(payload?.emergencyStop || payload?.maintenanceMode?.enabled),
+          );
+          setMaintenanceMessage(
+            payload?.message ||
+              payload?.maintenanceMode?.message ||
+              "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
+          );
         }
-      })
+        },
+      )
       .catch(() => undefined);
 
     return () => {
@@ -108,7 +124,7 @@ export default function LookupPage() {
 
           {isKotsaMaintenance ? (
             <p className={formMessageClassName} aria-live="polite">
-              현재 점검 중입니다. 잠시 후 다시 시도해주세요.
+              {maintenanceMessage}
             </p>
           ) : null}
 

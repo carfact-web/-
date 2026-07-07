@@ -16,6 +16,7 @@ import {
 import {
   evaluateKotsaSecuritySignals,
   getClientIpFromRequest,
+  getKotsaMaintenanceMode,
   isKotsaEmergencyStopped,
 } from "@/lib/server/kotsa/securityMonitor";
 import { resolveKotsaAuthenticatedUser } from "@/lib/server/kotsa/supabaseAdmin";
@@ -37,10 +38,68 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   const requestIp = getClientIpFromRequest(request);
   const userAgent = request.headers.get("user-agent");
-  const authResult = await resolveKotsaAuthenticatedUser(request);
+  const [authResult, maintenanceMode, emergencyStop] = await Promise.all([
+    resolveKotsaAuthenticatedUser(request),
+    getKotsaMaintenanceMode(),
+    isKotsaEmergencyStopped(),
+  ]);
 
   if ("error" in authResult) {
     const authError = authResult.error ?? "로그인 세션을 확인하지 못했습니다.";
+
+    if (emergencyStop) {
+      await writeKotsaAuditLog({
+        endpoint,
+        errorMessage: "KOTSA emergency stop is enabled.",
+        requestIp,
+        requestId,
+        responseTimeMs: Date.now() - startedAt,
+        status: "emergency_stop",
+        userAgent,
+        userId: null,
+        vehicleNumberHash: null,
+        vehicleNumberMasked: null,
+      });
+
+      const response = NextResponse.json(
+        {
+          ok: false,
+          code: "KOTSA_EMERGENCY_STOP",
+          error: "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
+          requestId,
+        },
+        { status: 503 },
+      );
+      response.headers.set("x-request-id", requestId);
+      return response;
+    }
+
+    if (maintenanceMode.enabled) {
+      await writeKotsaAuditLog({
+        endpoint,
+        errorMessage: "Maintenance mode is enabled.",
+        requestIp,
+        requestId,
+        responseTimeMs: Date.now() - startedAt,
+        status: "maintenance_mode",
+        userAgent,
+        userId: null,
+        vehicleNumberHash: null,
+        vehicleNumberMasked: null,
+      });
+
+      const response = NextResponse.json(
+        {
+          ok: false,
+          code: "MAINTENANCE_MODE",
+          error: maintenanceMode.message,
+          requestId,
+        },
+        { status: 503 },
+      );
+      response.headers.set("x-request-id", requestId);
+      return response;
+    }
 
     const auditStatus = authResult.status === 403 ? "ip_blocked" : "unauthorized";
 
@@ -85,7 +144,7 @@ export async function POST(request: NextRequest) {
     isVerifiedDealer: authResult.isVerifiedDealer,
   });
 
-  if (await isKotsaEmergencyStopped()) {
+  if (emergencyStop) {
     await writeKotsaAuditLog({
       endpoint,
       errorMessage: "KOTSA emergency stop is enabled.",
@@ -113,6 +172,34 @@ export async function POST(request: NextRequest) {
         ok: false,
         code: "KOTSA_EMERGENCY_STOP",
         error: "현재 점검 중입니다. 잠시 후 다시 시도해주세요.",
+        requestId,
+      },
+      { status: 503 },
+    );
+    response.headers.set("x-request-id", requestId);
+    return response;
+  }
+
+  if (maintenanceMode.enabled && !authResult.isAdmin) {
+    await writeKotsaAuditLog({
+      endpoint,
+      errorMessage: "Maintenance mode is enabled.",
+      requestIp,
+      requestId,
+      responseTimeMs: Date.now() - startedAt,
+      status: "maintenance_mode",
+      userAgent,
+      userId: authResult.userId,
+      userTier,
+      vehicleNumberHash: null,
+      vehicleNumberMasked: null,
+    });
+
+    const response = NextResponse.json(
+      {
+        ok: false,
+        code: "MAINTENANCE_MODE",
+        error: maintenanceMode.message,
         requestId,
       },
       { status: 503 },

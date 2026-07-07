@@ -182,6 +182,11 @@ insert into public.kotsa_operation_settings
 values
   ('api_unit_cost_krw', 'KOTSA API 1회 호출 단가', 0),
   ('kotsa_emergency_stop', 'KOTSA 비상정지', 0),
+  ('maintenance_mode_enabled', 'Maintenance Mode 활성화 여부', 0),
+  ('maintenance_started_at', 'Maintenance Mode 시작 시간', null),
+  ('maintenance_expected_end_at', 'Maintenance Mode 예상 종료 시간', null),
+  ('maintenance_message', 'Maintenance Mode 안내 문구', null),
+  ('maintenance_reason', 'Maintenance Mode 사유', null),
   ('supabase_backup_last_checked_at', 'Supabase 백업 마지막 확인일', null),
   ('supabase_pitr_enabled', 'Supabase PITR 활성화 여부', null),
   ('database_backup_last_at', 'DB 백업 마지막 확인일', null),

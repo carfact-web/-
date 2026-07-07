@@ -230,6 +230,14 @@ interface AdminKotsaHealth {
       proxyDetected: boolean;
     };
     emergencyStop: boolean;
+    maintenanceMode: {
+      enabled: boolean;
+      expectedEndAt: string | null;
+      message: string;
+      reason: string | null;
+      startedAt: string | null;
+      updatedAt: string | null;
+    };
     fail2banRecentBlocks: number;
     firewallStatus: string;
     recentAlerts: {
@@ -352,6 +360,14 @@ const emptyKotsaHealth: AdminKotsaHealth = {
       proxyDetected: false,
     },
     emergencyStop: false,
+    maintenanceMode: {
+      enabled: false,
+      expectedEndAt: null,
+      message: "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.",
+      reason: null,
+      startedAt: null,
+      updatedAt: null,
+    },
     fail2banRecentBlocks: 0,
     firewallStatus: "22 SSH / 80 HTTP / 443 HTTPS / others DROP",
     recentAlerts: [],
@@ -2409,6 +2425,11 @@ export default function AdminPage() {
   const [kotsaStats, setKotsaStats] =
     useState<AdminKotsaStats>(emptyKotsaStats);
   const [kotsaPolicies, setKotsaPolicies] = useState<AdminKotsaPolicy[]>([]);
+  const [maintenanceExpectedEndAt, setMaintenanceExpectedEndAt] = useState("");
+  const [maintenanceMessage, setMaintenanceMessage] = useState(
+    "현재 서비스 점검 중입니다. 잠시 후 다시 이용해주세요.",
+  );
+  const [maintenanceReason, setMaintenanceReason] = useState("");
   const [securityBlockIp, setSecurityBlockIp] = useState("");
   const [securityBlockReason, setSecurityBlockReason] = useState("");
   const [notices, setNotices] = useState<AdminCommunityPost[]>([]);
@@ -3203,6 +3224,11 @@ export default function AdminPage() {
       setKotsaHealth(nextKotsaHealth);
       setKotsaStats(nextKotsaStats);
       setKotsaPolicies(nextKotsaPolicies);
+      setMaintenanceExpectedEndAt(
+        nextKotsaHealth.security.maintenanceMode.expectedEndAt ?? "",
+      );
+      setMaintenanceMessage(nextKotsaHealth.security.maintenanceMode.message);
+      setMaintenanceReason(nextKotsaHealth.security.maintenanceMode.reason ?? "");
       setNotices(
         ((noticesResult.data ?? []) as AdminCommunityPost[]).filter(
           (notice) => notice.is_notice,
@@ -3374,6 +3400,51 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
+  const setMaintenanceMode = async (enabled: boolean) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        enabled
+          ? "계획 점검모드를 활성화하시겠습니까?"
+          : "계획 점검모드를 해제하시겠습니까?",
+      )
+    ) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const response = await fetch("/api/admin/maintenance-mode", {
+      body: JSON.stringify({
+        enabled,
+        expectedEndAt: enabled ? maintenanceExpectedEndAt || null : null,
+        message: maintenanceMessage,
+        reason: maintenanceReason,
+      }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    if (!response.ok) {
+      setActionMessage("점검모드 상태를 변경하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage(
+      enabled ? "점검모드를 활성화했습니다." : "점검모드를 해제했습니다.",
+    );
+    await loadAdminData();
+  };
+
   const blockSecurityIp = async () => {
     const accessToken = sessionAccessToken;
     const ip = securityBlockIp.trim();
@@ -3439,7 +3510,13 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
-  const runSecurityAction = async (action: "flush_cache" | "reset_circuit") => {
+  const runSecurityAction = async (
+    action:
+      | "disable_maintenance"
+      | "enable_maintenance"
+      | "flush_cache"
+      | "reset_circuit",
+  ) => {
     const accessToken = sessionAccessToken;
 
     if (!accessToken) {
@@ -5993,6 +6070,17 @@ export default function AdminPage() {
                 tone={kotsaHealth.circuitState === "closed" ? "blue" : "red"}
               />
               <MetricCard
+                label="점검모드"
+                value={
+                  kotsaHealth.security.maintenanceMode.enabled ? "ON" : "OFF"
+                }
+                tone={
+                  kotsaHealth.security.maintenanceMode.enabled
+                    ? "orange"
+                    : "neutral"
+                }
+              />
+              <MetricCard
                 label="평균 응답"
                 value={
                   kotsaHealth.averageResponseMs === null
@@ -6037,6 +6125,72 @@ export default function AdminPage() {
                     : "Emergency Stop ON"}
                 </button>
               </div>
+              <div className="grid gap-3 border-t border-red-100 pt-3 md:grid-cols-3">
+                <label className="grid gap-1 text-xs font-bold text-red-950">
+                  점검 안내 문구
+                  <input
+                    className={inputClassName}
+                    value={maintenanceMessage}
+                    onChange={(event) =>
+                      setMaintenanceMessage(event.target.value)
+                    }
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold text-red-950">
+                  예상 종료 시간
+                  <input
+                    className={inputClassName}
+                    placeholder="2026-07-07T18:00:00+09:00"
+                    value={maintenanceExpectedEndAt}
+                    onChange={(event) =>
+                      setMaintenanceExpectedEndAt(event.target.value)
+                    }
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold text-red-950">
+                  사유
+                  <input
+                    className={inputClassName}
+                    value={maintenanceReason}
+                    onChange={(event) => setMaintenanceReason(event.target.value)}
+                    placeholder="배포, 패치, DB 점검"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-col gap-3 border-t border-red-100 pt-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-black text-red-700">
+                    Maintenance Mode
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-red-950">
+                    상태:{" "}
+                    {kotsaHealth.security.maintenanceMode.enabled
+                      ? "계획 점검 ON"
+                      : "계획 점검 OFF"}
+                  </p>
+                  <p className={mutedTextClassName}>
+                    계획된 배포/패치 중 일반 사용자 화면과 API 액션을 503으로 차단합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-lg px-4 py-2 text-sm font-black text-white transition",
+                    kotsaHealth.security.maintenanceMode.enabled
+                      ? "bg-zinc-900 hover:bg-zinc-800"
+                      : "bg-orange-600 hover:bg-orange-700",
+                  )}
+                  onClick={() =>
+                    void setMaintenanceMode(
+                      !kotsaHealth.security.maintenanceMode.enabled,
+                    )
+                  }
+                >
+                  {kotsaHealth.security.maintenanceMode.enabled
+                    ? "Maintenance OFF"
+                    : "Maintenance ON"}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2 border-t border-red-100 pt-3">
                 <button
                   type="button"
@@ -6058,6 +6212,20 @@ export default function AdminPage() {
                   onClick={() => void exportKotsaAuditCsv()}
                 >
                   Audit Export(CSV)
+                </button>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void runSecurityAction("enable_maintenance")}
+                >
+                  Maintenance Mode ON
+                </button>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void runSecurityAction("disable_maintenance")}
+                >
+                  Maintenance Mode OFF
                 </button>
                 <button
                   type="button"

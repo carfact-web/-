@@ -58,6 +58,37 @@ export const resolveOptionalUserId = async (request: Request) => {
   return { userId: data.user.id };
 };
 
+export const resolveOptionalAdminUser = async (request: Request) => {
+  const token = getBearerToken(request);
+
+  if (!token) {
+    return { isAdmin: false, userId: null };
+  }
+
+  const clients = getSupabaseAdminClients();
+
+  if (!clients || token === supabaseServiceRoleKey) {
+    return { isAdmin: false, userId: null };
+  }
+
+  const { data, error } = await clients.auth.auth.getUser(token);
+
+  if (error || !data.user) {
+    return { isAdmin: false, userId: null };
+  }
+
+  const { data: profile } = await clients.admin
+    .from("user_profiles")
+    .select("role")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
+  return {
+    isAdmin: profile?.role === "admin" || profile?.role === "super_admin",
+    userId: data.user.id,
+  };
+};
+
 export const resolveKotsaAuthenticatedUser = async (request: Request) => {
   const token = getBearerToken(request);
   const requestIp = getClientIpFromRequest(request);

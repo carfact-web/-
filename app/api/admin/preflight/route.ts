@@ -3,7 +3,10 @@ import { stat } from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { NextRequest, NextResponse } from "next/server";
-import { isKotsaEmergencyStopped } from "@/lib/server/kotsa/securityMonitor";
+import {
+  getKotsaMaintenanceMode,
+  isKotsaEmergencyStopped,
+} from "@/lib/server/kotsa/securityMonitor";
 import { assertAdminRequest } from "@/lib/server/kotsa/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -270,7 +273,10 @@ export async function GET(request: NextRequest) {
     }),
   );
 
-  const emergencyStop = await isKotsaEmergencyStopped();
+  const [emergencyStop, maintenanceMode] = await Promise.all([
+    isKotsaEmergencyStopped(),
+    getKotsaMaintenanceMode(),
+  ]);
   checks.push(
     toCheck({
       guide: "/docs/incident-response.md",
@@ -280,6 +286,17 @@ export async function GET(request: NextRequest) {
         : "Emergency Stop이 OFF입니다.",
       status: emergencyStop ? "WARNING" : "OK",
       title: "Emergency Stop 상태",
+    }),
+  );
+  checks.push(
+    toCheck({
+      guide: "/docs/deployment-checklist.md",
+      key: "maintenance_mode",
+      message: maintenanceMode.enabled
+        ? "Maintenance Mode가 ON입니다."
+        : "Maintenance Mode가 OFF입니다.",
+      status: maintenanceMode.enabled ? "WARNING" : "OK",
+      title: "Maintenance Mode 상태",
     }),
   );
 
