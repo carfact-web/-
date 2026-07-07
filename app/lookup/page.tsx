@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
@@ -32,6 +32,7 @@ const formMessageClassName = cn(
 export default function LookupPage() {
   const router = useRouter();
   const [carNumber, setCarNumber] = useState("");
+  const [isKotsaMaintenance, setIsKotsaMaintenance] = useState(false);
   const normalizedCarNumber = normalizeVehiclePlateNumber(carNumber);
   const hasCarNumberInput = normalizedCarNumber.length > 0;
   const isCarNumberValid = isValidVehiclePlateNumber(normalizedCarNumber);
@@ -39,6 +40,10 @@ export default function LookupPage() {
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (isKotsaMaintenance) {
+      return;
+    }
 
     const value = normalizeVehiclePlateNumber(carNumber);
 
@@ -48,6 +53,23 @@ export default function LookupPage() {
 
     router.push(`/car/${encodeURIComponent(value)}`);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch("/api/kotsa/status")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { emergencyStop?: boolean } | null) => {
+        if (isMounted) {
+          setIsKotsaMaintenance(Boolean(payload?.emergencyStop));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <main className={pageClassName}>
@@ -84,10 +106,16 @@ export default function LookupPage() {
             </p>
           )}
 
+          {isKotsaMaintenance ? (
+            <p className={formMessageClassName} aria-live="polite">
+              현재 점검 중입니다. 잠시 후 다시 시도해주세요.
+            </p>
+          ) : null}
+
           <button
             type="submit"
             className={primaryButtonClassName}
-            disabled={!isCarNumberValid}
+            disabled={!isCarNumberValid || isKotsaMaintenance}
           >
             차량 이야기 보기
           </button>

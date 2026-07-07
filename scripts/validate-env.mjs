@@ -8,6 +8,7 @@ const requiredPublicEnv = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 ];
+const forbiddenPublicSecretPrefixes = ["NEXT_PUBLIC_KOTSA_"];
 
 const expectedProductionOrigin = "https://carfact.kr";
 const missing = requiredPublicEnv.filter((key) => !process.env[key]?.trim());
@@ -20,6 +21,22 @@ if (missing.length > 0) {
       "",
       "Set these before running a production build. Without them, login buttons",
       "are disabled because Supabase Auth is not configured in the browser.",
+    ].join("\n")
+  );
+  process.exit(1);
+}
+
+const exposedSecretKeys = Object.keys(process.env).filter((key) =>
+  forbiddenPublicSecretPrefixes.some((prefix) => key.startsWith(prefix))
+);
+
+if (exposedSecretKeys.length > 0) {
+  console.error(
+    [
+      "KOTSA secrets must never be exposed to the client bundle:",
+      ...exposedSecretKeys.map((key) => "- " + key),
+      "",
+      "Use server-only KOTSA_* environment variables instead.",
     ].join("\n")
   );
   process.exit(1);

@@ -35,6 +35,7 @@ type AdminTab =
   | "users"
   | "ai"
   | "knowledge"
+  | "kotsa"
   | "reports"
   | "notices";
 type AdminRole = "user" | "admin" | "super_admin";
@@ -170,6 +171,230 @@ interface AdminStats {
   reviews: number;
   users: number;
 }
+
+interface AdminKotsaAuditLog {
+  id: string;
+  request_id: string;
+  user_id: string | null;
+  vehicle_number_masked: string | null;
+  vehicle_number_hash: string | null;
+  query_type: string;
+  endpoint: string;
+  request_ip: string | null;
+  user_agent: string | null;
+  user_tier: string | null;
+  status: string;
+  response_code: string | null;
+  response_time_ms: number | null;
+  error_type: string | null;
+  counted_against_quota: boolean | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+interface AdminKotsaHealth {
+  averageResponseMs: number | null;
+  certificateCheckedAt: string | null;
+  certificateDaysUntilExpiration: number | null;
+  certificateExpiresAt: string | null;
+  certificateFileMode: string | null;
+  certificatePermissionOk: boolean | null;
+  certificateStatus: string;
+  circuitOpenedUntil: string | null;
+  circuitState: string;
+  consecutiveFailures: number;
+  connectionStatus: string;
+  lastFailureAt: string | null;
+  lastFailureMessage: string | null;
+  lastSuccessAt: string | null;
+  security: {
+    backupLastCheckedAt: string | null;
+    backupStatus: {
+      certificateBackupLastAt: string | null;
+      databaseBackupLastAt: string | null;
+      isBackupFresh: boolean;
+      lastSuccess: boolean;
+      pitrEnabled: boolean | null;
+      storageBackupLastAt: string | null;
+    };
+    blockedIps: {
+      created_at: string;
+      expires_at: string | null;
+      ip: string;
+      is_active: boolean;
+      reason: string | null;
+    }[];
+    cloudflare: {
+      clientIp: string | null;
+      enabled: boolean;
+      proxyDetected: boolean;
+    };
+    emergencyStop: boolean;
+    fail2banRecentBlocks: number;
+    firewallStatus: string;
+    recentAlerts: {
+      alert_type: string;
+      blocked: boolean;
+      created_at: string;
+      endpoint: string | null;
+      request_ip: string | null;
+      severity: string;
+    }[];
+    recentStatusCounts: {
+      forbidden: number;
+      serverError: number;
+      unauthorized: number;
+    };
+    securityScore: {
+      deductions: string[];
+      value: number;
+    };
+    securityStats: {
+      last30d: AdminSecurityPeriodStats | null;
+      last7d: AdminSecurityPeriodStats | null;
+      today: AdminSecurityPeriodStats | null;
+    };
+    timeline: { at: string; label: string }[];
+  };
+  startupWarnings: string[];
+}
+
+interface AdminSecurityPeriodStats {
+  averageResponseMs: number | null;
+  blockedIp: number;
+  circuitOpen: number;
+  cloudflareBlock: number;
+  emergencyStop: number;
+  fail2ban: number;
+  http401: number;
+  http403: number;
+  http404: number;
+  http429: number;
+  http500: number;
+  p95ResponseMs: number | null;
+  p99ResponseMs: number | null;
+}
+
+interface AdminKotsaStats {
+  actualCalls: number;
+  averageResponseMs: number | null;
+  cacheHitRate: number;
+  cacheHits: number;
+  circuitOpenCount: number;
+  dailySeries: {
+    actualCalls: number;
+    cacheHits: number;
+    date: string;
+    failures: number;
+    totalQueries: number;
+  }[];
+  estimatedMonthlyCalls: number;
+  estimatedMonthlyCostKrw: number;
+  failureCount: number;
+  maxResponseMs: number | null;
+  p95ResponseMs: number | null;
+  successCount: number;
+  successRate: number;
+  tierCounts: Record<string, number>;
+  timeoutCount: number;
+  topVehicles7d: {
+    label: string;
+    vehicleHashPrefix: string;
+    viewCount: number;
+  }[];
+  topVehicles30d: {
+    label: string;
+    vehicleHashPrefix: string;
+    viewCount: number;
+  }[];
+  totalQueries: number;
+  unitCostKrw: number;
+}
+
+interface AdminKotsaPolicy {
+  daily_limit: number | null;
+  label: string;
+  policy_key: string;
+  temporary_daily_limit: number | null;
+  temporary_expires_at: string | null;
+  updated_at: string;
+}
+
+const emptyKotsaHealth: AdminKotsaHealth = {
+  averageResponseMs: null,
+  certificateCheckedAt: null,
+  certificateDaysUntilExpiration: null,
+  certificateExpiresAt: null,
+  certificateFileMode: null,
+  certificatePermissionOk: null,
+  certificateStatus: "unknown",
+  circuitOpenedUntil: null,
+  circuitState: "closed",
+  consecutiveFailures: 0,
+  connectionStatus: "unknown",
+  lastFailureAt: null,
+  lastFailureMessage: null,
+  lastSuccessAt: null,
+  security: {
+    backupLastCheckedAt: null,
+    backupStatus: {
+      certificateBackupLastAt: null,
+      databaseBackupLastAt: null,
+      isBackupFresh: false,
+      lastSuccess: false,
+      pitrEnabled: null,
+      storageBackupLastAt: null,
+    },
+    blockedIps: [],
+    cloudflare: {
+      clientIp: null,
+      enabled: false,
+      proxyDetected: false,
+    },
+    emergencyStop: false,
+    fail2banRecentBlocks: 0,
+    firewallStatus: "22 SSH / 80 HTTP / 443 HTTPS / others DROP",
+    recentAlerts: [],
+    recentStatusCounts: {
+      forbidden: 0,
+      serverError: 0,
+      unauthorized: 0,
+    },
+    securityScore: {
+      deductions: [],
+      value: 0,
+    },
+    securityStats: {
+      last30d: null,
+      last7d: null,
+      today: null,
+    },
+    timeline: [],
+  },
+  startupWarnings: [],
+};
+
+const emptyKotsaStats: AdminKotsaStats = {
+  actualCalls: 0,
+  averageResponseMs: null,
+  cacheHitRate: 0,
+  cacheHits: 0,
+  circuitOpenCount: 0,
+  dailySeries: [],
+  estimatedMonthlyCalls: 0,
+  estimatedMonthlyCostKrw: 0,
+  failureCount: 0,
+  maxResponseMs: null,
+  p95ResponseMs: null,
+  successCount: 0,
+  successRate: 0,
+  tierCounts: {},
+  timeoutCount: 0,
+  topVehicles7d: [],
+  topVehicles30d: [],
+  totalQueries: 0,
+  unitCostKrw: 0,
+};
 
 interface AdminTrafficTopVehicle {
   vehicle_id: string;
@@ -473,6 +698,7 @@ const tabs: { label: string; value: AdminTab }[] = [
   { label: "회원 관리", value: "users" },
   { label: "AI 관리", value: "ai" },
   { label: "Knowledge Center", value: "knowledge" },
+  { label: "KOTSA 로그", value: "kotsa" },
   { label: "신고 관리", value: "reports" },
   { label: "공지 관리", value: "notices" },
 ];
@@ -2175,6 +2401,16 @@ export default function AdminPage() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [users, setUsers] = useState<AdminUserProfile[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
+  const [kotsaAuditLogs, setKotsaAuditLogs] = useState<AdminKotsaAuditLog[]>(
+    [],
+  );
+  const [kotsaHealth, setKotsaHealth] =
+    useState<AdminKotsaHealth>(emptyKotsaHealth);
+  const [kotsaStats, setKotsaStats] =
+    useState<AdminKotsaStats>(emptyKotsaStats);
+  const [kotsaPolicies, setKotsaPolicies] = useState<AdminKotsaPolicy[]>([]);
+  const [securityBlockIp, setSecurityBlockIp] = useState("");
+  const [securityBlockReason, setSecurityBlockReason] = useState("");
   const [notices, setNotices] = useState<AdminCommunityPost[]>([]);
   const [popupNotices, setPopupNotices] = useState<AdminPopupNotice[]>([]);
   const [knowledgeTerms, setKnowledgeTerms] = useState<AdminKnowledgeTerm[]>([]);
@@ -2209,6 +2445,7 @@ export default function AdminPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
+  const [kotsaAuditSearch, setKotsaAuditSearch] = useState("");
   const [reviewAuthorFilter, setReviewAuthorFilter] = useState("");
   const [reviewDateFilter, setReviewDateFilter] =
     useState<ReviewDateFilter>("all");
@@ -2543,6 +2780,7 @@ export default function AdminPage() {
     if (activeTab === "users") return userSearch;
     if (activeTab === "ai") return globalSearch;
     if (activeTab === "knowledge") return knowledgeSearch;
+    if (activeTab === "kotsa") return kotsaAuditSearch;
     if (activeTab === "reports") return reportSearch;
     if (activeTab === "notices") return noticeSearch;
     return "";
@@ -2550,6 +2788,7 @@ export default function AdminPage() {
     activeTab,
     globalSearch,
     knowledgeSearch,
+    kotsaAuditSearch,
     noticeSearch,
     postSearch,
     reportSearch,
@@ -2730,6 +2969,64 @@ export default function AdminPage() {
             )
             .catch(() => [] as AdminAiCandidateStatusRow[])
         : Promise.resolve([] as AdminAiCandidateStatusRow[]);
+      const kotsaAuditLogsPromise = accessToken
+        ? fetch(
+            "/api/admin/kotsa-audit-logs?limit=100&search=" +
+              encodeURIComponent(kotsaAuditSearch.trim()),
+            {
+              headers: {
+                Authorization: "Bearer " + accessToken,
+              },
+            },
+          )
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              Array.isArray(payload?.logs)
+                ? (payload.logs as AdminKotsaAuditLog[])
+                : [],
+            )
+            .catch(() => [] as AdminKotsaAuditLog[])
+        : Promise.resolve([] as AdminKotsaAuditLog[]);
+      const kotsaHealthPromise = accessToken
+        ? fetch("/api/admin/kotsa-health", {
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              payload?.health
+                ? (payload.health as AdminKotsaHealth)
+                : emptyKotsaHealth,
+            )
+            .catch(() => emptyKotsaHealth)
+        : Promise.resolve(emptyKotsaHealth);
+      const kotsaStatsPromise = accessToken
+        ? fetch("/api/admin/kotsa-stats", {
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              payload?.stats ? (payload.stats as AdminKotsaStats) : emptyKotsaStats,
+            )
+            .catch(() => emptyKotsaStats)
+        : Promise.resolve(emptyKotsaStats);
+      const kotsaPoliciesPromise = accessToken
+        ? fetch("/api/admin/kotsa-policy", {
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              Array.isArray(payload?.policies)
+                ? (payload.policies as AdminKotsaPolicy[])
+                : [],
+            )
+            .catch(() => [] as AdminKotsaPolicy[])
+        : Promise.resolve([] as AdminKotsaPolicy[]);
       const [
         statsResult,
         postsResult,
@@ -2745,6 +3042,10 @@ export default function AdminPage() {
         operatorDashboardResult,
         verifiedDealerFeatureResult,
         aiCandidateStatusRows,
+        nextKotsaAuditLogs,
+        nextKotsaHealth,
+        nextKotsaStats,
+        nextKotsaPolicies,
       ] = await Promise.all([
         supabase.rpc("admin_get_dashboard_stats"),
         supabase.rpc("admin_list_community_posts", {
@@ -2777,6 +3078,10 @@ export default function AdminPage() {
           target_user_ids: [],
         }),
         statusRowsPromise,
+        kotsaAuditLogsPromise,
+        kotsaHealthPromise,
+        kotsaStatsPromise,
+        kotsaPoliciesPromise,
       ]);
 
       if (statsResult.error) throw statsResult.error;
@@ -2894,6 +3199,10 @@ export default function AdminPage() {
       setReviews(nextReviews);
       setUsers((usersResult.data ?? []) as AdminUserProfile[]);
       setReports((reportsResult.data ?? []) as AdminReport[]);
+      setKotsaAuditLogs(nextKotsaAuditLogs);
+      setKotsaHealth(nextKotsaHealth);
+      setKotsaStats(nextKotsaStats);
+      setKotsaPolicies(nextKotsaPolicies);
       setNotices(
         ((noticesResult.data ?? []) as AdminCommunityPost[]).filter(
           (notice) => notice.is_notice,
@@ -2935,6 +3244,7 @@ export default function AdminPage() {
     canAccess,
     knowledgeSearch,
     knowledgeSort,
+    kotsaAuditSearch,
     noticeSearch,
     postSearch,
     reportSearch,
@@ -2952,6 +3262,273 @@ export default function AdminPage() {
   }, [canAccess, loadAdminData]);
 
   const refreshCurrentTab = async () => {
+    await loadAdminData();
+  };
+
+  const updateKotsaPolicyLimit = async (
+    policy: AdminKotsaPolicy,
+    nextLimit: number | null,
+  ) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("");
+
+    const response = await fetch("/api/admin/kotsa-policy", {
+      body: JSON.stringify({
+        dailyLimit: nextLimit,
+        policyKey: policy.policy_key,
+      }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    if (!response.ok) {
+      setActionMessage("KOTSA 조회 제한 정책을 변경하지 못했습니다.");
+      return;
+    }
+
+    await loadAdminData();
+  };
+
+  const updateKotsaPolicyTemporaryLimit = async (
+    policy: AdminKotsaPolicy,
+    nextLimit: number | null,
+  ) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage("");
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const response = await fetch("/api/admin/kotsa-policy", {
+      body: JSON.stringify({
+        policyKey: policy.policy_key,
+        temporaryDailyLimit: nextLimit,
+        temporaryExpiresAt: nextLimit === null ? null : todayEnd.toISOString(),
+      }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    if (!response.ok) {
+      setActionMessage("KOTSA 임시 제한 정책을 변경하지 못했습니다.");
+      return;
+    }
+
+    await loadAdminData();
+  };
+
+  const setKotsaEmergencyStop = async (enabled: boolean) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        enabled
+          ? "KOTSA 조회 기능을 즉시 비상정지하시겠습니까?"
+          : "KOTSA 비상정지를 해제하시겠습니까?",
+      )
+    ) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const response = await fetch("/api/admin/kotsa-emergency-stop", {
+      body: JSON.stringify({ enabled }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    if (!response.ok) {
+      setActionMessage("KOTSA 비상정지 상태를 변경하지 못했습니다.");
+      return;
+    }
+
+    setActionMessage(
+      enabled ? "KOTSA 비상정지를 활성화했습니다." : "KOTSA 비상정지를 해제했습니다.",
+    );
+    await loadAdminData();
+  };
+
+  const blockSecurityIp = async () => {
+    const accessToken = sessionAccessToken;
+    const ip = securityBlockIp.trim();
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    if (!ip) {
+      setActionMessage("차단할 IP를 입력해주세요.");
+      return;
+    }
+
+    setActionMessage("");
+
+    const response = await fetch("/api/admin/security-ip-blocks", {
+      body: JSON.stringify({
+        ip,
+        reason: securityBlockReason.trim() || "manual admin block",
+      }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      setActionMessage("IP 차단 등록에 실패했습니다.");
+      return;
+    }
+
+    setSecurityBlockIp("");
+    setSecurityBlockReason("");
+    setActionMessage("IP 차단을 등록했습니다.");
+    await loadAdminData();
+  };
+
+  const unblockSecurityIp = async (ip: string) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/security-ip-blocks", {
+      body: JSON.stringify({ ip, isActive: false, reason: "manual unblock" }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      setActionMessage("IP 차단 해제에 실패했습니다.");
+      return;
+    }
+
+    setActionMessage("IP 차단을 해제했습니다.");
+    await loadAdminData();
+  };
+
+  const runSecurityAction = async (action: "flush_cache" | "reset_circuit") => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/security-actions", {
+      body: JSON.stringify({ action }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      setActionMessage("보안 운영 작업에 실패했습니다.");
+      return;
+    }
+
+    setActionMessage("보안 운영 작업을 실행했습니다.");
+    await loadAdminData();
+  };
+
+  const exportKotsaAuditCsv = async () => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const search = kotsaAuditSearch.trim();
+    const query = new URLSearchParams({ format: "csv", limit: "1000" });
+
+    if (search) {
+      query.set("search", search);
+    }
+
+    const response = await fetch("/api/admin/kotsa-audit-logs?" + query.toString(), {
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+
+    if (!response.ok) {
+      setActionMessage("Audit CSV 내보내기에 실패했습니다.");
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "kotsa-audit-logs.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const markBackupCheckedNow = async () => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updates = [
+      { settingKey: "supabase_backup_last_checked_at", textValue: now },
+      { settingKey: "database_backup_last_at", textValue: now },
+      { settingKey: "storage_backup_last_at", textValue: now },
+      { settingKey: "certificate_backup_last_at", textValue: now },
+      { numericValue: 1, settingKey: "backup_last_success" },
+    ];
+
+    await Promise.all(
+      updates.map((payload) =>
+        fetch("/api/admin/security-settings", {
+          body: JSON.stringify(payload),
+          headers: {
+            Authorization: "Bearer " + accessToken,
+            "Content-Type": "application/json",
+          },
+          method: "PATCH",
+        }),
+      ),
+    );
+
+    setActionMessage("백업 확인 시간을 갱신했습니다.");
     await loadAdminData();
   };
 
@@ -3911,6 +4488,45 @@ export default function AdminPage() {
     await loadAdminData();
   };
 
+  const resetKotsaQuotaForUser = async (account: AdminUserProfile) => {
+    const accessToken = sessionAccessToken;
+
+    if (!accessToken) {
+      setActionMessage("로그인 세션을 확인하지 못했습니다.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `${account.nickname ?? account.id} 회원의 오늘 KOTSA 조회 사용량을 초기화하시겠습니까?`,
+      )
+    ) {
+      return;
+    }
+
+    setActionMessage("");
+
+    const response = await fetch("/api/admin/kotsa-user-quota-reset", {
+      body: JSON.stringify({ targetUserId: account.id }),
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      setActionMessage("KOTSA 조회 사용량 초기화에 실패했습니다.");
+      return;
+    }
+
+    const payload = (await response.json()) as { resetCount?: number };
+    setActionMessage(
+      `KOTSA 조회 사용량을 초기화했습니다. (${(payload.resetCount ?? 0).toLocaleString()}건)`,
+    );
+    await loadAdminData();
+  };
+
   const grantNicknameChangeTicket = async (account: AdminUserProfile) => {
     if (!supabase) {
       return;
@@ -4252,6 +4868,12 @@ export default function AdminPage() {
               새로고침
             </button>
             <Link
+              href="/admin/preflight"
+              className={cn(actionButtonClassName, "no-underline")}
+            >
+              운영 준비 점검
+            </Link>
+            <Link
               href="/"
               className={cn(actionButtonClassName, "no-underline")}
             >
@@ -4287,6 +4909,7 @@ export default function AdminPage() {
                     setReportSearch(value);
                     setNoticeSearch(value);
                     setKnowledgeSearch(value);
+                    setKotsaAuditSearch(value);
                   }}
                 />
                 <span className="pointer-events-none absolute left-3 top-2.5 text-sm text-zinc-400">
@@ -5173,6 +5796,9 @@ export default function AdminPage() {
                         onGrantNicknameChangeTicket={(target) =>
                           void grantNicknameChangeTicket(target)
                         }
+                        onResetKotsaQuota={(target) =>
+                          void resetKotsaQuotaForUser(target)
+                        }
                         onSetRole={(target, nextRole) =>
                           void setUserRole(target, nextRole)
                         }
@@ -5288,6 +5914,9 @@ export default function AdminPage() {
                             onGrantNicknameChangeTicket={(target) =>
                               void grantNicknameChangeTicket(target)
                             }
+                            onResetKotsaQuota={(target) =>
+                              void resetKotsaQuotaForUser(target)
+                            }
                             onSetRole={(target, nextRole) =>
                               void setUserRole(target, nextRole)
                             }
@@ -5304,6 +5933,712 @@ export default function AdminPage() {
                   ))
                 ) : (
                   <EmptyTableRow colSpan={9} message="회원이 없습니다." />
+                )}
+              </tbody>
+            </table>
+          </AdminTablePanel>
+        ) : null}
+
+        {activeTab === "kotsa" ? (
+          <AdminTablePanel
+            count={kotsaAuditLogs.length}
+            title="KOTSA 조회 로그"
+          >
+            <div className="mb-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-200/60">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-black text-zinc-500">
+                    Security Score
+                  </p>
+                  <p className="mt-1 text-3xl font-black text-zinc-950">
+                    {kotsaHealth.security.securityScore.value.toLocaleString()}
+                    <span className="text-base text-zinc-400"> /100</span>
+                  </p>
+                </div>
+                <p className={mutedTextClassName}>
+                  {kotsaHealth.security.securityScore.deductions.length
+                    ? kotsaHealth.security.securityScore.deductions.join(" · ")
+                    : "감점 항목 없음"}
+                </p>
+              </div>
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="공단 연결"
+                value={kotsaHealth.connectionStatus}
+                tone={
+                  kotsaHealth.connectionStatus === "ok" ? "blue" : "neutral"
+                }
+              />
+              <MetricCard
+                label="인증서"
+                value={
+                  kotsaHealth.certificateStatus +
+                  (kotsaHealth.certificateDaysUntilExpiration !== null
+                    ? " · D-" +
+                      kotsaHealth.certificateDaysUntilExpiration.toLocaleString()
+                    : "")
+                }
+                tone={
+                  kotsaHealth.certificateStatus === "ok" ? "blue" : "orange"
+                }
+              />
+              <MetricCard
+                label="서킷"
+                value={
+                  kotsaHealth.circuitState +
+                  " · 실패 " +
+                  kotsaHealth.consecutiveFailures.toLocaleString()
+                }
+                tone={kotsaHealth.circuitState === "closed" ? "blue" : "red"}
+              />
+              <MetricCard
+                label="평균 응답"
+                value={
+                  kotsaHealth.averageResponseMs === null
+                    ? "-"
+                    : kotsaHealth.averageResponseMs.toLocaleString() + "ms"
+                }
+                tone="neutral"
+              />
+            </div>
+            <div className="mb-4 grid gap-3 rounded-lg border border-red-200 bg-red-50 p-3 shadow-sm shadow-red-100/70">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-black text-red-700">
+                    KOTSA Emergency Stop
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-red-950">
+                    상태:{" "}
+                    {kotsaHealth.security.emergencyStop
+                      ? "비상정지 ON"
+                      : "정상 운영"}
+                  </p>
+                  <p className={mutedTextClassName}>
+                    ON 상태에서는 KOTSA 공단 호출이 전체 중단되고 사용자에게 점검 안내가 표시됩니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-lg px-4 py-2 text-sm font-black text-white transition",
+                    kotsaHealth.security.emergencyStop
+                      ? "bg-zinc-900 hover:bg-zinc-800"
+                      : "bg-red-600 hover:bg-red-700",
+                  )}
+                  onClick={() =>
+                    void setKotsaEmergencyStop(
+                      !kotsaHealth.security.emergencyStop,
+                    )
+                  }
+                >
+                  {kotsaHealth.security.emergencyStop
+                    ? "비상정지 해제"
+                    : "Emergency Stop ON"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 border-t border-red-100 pt-3">
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void runSecurityAction("flush_cache")}
+                >
+                  Flush Cache
+                </button>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void runSecurityAction("reset_circuit")}
+                >
+                  Circuit Reset
+                </button>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void exportKotsaAuditCsv()}
+                >
+                  Audit Export(CSV)
+                </button>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void loadAdminData()}
+                >
+                  Health Refresh
+                </button>
+              </div>
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="최근 401"
+                value={kotsaHealth.security.recentStatusCounts.unauthorized.toLocaleString()}
+                tone={kotsaHealth.security.recentStatusCounts.unauthorized ? "orange" : "neutral"}
+              />
+              <MetricCard
+                label="최근 403"
+                value={kotsaHealth.security.recentStatusCounts.forbidden.toLocaleString()}
+                tone={kotsaHealth.security.recentStatusCounts.forbidden ? "orange" : "neutral"}
+              />
+              <MetricCard
+                label="최근 500"
+                value={kotsaHealth.security.recentStatusCounts.serverError.toLocaleString()}
+                tone={kotsaHealth.security.recentStatusCounts.serverError ? "red" : "neutral"}
+              />
+              <MetricCard
+                label="마지막 백업 확인"
+                value={formatOptionalDate(kotsaHealth.security.backupLastCheckedAt)}
+                tone="neutral"
+              />
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Cloudflare"
+                value={
+                  (kotsaHealth.security.cloudflare.enabled ? "ON" : "OFF") +
+                  " · " +
+                  (kotsaHealth.security.cloudflare.proxyDetected
+                    ? "Proxy"
+                    : "Direct")
+                }
+                tone={kotsaHealth.security.cloudflare.enabled ? "blue" : "orange"}
+              />
+              <MetricCard
+                label="Client IP"
+                value={kotsaHealth.security.cloudflare.clientIp ?? "-"}
+                tone="neutral"
+              />
+              <MetricCard
+                label="Firewall"
+                value={kotsaHealth.security.firewallStatus}
+                tone="blue"
+              />
+              <MetricCard
+                label="Fail2Ban"
+                value={kotsaHealth.security.fail2banRecentBlocks.toLocaleString()}
+                tone={kotsaHealth.security.fail2banRecentBlocks ? "orange" : "neutral"}
+              />
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-3">
+              {[
+                ["오늘", kotsaHealth.security.securityStats.today],
+                ["최근 7일", kotsaHealth.security.securityStats.last7d],
+                ["최근 30일", kotsaHealth.security.securityStats.last30d],
+              ].map(([label, stats]) => (
+                <div
+                  className="rounded-lg border border-zinc-200 bg-white p-3 text-xs shadow-sm shadow-zinc-200/60"
+                  key={String(label)}
+                >
+                  <p className="mb-2 font-black text-zinc-500">
+                    Security {String(label)}
+                  </p>
+                  {stats ? (
+                    <div className="grid gap-1 font-mono text-zinc-600">
+                      <p>
+                        401/403/404/429/500:{" "}
+                        {(stats as AdminSecurityPeriodStats).http401}/
+                        {(stats as AdminSecurityPeriodStats).http403}/
+                        {(stats as AdminSecurityPeriodStats).http404}/
+                        {(stats as AdminSecurityPeriodStats).http429}/
+                        {(stats as AdminSecurityPeriodStats).http500}
+                      </p>
+                      <p>
+                        Circuit/Emergency/IP/F2B/CF:{" "}
+                        {(stats as AdminSecurityPeriodStats).circuitOpen}/
+                        {(stats as AdminSecurityPeriodStats).emergencyStop}/
+                        {(stats as AdminSecurityPeriodStats).blockedIp}/
+                        {(stats as AdminSecurityPeriodStats).fail2ban}/
+                        {(stats as AdminSecurityPeriodStats).cloudflareBlock}
+                      </p>
+                      <p>
+                        AVG/P95/P99:{" "}
+                        {(stats as AdminSecurityPeriodStats).averageResponseMs ?? "-"}/
+                        {(stats as AdminSecurityPeriodStats).p95ResponseMs ?? "-"}/
+                        {(stats as AdminSecurityPeriodStats).p99ResponseMs ?? "-"}ms
+                      </p>
+                    </div>
+                  ) : (
+                    <p className={mutedTextClassName}>집계 전입니다.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mb-4 rounded-lg border border-zinc-200 bg-white p-3 text-xs shadow-sm shadow-zinc-200/60">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="grid gap-1 text-zinc-600">
+                  <p className="font-black text-zinc-500">Backup Status</p>
+                  <p>
+                    PITR:{" "}
+                    {kotsaHealth.security.backupStatus.pitrEnabled === null
+                      ? "UNKNOWN"
+                      : kotsaHealth.security.backupStatus.pitrEnabled
+                        ? "YES"
+                        : "NO"}{" "}
+                    · 성공:{" "}
+                    {kotsaHealth.security.backupStatus.lastSuccess ? "YES" : "NO"}
+                  </p>
+                  <p>
+                    DB {formatOptionalDate(kotsaHealth.security.backupStatus.databaseBackupLastAt)}
+                    {" · "}Storage {formatOptionalDate(kotsaHealth.security.backupStatus.storageBackupLastAt)}
+                    {" · "}Cert {formatOptionalDate(kotsaHealth.security.backupStatus.certificateBackupLastAt)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => void markBackupCheckedNow()}
+                >
+                  백업 확인 기록
+                </button>
+              </div>
+            </div>
+            <div className="mb-4 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+                <p className="mb-2 text-xs font-black text-zinc-500">
+                  최근 보안 알림
+                </p>
+                {kotsaHealth.security.recentAlerts.length ? (
+                  <div className="grid gap-2">
+                    {kotsaHealth.security.recentAlerts.map((alert) => (
+                      <div
+                        className="grid gap-1 rounded-lg bg-zinc-50 p-2 text-xs"
+                        key={alert.created_at + alert.alert_type}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-black text-zinc-800">
+                            {alert.alert_type}
+                          </span>
+                          <span className="font-mono text-zinc-500">
+                            {formatDate(alert.created_at)}
+                          </span>
+                        </div>
+                        <p className="font-mono text-zinc-500">
+                          {alert.request_ip ?? "-"} · {alert.endpoint ?? "-"} ·{" "}
+                          {alert.blocked ? "blocked" : alert.severity}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={mutedTextClassName}>최근 보안 알림이 없습니다.</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+                <p className="mb-2 text-xs font-black text-zinc-500">
+                  최근 차단 IP
+                </p>
+                <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <input
+                    className={inputClassName}
+                    placeholder="차단 IP"
+                    value={securityBlockIp}
+                    onChange={(event) => setSecurityBlockIp(event.target.value)}
+                  />
+                  <input
+                    className={inputClassName}
+                    placeholder="차단 사유"
+                    value={securityBlockReason}
+                    onChange={(event) =>
+                      setSecurityBlockReason(event.target.value)
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-black text-white transition hover:bg-zinc-800"
+                    onClick={() => void blockSecurityIp()}
+                  >
+                    IP 차단
+                  </button>
+                </div>
+                {kotsaHealth.security.blockedIps.length ? (
+                  <div className="grid gap-2">
+                    {kotsaHealth.security.blockedIps.map((blockedIp) => (
+                      <div
+                        className="flex items-center justify-between gap-2 rounded-lg bg-zinc-50 p-2 text-xs"
+                        key={blockedIp.ip}
+                      >
+                        <span className="font-mono font-black text-zinc-800">
+                          {blockedIp.ip}
+                        </span>
+                        <span className="truncate text-zinc-500">
+                          {blockedIp.reason ?? "사유 없음"}
+                        </span>
+                        <button
+                          type="button"
+                          className={actionButtonClassName}
+                          onClick={() => void unblockSecurityIp(blockedIp.ip)}
+                        >
+                          해제
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={mutedTextClassName}>차단 IP가 없습니다.</p>
+                )}
+              </div>
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="오늘 전체 조회"
+                value={kotsaStats.totalQueries.toLocaleString()}
+                tone="blue"
+              />
+              <MetricCard
+                label="공단 실제 호출"
+                value={kotsaStats.actualCalls.toLocaleString()}
+                tone="neutral"
+              />
+              <MetricCard
+                label="Cache hit"
+                value={
+                  kotsaStats.cacheHits.toLocaleString() +
+                  " · " +
+                  kotsaStats.cacheHitRate.toLocaleString() +
+                  "%"
+                }
+                tone="blue"
+              />
+              <MetricCard
+                label="실패/Timeout/Circuit"
+                value={
+                  kotsaStats.failureCount.toLocaleString() +
+                  "/" +
+                  kotsaStats.timeoutCount.toLocaleString() +
+                  "/" +
+                  kotsaStats.circuitOpenCount.toLocaleString()
+                }
+                tone={kotsaStats.failureCount ? "red" : "neutral"}
+              />
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="성공/성공률"
+                value={
+                  kotsaStats.successCount.toLocaleString() +
+                  " · " +
+                  kotsaStats.successRate.toLocaleString() +
+                  "%"
+                }
+                tone="blue"
+              />
+              <MetricCard
+                label="p95 응답"
+                value={
+                  kotsaStats.p95ResponseMs === null
+                    ? "-"
+                    : kotsaStats.p95ResponseMs.toLocaleString() + "ms"
+                }
+                tone="neutral"
+              />
+              <MetricCard
+                label="최대 응답"
+                value={
+                  kotsaStats.maxResponseMs === null
+                    ? "-"
+                    : kotsaStats.maxResponseMs.toLocaleString() + "ms"
+                }
+                tone={kotsaStats.maxResponseMs && kotsaStats.maxResponseMs > 8000 ? "red" : "neutral"}
+              />
+              <MetricCard
+                label="예상 월 호출/비용"
+                value={
+                  kotsaStats.estimatedMonthlyCalls.toLocaleString() +
+                  " · " +
+                  kotsaStats.estimatedMonthlyCostKrw.toLocaleString() +
+                  "원"
+                }
+                tone="neutral"
+              />
+            </div>
+            <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
+              <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-zinc-500">
+                    최근 30일 조회량
+                  </p>
+                  <p className={mutedTextClassName}>
+                    전체/공단/캐시/실패
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  {kotsaStats.dailySeries.map((day) => {
+                    const maxDailyTotal = Math.max(
+                      ...kotsaStats.dailySeries.map((item) => item.totalQueries),
+                      1,
+                    );
+
+                    return (
+                      <div
+                        className="grid grid-cols-[5.5rem_minmax(0,1fr)_8rem] items-center gap-2 text-xs"
+                        key={day.date}
+                      >
+                        <span className="font-mono font-bold text-zinc-500">
+                          {day.date.slice(5)}
+                        </span>
+                        <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                          <div
+                            className="h-full rounded-full bg-[#2563EB]"
+                            style={{
+                              width:
+                                Math.max(
+                                  (day.totalQueries / maxDailyTotal) * 100,
+                                  day.totalQueries ? 4 : 0,
+                                ).toString() + "%",
+                            }}
+                          />
+                        </div>
+                        <span className="font-mono text-zinc-600">
+                          {day.totalQueries}/{day.actualCalls}/{day.cacheHits}/{day.failures}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid gap-3">
+                {[
+                  ["최근 7일 TOP10", kotsaStats.topVehicles7d],
+                  ["최근 30일 TOP10", kotsaStats.topVehicles30d],
+                ].map(([label, vehicles]) => (
+                  <div
+                    className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60"
+                    key={String(label)}
+                  >
+                    <p className="mb-2 text-xs font-black text-zinc-500">
+                      {String(label)}
+                    </p>
+                    {(vehicles as AdminKotsaStats["topVehicles7d"]).length ? (
+                      <div className="grid gap-1">
+                        {(vehicles as AdminKotsaStats["topVehicles7d"]).map(
+                          (vehicle, index) => (
+                            <div
+                              className="flex items-center justify-between gap-2 text-xs"
+                              key={vehicle.vehicleHashPrefix}
+                            >
+                              <span className="min-w-0 truncate font-mono font-bold text-zinc-700">
+                                {index + 1}. {vehicle.label}
+                              </span>
+                              <span className="shrink-0 font-mono text-zinc-500">
+                                {vehicle.viewCount.toLocaleString()}회
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    ) : (
+                      <p className={mutedTextClassName}>조회 데이터가 없습니다.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="오늘 전체 조회"
+                value={kotsaStats.totalQueries.toLocaleString()}
+                tone="blue"
+              />
+              <MetricCard
+                label="실제 공단 호출"
+                value={kotsaStats.actualCalls.toLocaleString()}
+                tone="neutral"
+              />
+              <MetricCard
+                label="캐시 적중률"
+                value={
+                  kotsaStats.cacheHits.toLocaleString() +
+                  " · " +
+                  kotsaStats.cacheHitRate.toLocaleString() +
+                  "%"
+                }
+                tone="blue"
+              />
+              <MetricCard
+                label="단가"
+                value={kotsaStats.unitCostKrw.toLocaleString() + "원"}
+                tone="neutral"
+              />
+            </div>
+            <div className="mb-4 grid gap-3 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60">
+              <p className="text-xs font-black text-zinc-500">
+                KOTSA 조회 제한 정책
+              </p>
+              <div className="grid gap-2 md:grid-cols-4">
+                {kotsaPolicies.map((policy) => (
+                  <div
+                    className="grid gap-2 rounded-lg border border-zinc-100 p-2 text-xs font-bold text-zinc-600"
+                    key={policy.policy_key}
+                  >
+                    <label className="grid gap-1">
+                      {policy.label} 기본
+                      <input
+                        className={inputClassName}
+                        disabled={policy.policy_key === "admin"}
+                        min={1}
+                        type="number"
+                        value={policy.daily_limit ?? ""}
+                        onChange={(event) =>
+                          void updateKotsaPolicyLimit(
+                            policy,
+                            event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      오늘만 override
+                      <input
+                        className={inputClassName}
+                        defaultValue={policy.temporary_daily_limit ?? ""}
+                        disabled={policy.policy_key === "admin"}
+                        min={1}
+                        placeholder="미사용"
+                        type="number"
+                        onBlur={(event) =>
+                          void updateKotsaPolicyTemporaryLimit(
+                            policy,
+                            event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          )
+                        }
+                      />
+                    </label>
+                    <span className="font-normal text-zinc-400">
+                      만료{" "}
+                      {formatOptionalDate(policy.temporary_expires_at)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className={mutedTextClassName}>
+                회원 등급별 조회 수: 일반{" "}
+                {(kotsaStats.tierCounts.general ?? 0).toLocaleString()} · 인증딜러{" "}
+                {(kotsaStats.tierCounts.verified_dealer ?? 0).toLocaleString()} · 관리자{" "}
+                {(kotsaStats.tierCounts.admin ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div className="mb-4 grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+              <p>
+                마지막 성공: {formatOptionalDate(kotsaHealth.lastSuccessAt)}
+              </p>
+              <p>
+                마지막 실패: {formatOptionalDate(kotsaHealth.lastFailureAt)}
+                {kotsaHealth.lastFailureMessage
+                  ? " · " + kotsaHealth.lastFailureMessage
+                  : ""}
+              </p>
+              <p>
+                인증서 만료:{" "}
+                {formatOptionalDate(kotsaHealth.certificateExpiresAt)} · 권한{" "}
+                {kotsaHealth.certificatePermissionOk === null
+                  ? "확인 필요"
+                  : kotsaHealth.certificatePermissionOk
+                    ? "정상"
+                    : "점검 필요"}{" "}
+                ({kotsaHealth.certificateFileMode ?? "-"})
+              </p>
+              {kotsaHealth.startupWarnings.length ? (
+                <p className="font-bold text-orange-700">
+                  {kotsaHealth.startupWarnings.join(" / ")}
+                </p>
+              ) : null}
+            </div>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <input
+                className={cn(inputClassName, "sm:max-w-sm")}
+                placeholder="마스킹 차량번호, 상태, 응답코드 검색"
+                value={kotsaAuditSearch}
+                onChange={(event) => setKotsaAuditSearch(event.target.value)}
+              />
+              <p className={mutedTextClassName}>
+                차량번호 원문과 인증 정보는 저장하지 않습니다.
+              </p>
+            </div>
+            <div className={mobileListClassName}>
+              {kotsaAuditLogs.length ? (
+                kotsaAuditLogs.map((log) => (
+                  <article className={mobileCardClassName} key={log.id}>
+                    <div className="min-w-0">
+                      <p className={mobileCardTitleClassName}>
+                        {log.vehicle_number_masked ?? "차량번호 없음"}
+                      </p>
+                      <p className={mobileCardMetaClassName}>
+                        {log.status} · {log.response_code ?? "응답코드 없음"} ·{" "}
+                        {formatDate(log.created_at)}
+                      </p>
+                      <p className={mobileCardMetaClassName}>
+                        {log.request_ip ?? "IP 없음"}
+                      </p>
+                      {log.error_message ? (
+                        <p className={mobileCardSubMetaClassName}>
+                          {log.error_message}
+                        </p>
+                      ) : null}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <EmptyMobileState message="KOTSA 조회 로그가 없습니다." />
+              )}
+            </div>
+            <table className={desktopTableClassName}>
+              <thead>
+                <tr>
+                  <th className={tableHeadCellClassName}>시각</th>
+                  <th className={tableHeadCellClassName}>차량번호</th>
+                  <th className={tableHeadCellClassName}>상태</th>
+                  <th className={tableHeadCellClassName}>응답코드</th>
+                  <th className={tableHeadCellClassName}>요청 ID</th>
+                  <th className={tableHeadCellClassName}>응답시간</th>
+                  <th className={tableHeadCellClassName}>사용자</th>
+                  <th className={tableHeadCellClassName}>IP</th>
+                  <th className={tableHeadCellClassName}>오류</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200">
+                {kotsaAuditLogs.length ? (
+                  kotsaAuditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
+                        {formatDate(log.created_at)}
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-sm font-bold")}>
+                        {log.vehicle_number_masked ?? "-"}
+                      </td>
+                      <td className={tableCellClassName}>
+                        <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-bold text-zinc-700">
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs")}>
+                        {log.response_code ?? "-"}
+                      </td>
+                      <td className={cn(tableCellClassName, "max-w-44 truncate font-mono text-xs")}>
+                        {log.request_id}
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs")}>
+                        {log.response_time_ms === null
+                          ? "-"
+                          : log.response_time_ms.toLocaleString() + "ms"}
+                      </td>
+                      <td className={cn(tableCellClassName, "max-w-40 truncate font-mono text-xs")}>
+                        {log.user_id ?? "anonymous"}
+                      </td>
+                      <td className={cn(tableCellClassName, "whitespace-nowrap font-mono text-xs")}>
+                        {log.request_ip ?? "-"}
+                      </td>
+                      <td className={tableCellClassName}>
+                        <span className="block max-w-80 truncate text-xs text-zinc-500">
+                          {log.error_message ?? "-"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyTableRow colSpan={9} message="KOTSA 조회 로그가 없습니다." />
                 )}
               </tbody>
             </table>
@@ -6009,6 +7344,9 @@ export default function AdminPage() {
                 onGrantNicknameChangeTicket={(target) =>
                   void grantNicknameChangeTicket(target)
                 }
+                onResetKotsaQuota={(target) =>
+                  void resetKotsaQuotaForUser(target)
+                }
                 onSetRole={(target, nextRole) =>
                   void setUserRole(target, nextRole)
                 }
@@ -6110,6 +7448,7 @@ export default function AdminPage() {
 function SearchBar({
   activeTab,
   setKnowledgeSearch,
+  setKotsaAuditSearch,
   searchValue,
   setNoticeSearch,
   setPostSearch,
@@ -6119,6 +7458,7 @@ function SearchBar({
 }: {
   activeTab: Exclude<AdminTab, "dashboard">;
   setKnowledgeSearch: (value: string) => void;
+  setKotsaAuditSearch: (value: string) => void;
   searchValue: string;
   setNoticeSearch: (value: string) => void;
   setPostSearch: (value: string) => void;
@@ -6132,6 +7472,7 @@ function SearchBar({
     users: "닉네임, 회원 ID, role 검색",
     ai: "AI 후보, 키워드, 모델명 검색",
     knowledge: "대표명, slug, 설명, 원인, 증상, 키워드, 차종 검색",
+    kotsa: "마스킹 차량번호, 상태, 응답코드 검색",
     reports: "신고 사유, 대상 내용, 작성자 검색",
     notices: "공지 제목, 내용, 팝업 URL 검색",
   }[activeTab];
@@ -6141,6 +7482,7 @@ function SearchBar({
     if (activeTab === "reviews") setReviewSearch(value);
     if (activeTab === "users") setUserSearch(value);
     if (activeTab === "knowledge") setKnowledgeSearch(value);
+    if (activeTab === "kotsa") setKotsaAuditSearch(value);
     if (activeTab === "reports") setReportSearch(value);
     if (activeTab === "notices") setNoticeSearch(value);
   };
@@ -7359,6 +8701,34 @@ function GrowthMetricCard({
         {value}
       </p>
       <p className="mt-2 text-xs font-bold leading-5 text-zinc-500">{detail}</p>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "blue" | "neutral" | "orange" | "red";
+  value: string;
+}) {
+  const toneClassName =
+    tone === "blue"
+      ? "text-blue-600"
+      : tone === "orange"
+        ? "text-orange-600"
+        : tone === "red"
+          ? "text-red-600"
+          : "text-zinc-700";
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-200/60">
+      <p className="text-xs font-black text-zinc-500">{label}</p>
+      <p className={cn("mt-2 text-lg font-black tracking-tight", toneClassName)}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -10384,6 +11754,7 @@ function UserActionButtons({
   isSuperAdmin,
   isVerifiedDealerFeatureReady,
   onGrantNicknameChangeTicket,
+  onResetKotsaQuota,
   onSetRole,
   onSetSuspended,
   onSetVerifiedDealer,
@@ -10392,6 +11763,7 @@ function UserActionButtons({
   isSuperAdmin: boolean;
   isVerifiedDealerFeatureReady: boolean;
   onGrantNicknameChangeTicket: (account: AdminUserProfile) => void;
+  onResetKotsaQuota: (account: AdminUserProfile) => void;
   onSetRole: (account: AdminUserProfile, nextRole: "user" | "admin") => void;
   onSetSuspended: (account: AdminUserProfile) => void;
   onSetVerifiedDealer: (account: AdminUserProfile) => void;
@@ -10425,6 +11797,13 @@ function UserActionButtons({
         onClick={() => onGrantNicknameChangeTicket(account)}
       >
         닉네임 변경
+      </button>
+      <button
+        type="button"
+        className={actionButtonClassName}
+        onClick={() => onResetKotsaQuota(account)}
+      >
+        KOTSA 초기화
       </button>
       <button
         type="button"
