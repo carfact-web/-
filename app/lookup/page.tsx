@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KotsaLoginRequiredModal } from "@/components/KotsaLoginRequiredModal";
 import { KotsaLookupProgress } from "@/components/KotsaLookupProgress";
 import { KotsaLookupResultModal } from "@/components/KotsaLookupResultModal";
@@ -41,22 +41,23 @@ const delay = (ms: number) =>
 
 type LookupModalType = "not_business" | "error";
 
-const getInitialVehicleNumberFromQuery = () => {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const searchParams = new URLSearchParams(window.location.search);
-  return normalizeVehiclePlateNumber(
-    sanitizeVehiclePlateNumber(searchParams.get("carNumber") ?? ""),
-  );
-};
-
 export default function LookupPage() {
+  return (
+    <Suspense fallback={null}>
+      <LookupPageContent />
+    </Suspense>
+  );
+}
+
+function LookupPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryCarNumber = searchParams.get("carNumber") ?? "";
+  const normalizedQueryCarNumber = normalizeVehiclePlateNumber(
+    sanitizeVehiclePlateNumber(queryCarNumber),
+  );
   const autoLookupVehicleRef = useRef<string | null>(null);
-  const [carNumber, setCarNumber] = useState(getInitialVehicleNumberFromQuery);
-  const queryCarNumberRef = useRef(carNumber);
+  const [carNumber, setCarNumber] = useState(normalizedQueryCarNumber);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isKotsaMaintenance, setIsKotsaMaintenance] = useState(false);
   const [lookupModalType, setLookupModalType] =
@@ -198,17 +199,27 @@ export default function LookupPage() {
   }, []);
 
   useEffect(() => {
-    const queryCarNumber = queryCarNumberRef.current;
-
-    if (!queryCarNumber) {
+    if (!normalizedQueryCarNumber) {
       return;
     }
 
-    if (autoLookupVehicleRef.current === queryCarNumber) {
+    const timeoutId = window.setTimeout(() => {
+      setCarNumber(normalizedQueryCarNumber);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [normalizedQueryCarNumber]);
+
+  useEffect(() => {
+    if (!normalizedQueryCarNumber) {
       return;
     }
 
-    if (normalizedCarNumber !== queryCarNumber) {
+    if (autoLookupVehicleRef.current === normalizedQueryCarNumber) {
+      return;
+    }
+
+    if (normalizedCarNumber !== normalizedQueryCarNumber) {
       return;
     }
 
@@ -217,8 +228,8 @@ export default function LookupPage() {
     }
 
     const timeoutId = window.setTimeout(() => {
-      autoLookupVehicleRef.current = queryCarNumber;
-      void runKotsaLookup(queryCarNumber);
+      autoLookupVehicleRef.current = normalizedQueryCarNumber;
+      void runKotsaLookup(normalizedQueryCarNumber);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -227,6 +238,7 @@ export default function LookupPage() {
     isKotsaMaintenance,
     isLookupBusy,
     normalizedCarNumber,
+    normalizedQueryCarNumber,
     runKotsaLookup,
   ]);
 
