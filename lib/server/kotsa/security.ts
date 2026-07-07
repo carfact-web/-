@@ -2,12 +2,12 @@ import {
   constants,
   createHash,
   createPrivateKey,
-  createPublicKey,
   createSign,
   createVerify,
   privateDecrypt,
   publicEncrypt,
   randomBytes,
+  KeyObject,
   X509Certificate,
 } from "crypto";
 import { readFile } from "fs/promises";
@@ -95,7 +95,7 @@ const readKotsaPrivateKey = async ({
 const readKotsaPublicKey = async ({ certificatePath }: KotsaSecurityConfig) => {
   const certificate = new X509Certificate(await readFile(certificatePath));
 
-  return createPublicKey(certificate.publicKey);
+  return certificate.publicKey;
 };
 
 const signEncryptedMessage = (privateKey: ReturnType<typeof createPrivateKey>, data: Buffer) => {
@@ -107,7 +107,7 @@ const signEncryptedMessage = (privateKey: ReturnType<typeof createPrivateKey>, d
 };
 
 const verifyEncryptedMessage = (
-  publicKey: ReturnType<typeof createPublicKey>,
+  publicKey: KeyObject,
   data: Buffer,
   signature: Buffer,
 ) => {
