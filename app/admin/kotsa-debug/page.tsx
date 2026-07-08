@@ -13,6 +13,19 @@ interface DebugResponse {
     encryption: {
       base64Length: number;
       derPackageOk: boolean;
+      derSummary: {
+        objectCount: number;
+        objects: Array<{
+          byteLength: number;
+          index: number;
+          length: number;
+          tag: string;
+          tagName: string;
+        }>;
+        sequenceLength: number;
+        sequenceTag: string;
+        totalLength: number;
+      } | null;
       requestSha256: string;
       success: boolean;
     };
@@ -31,6 +44,9 @@ interface DebugResponse {
       fieldKeys: string[];
       linkInfoCd: string;
       mode: RequestMode;
+      plainJsonByteLength: number;
+      plainJsonMasked: string;
+      plainJsonSha256: string;
       vehicleAssertions: {
         byteLength: number;
         hasMaskCharacter: boolean;
@@ -47,10 +63,42 @@ interface DebugResponse {
       bodyLength: number;
       decryptError: string | null;
       decryptOk: boolean;
+      decryptedJsonMasked: string | null;
       headers: {
+        connection: string | null;
+        contentLength: string | null;
+        contentType: string | null;
+        date: string | null;
         hubResult: string | null;
         hubResultCode: string | null;
+        server: string | null;
         transactionId: string | null;
+        transferEncoding: string | null;
+      };
+    };
+    raw: {
+      httpRequestSummary: {
+        accept: string;
+        bodyHasTrailingNewline: boolean;
+        bodyLength: number;
+        bodyShape: string;
+        contentLength: number;
+        contentType: string;
+        finalBodyLastChar: string;
+        method: string;
+        transferEncoding: string | null;
+        url: string;
+      };
+      httpResponseSummary: {
+        connection: string | null;
+        contentLength: string | null;
+        contentType: string | null;
+        date: string | null;
+        hubResult: string | null;
+        hubResultCode: string | null;
+        server: string | null;
+        transactionId: string | null;
+        transferEncoding: string | null;
       };
     };
     structure: {
@@ -89,6 +137,9 @@ const valueClassName = "mt-1 break-all text-sm font-bold text-zinc-900";
 
 const boolText = (value: boolean) => (value ? "성공" : "실패");
 const existsText = (value: boolean) => (value ? "존재" : "없음");
+
+const codeBlockClassName =
+  "mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-200 bg-zinc-950 p-3 text-xs font-semibold text-zinc-50";
 
 function Field({
   label,
@@ -431,6 +482,79 @@ export default function KotsaDebugPage() {
                 value={diagnostics.structure.firstRowKeys.join(", ")}
               />
             </Section>
+
+            <section className={cardClassName}>
+              <h2 className="text-base font-black">Raw View</h2>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Field
+                  label="Plain JSON SHA256"
+                  value={diagnostics.request.plainJsonSha256}
+                />
+                <Field
+                  label="Plain JSON byte length"
+                  value={diagnostics.request.plainJsonByteLength}
+                />
+                <Field
+                  label="Base64 length"
+                  value={diagnostics.encryption.base64Length}
+                />
+                <Field
+                  label="DER object count"
+                  value={diagnostics.encryption.derSummary?.objectCount}
+                />
+                <Field
+                  label="DER object lengths"
+                  value={diagnostics.encryption.derSummary?.objects
+                    .map((object) => `${object.index}:${object.length}`)
+                    .join(", ")}
+                />
+                <Field
+                  label="prcsImprtyRsnCd / DtIs"
+                  value={`${diagnostics.structure.fields.prcsImprtyRsnCd ?? "null"} / ${
+                    diagnostics.structure.fields.prcsImprtyRsnDtls ?? "null"
+                  }`}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div>
+                  <p className={labelClassName}>Plain JSON masked</p>
+                  <pre className={codeBlockClassName}>
+                    {diagnostics.request.plainJsonMasked}
+                  </pre>
+                </div>
+                <div>
+                  <p className={labelClassName}>DER objects</p>
+                  <pre className={codeBlockClassName}>
+                    {JSON.stringify(diagnostics.encryption.derSummary, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <p className={labelClassName}>HTTP request summary</p>
+                  <pre className={codeBlockClassName}>
+                    {JSON.stringify(diagnostics.raw.httpRequestSummary, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <p className={labelClassName}>HTTP response summary</p>
+                  <pre className={codeBlockClassName}>
+                    {JSON.stringify(diagnostics.raw.httpResponseSummary, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <p className={labelClassName}>Decrypted JSON masked</p>
+                  <pre className={codeBlockClassName}>
+                    {diagnostics.response.decryptedJsonMasked ?? "null"}
+                  </pre>
+                </div>
+                <div>
+                  <p className={labelClassName}>response data[0] key list</p>
+                  <pre className={codeBlockClassName}>
+                    {diagnostics.structure.firstRowKeys.join("\n")}
+                  </pre>
+                </div>
+              </div>
+            </section>
           </>
         ) : null}
       </div>

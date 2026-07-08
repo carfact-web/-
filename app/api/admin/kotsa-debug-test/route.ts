@@ -5,7 +5,11 @@ import {
   decryptKotsaPayload,
   encryptKotsaPayload,
 } from "@/lib/server/kotsa/security";
-import { decodeKotsaPackage } from "@/lib/server/kotsa/der";
+import {
+  decodeKotsaPackage,
+  readDerChildren,
+  readDerNode,
+} from "@/lib/server/kotsa/der";
 import { maskVehicleNumber } from "@/lib/server/kotsa/vehicleNumber";
 import { assertAdminRequest } from "@/lib/server/kotsa/supabaseAdmin";
 
@@ -60,6 +64,13 @@ const normalizeInput = (vehicleNumber: string, nfcNormalize: boolean) =>
 const maskInput = (vehicleNumber: string) =>
   maskVehicleNumber(vehicleNumber) ?? "****";
 
+const maskJsonText = (value: unknown) =>
+  JSON.stringify(value).replace(
+    /"(vhclNo|vhrno)"\s*:\s*"([^"]*)"/g,
+    (_match, key: string, vehicleNumber: string) =>
+      `"${key}":"${maskInput(vehicleNumber)}"`,
+  );
+
 const getVehicleAssertions = (vehicleNumber: string) => ({
   byteLength: Buffer.byteLength(vehicleNumber, "utf8"),
   hasMaskCharacter: vehicleNumber.includes("*"),
@@ -86,6 +97,38 @@ const createRequestObject = (
 
   return { data: [item] };
 };
+
+const getDerSummary = (base64Payload: string) => {
+  const decoded = Buffer.from(base64Payload, "base64");
+  const sequence = readDerNode(decoded);
+  const children = sequence.tag === 0x30 ? readDerChildren(sequence.value) : [];
+
+  return {
+    objectCount: children.length,
+    objects: children.map((child, index) => ({
+      byteLength: child.value.length,
+      index,
+      length: child.value.length,
+      tag: "0x" + child.tag.toString(16).padStart(2, "0"),
+      tagName: child.tag === 0x04 ? "OCTET STRING" : "UNKNOWN",
+    })),
+    sequenceLength: sequence.value.length,
+    sequenceTag: "0x" + sequence.tag.toString(16).padStart(2, "0"),
+    totalLength: decoded.length,
+  };
+};
+
+const getHeaderSummary = (headers: Headers) => ({
+  connection: headers.get("connection"),
+  contentLength: headers.get("content-length"),
+  contentType: headers.get("content-type"),
+  date: headers.get("date"),
+  hubResult: headers.get("hub_result"),
+  hubResultCode: headers.get("hub_result_code"),
+  server: headers.get("server"),
+  transactionId: headers.get("transaction_id"),
+  transferEncoding: headers.get("transfer-encoding"),
+});
 
 const getDataSummary = (payload: unknown) => {
   const root = asRecord(payload);
@@ -147,6 +190,7 @@ export async function POST(request: NextRequest) {
   const vehicleNumber = normalizeInput(rawVehicleNumber, nfcNormalize);
   const requestObject = createRequestObject(vehicleNumber, requestMode);
   const requestJson = JSON.stringify(requestObject);
+  const requestJsonMasked = maskJsonText(requestObject);
   const requestSha256 = sha256(requestJson);
   const config = getKotsaConfig();
   const contentType =
@@ -156,6 +200,7 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
 
   let encryptedRequest = "";
+  let derSummary: ReturnType<typeof getDerSummary> | null = null;
   let packageDecoded = false;
   let requestBase64Length = 0;
 
@@ -163,6 +208,7 @@ export async function POST(request: NextRequest) {
     encryptedRequest = await encryptKotsaPayload(requestJson, config);
     requestBase64Length = encryptedRequest.length;
     decodeKotsaPackage(Buffer.from(encryptedRequest, "base64"));
+    derSummary = getDerSummary(encryptedRequest);
     packageDecoded = true;
   } catch (error) {
     return NextResponse.json(
@@ -219,6 +265,7 @@ export async function POST(request: NextRequest) {
       encryption: {
         base64Length: requestBase64Length,
         derPackageOk: packageDecoded,
+        derSummary,
         requestSha256,
         success: Boolean(encryptedRequest),
       },
@@ -237,6 +284,9 @@ export async function POST(request: NextRequest) {
         fieldKeys: Object.keys(requestObject.data[0]),
         linkInfoCd,
         mode: requestMode,
+        plainJsonByteLength: Buffer.byteLength(requestJson, "utf8"),
+        plainJsonMasked: requestJsonMasked,
+        plainJsonSha256: requestSha256,
         vehicleAssertions: getVehicleAssertions(vehicleNumber),
         vehicleNumberMasked: maskInput(vehicleNumber),
         vhclNoExists: Object.prototype.hasOwnProperty.call(
@@ -248,11 +298,25 @@ export async function POST(request: NextRequest) {
         bodyLength: responseBodyLength,
         decryptError,
         decryptOk: responseDecryptOk,
-        headers: {
-          hubResult: response.headers.get("hub_result"),
-          hubResultCode: response.headers.get("hub_result_code"),
-          transactionId: response.headers.get("transaction_id"),
+        decryptedJsonMasked: decryptedPayload
+          ? maskJsonText(decryptedPayload)
+          : null,
+        headers: getHeaderSummary(response.headers),
+      },
+      raw: {
+        httpRequestSummary: {
+          accept: "application/json",
+          bodyHasTrailingNewline: encryptedRequest.endsWith("\n"),
+          bodyLength: Buffer.byteLength(encryptedRequest, "utf8"),
+          bodyShape: "raw encrypted base64",
+          contentLength: Buffer.byteLength(encryptedRequest, "utf8"),
+          contentType,
+          finalBodyLastChar: encryptedRequest.slice(-1),
+          method: "POST",
+          transferEncoding: null,
+          url: config.apiBaseUrl,
         },
+        httpResponseSummary: getHeaderSummary(response.headers),
       },
       structure: getDataSummary(decryptedPayload),
     },
