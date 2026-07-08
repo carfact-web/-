@@ -27,9 +27,9 @@ interface DebugRequest {
 }
 
 const linkInfoCd = "AC1_ZA90_01";
-const picId = "carfact";
+const picId = "ZA90";
 const picIpAddr = "95.217.167.210";
-const picNm = "박신";
+const picNm = "케이엠컴퍼니";
 
 const sha256 = (value: string | Buffer) =>
   createHash("sha256").update(value).digest("hex");
