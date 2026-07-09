@@ -1082,13 +1082,18 @@ export default function Home() {
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const value = normalizeVehiclePlateNumber(carNumber);
+    const formData = new FormData(event.currentTarget);
+    const inputValue = formData.get("carNumber");
+    const value = normalizeVehiclePlateNumber(
+      typeof inputValue === "string" ? inputValue : "",
+    );
 
     if (!isValidVehiclePlateNumber(value)) {
       return;
     }
 
-    router.push(`/lookup?carNumber=${encodeURIComponent(value)}`);
+    setCarNumber(value);
+    router.push(`/car/${encodeURIComponent(value)}`);
   };
 
   return (
@@ -1181,6 +1186,7 @@ export default function Home() {
 
           <div className={cn("mt-5", plateInputFrameClassName)}>
             <input
+              name="carNumber"
               value={formatVehiclePlateNumberForDisplay(carNumber)}
               onChange={(e) => {
                 setCarNumber(sanitizeVehiclePlateNumber(e.target.value));

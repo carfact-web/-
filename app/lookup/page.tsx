@@ -62,7 +62,19 @@ function LookupPageContent() {
 
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    goToCarReport(normalizeVehiclePlateNumber(carNumber));
+
+    const formData = new FormData(event.currentTarget);
+    const inputValue = formData.get("carNumber");
+    const value = normalizeVehiclePlateNumber(
+      typeof inputValue === "string" ? inputValue : "",
+    );
+
+    if (!isValidVehiclePlateNumber(value)) {
+      return;
+    }
+
+    setCarNumber(value);
+    goToCarReport(value);
   };
 
   useEffect(() => {
@@ -129,6 +141,7 @@ function LookupPageContent() {
 
         <form className={panelClassName} onSubmit={goToReport}>
           <input
+            name="carNumber"
             value={formatVehiclePlateNumberForDisplay(carNumber)}
             onChange={(event) => {
               setCarNumber(sanitizeVehiclePlateNumber(event.target.value));
