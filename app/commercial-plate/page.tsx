@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { KotsaLoginRequiredModal } from "@/components/KotsaLoginRequiredModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,19 +15,18 @@ import type { KotsaVehicleHistory } from "@/types/kotsa";
 const pageClassName = cn("min-h-screen bg-black px-4 py-8 text-white sm:px-6");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
 const panelClassName = cn(
-  "rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/20 sm:p-5",
+  "rounded-lg border border-amber-400/20 bg-[linear-gradient(180deg,#11100a_0%,#080806_100%)] p-4 shadow-2xl shadow-black/20 sm:p-5",
 );
 const inputClassName = cn(
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-4 text-base text-white outline-none transition",
-  "placeholder:text-zinc-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20",
+  "commercial-plate-number-input",
 );
 const primaryButtonClassName = cn(
   "mt-3 w-full rounded-lg px-4 py-4 text-base font-bold text-white transition",
-  "bg-[#FF3B30] hover:bg-[#f52f25] active:scale-[0.99]",
+  "bg-amber-500 text-zinc-950 hover:bg-amber-400 active:scale-[0.99]",
   "disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:hover:bg-[#3A3A3A] disabled:active:scale-100",
 );
 const formMessageClassName = cn(
-  "mt-2 px-1 text-xs font-semibold text-[#FF3B30]",
+  "mt-2 px-1 text-xs font-semibold text-amber-300",
 );
 
 interface CommercialPlateResponse {
@@ -238,42 +236,29 @@ export default function CommercialPlatePage() {
         <div className="mb-6">
           <h1 className="text-3xl font-black text-white">영업넘버 확인</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            영업용 번호판을 직접 입력하면 KOTSA 사업용 차량 정보를 확인합니다.
+            영업용 번호판을 직접 입력하면 운행 여부와 기본 이력을 확인합니다.
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
-            <Link
-              href="/lookup"
-              className="rounded-md px-3 py-2 text-center text-sm font-black text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
-            >
-              차량조회
-            </Link>
-            <Link
-              href="/commercial-plate"
-              className="rounded-md bg-zinc-800 px-3 py-2 text-center text-sm font-black text-white"
-              aria-current="page"
-            >
-              영업넘버 확인
-            </Link>
-          </div>
         </div>
 
         <form className={panelClassName} onSubmit={lookupCommercialPlate}>
-          <input
-            value={plateNumber}
-            onChange={(event) => {
-              setPlateNumber(sanitizeVehiclePlateNumber(event.target.value));
-            }}
-            type="text"
-            placeholder="예) 서울38아8000 / 경기70바1234"
-            className={inputClassName}
-            aria-invalid={showValidationError}
-            aria-describedby={
-              showValidationError ? "commercial-plate-validation" : undefined
-            }
-          />
+          <div className="commercial-plate-input-frame">
+            <input
+              value={plateNumber}
+              onChange={(event) => {
+                setPlateNumber(sanitizeVehiclePlateNumber(event.target.value));
+              }}
+              type="text"
+              placeholder="예) 서울38아8000"
+              className={inputClassName}
+              aria-invalid={showValidationError}
+              aria-describedby={
+                showValidationError ? "commercial-plate-validation" : undefined
+              }
+            />
+          </div>
 
           <p className="mt-2 px-1 text-xs leading-5 text-zinc-500">
-            예) 서울38아8000, 경기70바1234
+            예) 경기70바1234
             <br />
             지역명이 있는 번호판은 반드시 지역명까지 입력해주세요.
           </p>
@@ -309,13 +294,13 @@ export default function CommercialPlatePage() {
           <section className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase text-red-400">KOTSA</p>
+                <p className="text-xs font-black text-amber-300">영업넘버</p>
                 <h2 className="mt-1 text-2xl font-black text-white">
-                  사업용 차량 정보
+                  영업넘버 정보
                 </h2>
               </div>
               <span className="rounded-md border border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-300">
-                24시간 캐시
+                24시간 보관
               </span>
             </div>
 
@@ -331,10 +316,8 @@ export default function CommercialPlatePage() {
             </dl>
 
             {ruleInsights.length ? (
-              <section className="mt-5 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                <p className="text-xs font-black uppercase text-red-400">
-                  Rule Insight
-                </p>
+              <section className="mt-5 rounded-lg border border-amber-400/20 bg-zinc-900 p-4">
+                <p className="text-xs font-black text-amber-300">규칙 기반 해석</p>
                 <h3 className="mt-1 text-lg font-black text-white">
                   영업넘버 해석
                 </h3>

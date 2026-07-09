@@ -5,14 +5,18 @@ import { cn } from "@/utils/cn";
 
 interface KotsaLoginRequiredModalProps {
   isOpen: boolean;
+  message?: string;
   onClose: () => void;
   redirectTo?: string;
+  title?: string;
 }
 
 export function KotsaLoginRequiredModal({
   isOpen,
+  message = "영업넘버 확인은 로그인 후 사용할 수 있습니다.",
   onClose,
   redirectTo = "/lookup",
+  title = "회원 전용 확인",
 }: KotsaLoginRequiredModalProps) {
   if (!isOpen) {
     return null;
@@ -23,9 +27,9 @@ export function KotsaLoginRequiredModal({
       <section className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-white shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-lg font-black">회원 전용 조회</p>
+            <p className="text-lg font-black">{title}</p>
             <p className="mt-1 text-sm leading-6 text-zinc-400">
-              KOTSA 차량 이력 조회는 로그인 후 사용할 수 있습니다.
+              {message}
             </p>
           </div>
           <button

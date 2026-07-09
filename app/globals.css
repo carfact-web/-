@@ -123,6 +123,90 @@ body {
   background: #f6f7f8;
 }
 
+.commercial-plate-input-frame {
+  position: relative;
+  isolation: isolate;
+  padding: 3px;
+  border: 2px solid #4a3100;
+  border-radius: 14px;
+  background: #ffe08a;
+  box-shadow:
+    0 0 0 3px #151006,
+    0 10px 18px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(245, 158, 11, 0.34),
+    inset 0 -1px 0 rgba(74, 49, 0, 0.28);
+}
+
+.commercial-plate-input-frame::before,
+.commercial-plate-input-frame::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(74, 49, 0, 0.14);
+  border-radius: 999px;
+  background: #fff5c2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transform: translateY(-50%);
+}
+
+.commercial-plate-input-frame::before {
+  left: 14px;
+}
+
+.commercial-plate-input-frame::after {
+  right: 14px;
+}
+
+.commercial-plate-input-frame:has(.commercial-plate-number-input:focus) {
+  box-shadow:
+    0 0 0 3px #151006,
+    0 12px 22px rgba(0, 0, 0, 0.36),
+    0 0 0 2px rgba(245, 158, 11, 0.48),
+    inset 0 -1px 0 rgba(74, 49, 0, 0.28);
+}
+
+.commercial-plate-number-input {
+  width: 100%;
+  height: 60px;
+  border: 3px solid #4a3100;
+  border-radius: 9px;
+  outline: none;
+  background: #fff7d6;
+  color: #231800;
+  box-shadow: inset 0 1px 2px rgba(74, 49, 0, 0.12);
+  padding: 0 56px;
+  text-align: center;
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", Arial, Helvetica, sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 2px;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8),
+    0 2px 3px rgba(74, 49, 0, 0.14);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.commercial-plate-number-input::placeholder {
+  color: rgba(111, 78, 10, 0.48);
+  font-weight: 800;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8),
+    0 2px 4px rgba(74, 49, 0, 0.12);
+}
+
+.commercial-plate-number-input:focus {
+  border-color: #a16207;
+  background: #fff9df;
+}
+
 @media (min-width: 640px) {
   .plate-input-frame {
     padding: 3px;
@@ -144,6 +228,33 @@ body {
   }
 
   .plate-number-input {
+    height: 70px;
+    border-radius: 10px;
+    padding: 0 76px;
+    font-size: 42px;
+    letter-spacing: 2.5px;
+  }
+
+  .commercial-plate-input-frame {
+    padding: 3px;
+    border-radius: 16px;
+  }
+
+  .commercial-plate-input-frame::before,
+  .commercial-plate-input-frame::after {
+    width: 11px;
+    height: 11px;
+  }
+
+  .commercial-plate-input-frame::before {
+    left: 18px;
+  }
+
+  .commercial-plate-input-frame::after {
+    right: 18px;
+  }
+
+  .commercial-plate-number-input {
     height: 70px;
     border-radius: 10px;
     padding: 0 76px;
