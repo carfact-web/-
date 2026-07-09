@@ -1,5 +1,5 @@
 const compactVehicleNumber = (vehicleNumber: string) =>
-  vehicleNumber.trim().replace(/\s+/g, "").toUpperCase();
+  vehicleNumber.trim().normalize("NFC").replace(/\s+/g, "").toUpperCase();
 
 const vehicleNumberPatterns = [
   /^[0-9]{2,3}[가-힣][0-9]{4}$/,

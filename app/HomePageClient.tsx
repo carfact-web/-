@@ -1215,6 +1215,9 @@ export default function Home() {
           >
             차량 이야기 보기
           </button>
+          <p className="mt-3 text-xs leading-5 text-zinc-500">
+            영업용 번호판 확인은 별도 탭에서 이용할 수 있습니다.
+          </p>
         </form>
 
         {trafficRankings &&

@@ -35,8 +35,6 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const endpoint = "/api/kotsa/vehicle-history";
-
 const jsonError = (message: string, status: number) =>
   NextResponse.json({ ok: false, error: message }, { status });
 
@@ -54,6 +52,7 @@ const createSuccessPayload = (
 });
 
 export async function POST(request: NextRequest) {
+  const endpoint = request.nextUrl.pathname;
   const requestId = randomUUID();
   const startedAt = Date.now();
   const requestIp = getClientIpFromRequest(request);

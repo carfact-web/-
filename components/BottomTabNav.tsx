@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
 
-type TabIconName = "home" | "recent" | "community" | "my" | "admin";
+type TabIconName = "home" | "recent" | "commercial" | "community" | "my" | "admin";
 
 const navClassName = cn(
   "fixed inset-x-0 bottom-0 z-50 w-screen overflow-hidden border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-xl"
@@ -30,6 +30,7 @@ const tabs: {
 }[] = [
   { href: "/", label: "홈", icon: "home", matchPrefix: false },
   { href: "/recent", label: "최근조회", icon: "recent", matchPrefix: true },
+  { href: "/commercial-plate", label: "영업넘버", icon: "commercial", matchPrefix: true },
   { href: "/community", label: "커뮤니티", icon: "community", matchPrefix: true },
   { href: "/my", label: "내 계정", icon: "my", matchPrefix: true },
 ];
@@ -95,6 +96,29 @@ function TabIcon({ icon }: { icon: TabIconName }) {
     );
   }
 
+  if (icon === "commercial") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
+        <path
+          d="M5 7.5h14a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M7 17v2M17 17v2M7.5 12.2h3M13.5 12.2h3"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
   if (icon === "admin") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
@@ -149,10 +173,10 @@ export function BottomTabNav() {
   return (
     <nav className={navClassName} aria-label="하단 탐색">
       <div
-        className={cn(
-          navInnerClassName,
-          isAdmin ? "grid-cols-5" : "grid-cols-4"
-        )}
+        className={navInnerClassName}
+        style={{
+          gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))`,
+        }}
       >
         {visibleTabs.map((tab) => (
           <Link

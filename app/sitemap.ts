@@ -16,6 +16,11 @@ const staticRoutes: MetadataRoute.Sitemap = [
     priority: 0.7,
   },
   {
+    url: getCanonicalUrl("/commercial-plate"),
+    changeFrequency: "weekly",
+    priority: 0.6,
+  },
+  {
     url: getCanonicalUrl("/community"),
     changeFrequency: "daily",
     priority: 0.8,
