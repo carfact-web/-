@@ -22,7 +22,7 @@ const inputClassName = cn(
 );
 const primaryButtonClassName = cn(
   "mt-3 w-full rounded-lg px-4 py-4 text-base font-bold text-white transition",
-  "bg-amber-500 text-zinc-950 hover:bg-amber-400 active:scale-[0.99]",
+  "bg-[#FFD400] text-zinc-950 shadow-lg shadow-yellow-950/30 hover:bg-[#FFE15C] active:scale-[0.99]",
   "disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:hover:bg-[#3A3A3A] disabled:active:scale-100",
 );
 const formMessageClassName = cn(
@@ -241,6 +241,19 @@ export default function CommercialPlatePage() {
         </div>
 
         <form className={panelClassName} onSubmit={lookupCommercialPlate}>
+          <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/10 p-4">
+            <p className="text-sm leading-6 text-zinc-200">
+              영업넘버 확인은 택시·화물·렌터카 등 영업용 번호판 차량의 운행
+              여부와 기본 이력을 확인하는 기능입니다. 영업용 번호판 거래, 임대,
+              운송계약 과정에서 발생할 수 있는 허위번호·말소차량·용도불일치
+              피해를 줄이기 위한 참고용 정보입니다.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              카팩트는 차량 거래 과정에서 판매자만 알고 있는 정보를 줄이고,
+              사용자가 직접 확인 가능한 차량 정보를 늘리는 것을 목표로 합니다.
+            </p>
+          </div>
+
           <div className="commercial-plate-input-frame">
             <input
               value={plateNumber}
@@ -261,6 +274,10 @@ export default function CommercialPlatePage() {
             예) 경기70바1234
             <br />
             지역명이 있는 번호판은 반드시 지역명까지 입력해주세요.
+          </p>
+          <p className="mt-3 px-1 text-xs leading-5 text-zinc-500">
+            조회 결과는 차량 확인 목적의 참고 정보이며, 타인의 권리 침해, 무단
+            수집, 영업 방해 목적으로 사용할 수 없습니다.
           </p>
 
           {showValidationError && (

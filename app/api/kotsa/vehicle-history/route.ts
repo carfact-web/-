@@ -21,7 +21,10 @@ import {
   getKotsaMaintenanceMode,
   isKotsaEmergencyStopped,
 } from "@/lib/server/kotsa/securityMonitor";
-import { resolveKotsaAuthenticatedUser } from "@/lib/server/kotsa/supabaseAdmin";
+import {
+  getSupabaseAdminClients,
+  resolveKotsaAuthenticatedUser,
+} from "@/lib/server/kotsa/supabaseAdmin";
 import {
   maskVehicleNumber,
   normalizeVehicleNumber,
@@ -51,7 +54,117 @@ const createSuccessPayload = (
   requestId,
 });
 
-export async function POST(request: NextRequest) {
+interface HandleKotsaVehicleHistoryOptions {
+  commercialPlateQuota?: boolean;
+}
+
+const commercialPlateQuotaLimit = 5;
+const commercialPlateQuotaWindowMs = 24 * 60 * 60 * 1000;
+const commercialPlateQuotaExceededMessage =
+  "24시간 조회 가능 횟수를 초과했습니다.\n동일 번호 재조회는 가능하며, 신규 번호 조회는 24시간 후 다시 이용해주세요.";
+
+const checkCommercialPlateRollingQuota = async ({
+  endpoint,
+  tier,
+  userId,
+  vehicleNumberHash,
+}: {
+  endpoint: string;
+  tier: string;
+  userId: string;
+  vehicleNumberHash: string;
+}) => {
+  if (tier === "admin") {
+    return {
+      allowed: true,
+      limit: null,
+      remaining: null,
+      sameVehicleWithinWindow: false,
+      used: 0,
+    };
+  }
+
+  const since = new Date(Date.now() - commercialPlateQuotaWindowMs).toISOString();
+  const clients = getSupabaseAdminClients();
+
+  if (!clients) {
+    return {
+      allowed: false,
+      limit: commercialPlateQuotaLimit,
+      remaining: 0,
+      sameVehicleWithinWindow: false,
+      used: 0,
+    };
+  }
+
+  const { data: sameVehicleRows, error: sameVehicleError } = await clients.admin
+    .from("kotsa_api_audit_logs")
+    .select("id")
+    .eq("endpoint", endpoint)
+    .eq("user_id", userId)
+    .eq("vehicle_number_hash", vehicleNumberHash)
+    .gte("created_at", since)
+    .in("status", ["success", "cache_hit"])
+    .limit(1);
+
+  if (sameVehicleError) {
+    return {
+      allowed: false,
+      limit: commercialPlateQuotaLimit,
+      remaining: 0,
+      sameVehicleWithinWindow: false,
+      used: 0,
+    };
+  }
+
+  if (sameVehicleRows?.length) {
+    return {
+      allowed: true,
+      limit: commercialPlateQuotaLimit,
+      remaining: null,
+      sameVehicleWithinWindow: true,
+      used: null,
+    };
+  }
+
+  const { data, error } = await clients.admin
+    .from("kotsa_api_audit_logs")
+    .select("vehicle_number_hash")
+    .eq("endpoint", endpoint)
+    .eq("user_id", userId)
+    .eq("counted_against_quota", true)
+    .gte("created_at", since);
+
+  if (error) {
+    return {
+      allowed: false,
+      limit: commercialPlateQuotaLimit,
+      remaining: 0,
+      sameVehicleWithinWindow: false,
+      used: 0,
+    };
+  }
+
+  const used = new Set(
+    (data ?? [])
+      .map((row) => row.vehicle_number_hash)
+      .filter((value): value is string => typeof value === "string" && value.length > 0),
+  ).size;
+  const remaining = Math.max(commercialPlateQuotaLimit - used, 0);
+
+  return {
+    allowed: remaining > 0,
+    limit: commercialPlateQuotaLimit,
+    remaining,
+    sameVehicleWithinWindow: false,
+    used,
+  };
+};
+
+export async function handleKotsaVehicleHistoryRequest(
+  request: NextRequest,
+  options: HandleKotsaVehicleHistoryOptions = {},
+) {
   const endpoint = request.nextUrl.pathname;
   const requestId = randomUUID();
   const startedAt = Date.now();
@@ -318,47 +431,97 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const quota = await checkKotsaDailyQuota({
-      requestIp,
-      tier: userTier,
-      userId: authResult.userId,
-    });
+    let countedAgainstQuota = true;
 
-    if (!quota.allowed) {
-      await writeKotsaAuditLog({
+    if (options.commercialPlateQuota && vehicleNumberHash) {
+      const quota = await checkCommercialPlateRollingQuota({
         endpoint,
-        errorMessage: "KOTSA daily quota exceeded.",
-        requestIp,
-        requestId,
-        responseTimeMs: Date.now() - startedAt,
-        status: "rate_limited",
-        userAgent,
+        tier: userTier,
         userId: authResult.userId,
-        userTier,
         vehicleNumberHash,
-        vehicleNumberMasked,
       });
-      await evaluateKotsaSecuritySignals({
-        endpoint,
-        requestId,
+
+      countedAgainstQuota = !quota.sameVehicleWithinWindow;
+
+      if (!quota.allowed) {
+        await writeKotsaAuditLog({
+          endpoint,
+          errorMessage: "Commercial plate rolling quota exceeded.",
+          requestIp,
+          requestId,
+          responseTimeMs: Date.now() - startedAt,
+          status: "rate_limited",
+          userAgent,
+          userId: authResult.userId,
+          userTier,
+          vehicleNumberHash,
+          vehicleNumberMasked,
+        });
+        await evaluateKotsaSecuritySignals({
+          endpoint,
+          requestId,
+          requestIp,
+          status: "rate_limited",
+          statusCode: 429,
+          userId: authResult.userId,
+        });
+
+        const response = NextResponse.json(
+          {
+            ok: false,
+            code: "COMMERCIAL_PLATE_LIMIT_EXCEEDED",
+            error: commercialPlateQuotaExceededMessage,
+            quota,
+            requestId,
+          },
+          { status: 429 },
+        );
+        response.headers.set("x-request-id", requestId);
+        return response;
+      }
+    } else {
+      const quota = await checkKotsaDailyQuota({
         requestIp,
-        status: "rate_limited",
-        statusCode: 429,
+        tier: userTier,
         userId: authResult.userId,
       });
 
-      const response = NextResponse.json(
-        {
-          ok: false,
-          code: "KOTSA_DAILY_LIMIT_EXCEEDED",
-          error: "오늘 조회 가능 횟수를 모두 사용했습니다.",
-          quota,
+      if (!quota.allowed) {
+        await writeKotsaAuditLog({
+          endpoint,
+          errorMessage: "KOTSA daily quota exceeded.",
+          requestIp,
           requestId,
-        },
-        { status: 429 },
-      );
-      response.headers.set("x-request-id", requestId);
-      return response;
+          responseTimeMs: Date.now() - startedAt,
+          status: "rate_limited",
+          userAgent,
+          userId: authResult.userId,
+          userTier,
+          vehicleNumberHash,
+          vehicleNumberMasked,
+        });
+        await evaluateKotsaSecuritySignals({
+          endpoint,
+          requestId,
+          requestIp,
+          status: "rate_limited",
+          statusCode: 429,
+          userId: authResult.userId,
+        });
+
+        const response = NextResponse.json(
+          {
+            ok: false,
+            code: "KOTSA_DAILY_LIMIT_EXCEEDED",
+            error: "오늘 조회 가능 횟수를 모두 사용했습니다.",
+            quota,
+            requestId,
+          },
+          { status: 429 },
+        );
+        response.headers.set("x-request-id", requestId);
+        return response;
+      }
     }
 
     const result = await fetchKotsaVehicleHistory({ vehicleNumber });
@@ -372,7 +535,7 @@ export async function POST(request: NextRequest) {
       responseCode: result.responseCode,
       responseTimeMs: Date.now() - startedAt,
       status: "success",
-      countedAgainstQuota: true,
+      countedAgainstQuota,
       userAgent,
       userId: authResult.userId,
       userTier,
@@ -463,4 +626,8 @@ export async function POST(request: NextRequest) {
 
     return response;
   }
+}
+
+export async function POST(request: NextRequest) {
+  return handleKotsaVehicleHistoryRequest(request);
 }
