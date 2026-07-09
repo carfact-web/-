@@ -235,22 +235,36 @@ export default function CommercialPlatePage() {
       <div className={shellClassName}>
         <div className="mb-6">
           <h1 className="text-3xl font-black text-white">영업넘버 확인</h1>
+          <span className="mt-3 inline-flex rounded-full bg-[#FFD400] px-3 py-1 text-xs font-black text-[#241700] shadow-sm shadow-yellow-950/30">
+            🟡 국토교통부 사업용 차량 정보
+          </span>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
             영업용 번호판을 직접 입력하면 운행 여부와 기본 이력을 확인합니다.
           </p>
         </div>
 
         <form className={panelClassName} onSubmit={lookupCommercialPlate}>
-          <div className="mb-5 rounded-lg border border-amber-400/20 bg-amber-400/10 p-4">
-            <p className="text-sm leading-6 text-zinc-200">
-              영업넘버 확인은 택시·화물·렌터카 등 영업용 번호판 차량의 운행
-              여부와 기본 이력을 확인하는 기능입니다. 영업용 번호판 거래, 임대,
-              운송계약 과정에서 발생할 수 있는 허위번호·말소차량·용도불일치
-              피해를 줄이기 위한 참고용 정보입니다.
+          <div className="mb-5 rounded-lg border border-amber-400/25 bg-amber-400/10 p-4 text-sm leading-7 text-zinc-200">
+            <p className="font-black text-amber-200">📌 영업넘버 확인이란?</p>
+            <p className="mt-2">
+              택시, 화물, 렌터카 등 영업용 번호판 차량의 운행 여부와 기본 이력을
+              확인하는 기능입니다.
             </p>
-            <p className="mt-3 text-sm leading-6 text-zinc-300">
-              카팩트는 차량 거래 과정에서 판매자만 알고 있는 정보를 줄이고,
-              사용자가 직접 확인 가능한 차량 정보를 늘리는 것을 목표로 합니다.
+
+            <p className="mt-4 font-black text-amber-200">
+              ✔ 이런 경우 활용하세요.
+            </p>
+            <ul className="mt-2 space-y-1 text-zinc-300">
+              <li>• 허위 영업번호 확인</li>
+              <li>• 말소 차량 여부 확인</li>
+              <li>• 용도 불일치 차량 확인</li>
+              <li>• 실제 운행 중인 영업차량 여부 확인</li>
+            </ul>
+
+            <p className="mt-4 font-black text-amber-200">💡 카팩트는</p>
+            <p className="mt-2 text-zinc-300">
+              판매자만 알고 있는 정보를 줄이고, 사용자가 직접 확인 가능한 차량
+              정보를 늘려 차량 거래의 정보 비대칭을 줄이는 것을 목표로 합니다.
             </p>
           </div>
 
@@ -270,15 +284,23 @@ export default function CommercialPlatePage() {
             />
           </div>
 
-          <p className="mt-2 px-1 text-xs leading-5 text-zinc-500">
-            예) 경기70바1234
-            <br />
-            지역명이 있는 번호판은 반드시 지역명까지 입력해주세요.
-          </p>
-          <p className="mt-3 px-1 text-xs leading-5 text-zinc-500">
-            조회 결과는 차량 확인 목적의 참고 정보이며, 타인의 권리 침해, 무단
-            수집, 영업 방해 목적으로 사용할 수 없습니다.
-          </p>
+          <div className="mt-3 space-y-3 px-1 text-sm leading-6 text-zinc-400">
+            <p>
+              예) 경기70바1234
+              <br />
+              지역명이 있는 번호판은 반드시 지역명까지 입력해주세요.
+            </p>
+            <p>
+              하루 최대 5개의 새로운 영업번호를 조회할 수 있습니다.
+              <br />
+              동일 번호 재조회는 24시간 동안 조회 횟수에 포함되지 않습니다.
+            </p>
+            <p>
+              조회 결과는 차량 확인 목적의 참고 정보이며, 타인의 권리 침해, 무단
+              수집, 영업 방해 목적으로 사용할 수 없습니다.
+            </p>
+            <p>※ 영업용 차량이 아닌 일반 자가용 차량은 조회되지 않습니다.</p>
+          </div>
 
           {showValidationError && (
             <p
