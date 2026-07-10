@@ -882,7 +882,7 @@ const tableHeadCellClassName = cn(
   "whitespace-nowrap px-3 py-2 text-left text-[11px] font-black uppercase tracking-[0.08em] text-zinc-400",
 );
 const tableCellClassName = cn("px-3 py-3 align-top text-zinc-700");
-const tableActionCellClassName = cn(tableCellClassName, "min-w-[24rem] text-right");
+const tableActionCellClassName = cn(tableCellClassName, "min-w-[28rem] text-right");
 const desktopActionGroupClassName = cn("flex flex-nowrap justify-end gap-1.5");
 const mobileListClassName = cn("divide-y divide-zinc-100 md:hidden");
 const mobileCardClassName = cn(
@@ -2600,6 +2600,9 @@ export default function AdminPage() {
   >(null);
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [expandedUserIdRows, setExpandedUserIdRows] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
@@ -3457,6 +3460,20 @@ export default function AdminPage() {
   const refreshCurrentTab = async () => {
     await loadAdminData();
   };
+
+  const toggleExpandedUserIdRow = useCallback((userId: string) => {
+    setExpandedUserIdRows((current) => {
+      const next = new Set(current);
+
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+
+      return next;
+    });
+  }, []);
 
   const updateKotsaPolicyLimit = async (
     policy: AdminKotsaPolicy,
@@ -6203,9 +6220,9 @@ export default function AdminPage() {
                   <th className={tableHeadCellClassName}>변경권</th>
                   <th className={tableHeadCellClassName}>Role</th>
                   <th className={tableHeadCellClassName}>인증딜러</th>
-                  <th className={cn(tableHeadCellClassName, "min-w-16")}>상태</th>
-                  <th className={cn(tableHeadCellClassName, "min-w-36")}>가입일</th>
-                  <th className={cn(tableHeadCellClassName, "min-w-36")}>최근 로그인</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-20")}>상태</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-40")}>가입일</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-40")}>최근 로그인</th>
                   <th className={cn(tableHeadCellClassName, "text-right")}>
                     관리
                   </th>
@@ -6213,28 +6230,42 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-zinc-200">
                 {users.length ? (
-                  users.map((account) => (
+                  users.map((account) => {
+                    const isUserIdExpanded = expandedUserIdRows.has(account.id);
+
+                    return (
                     <tr key={account.id}>
                       <td className={tableCellClassName}>
-                        <div className="min-w-32">
-                          <button
-                            type="button"
-                            className="inline-flex max-w-56 items-center gap-1.5 truncate text-left"
-                            onClick={() => setSelectedUserId(account.id)}
-                          >
-                            <VerifiedNickname
-                              isVerifiedDealer={account.is_verified_dealer}
+                        <div className="min-w-32 max-w-52">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <button
+                              type="button"
+                              className="min-w-0 truncate text-left"
+                              onClick={() => setSelectedUserId(account.id)}
                             >
-                              {(account.nickname ?? "닉네임 없음") +
-                                " (" +
-                                formatCompactId(account.id, 8) +
-                                ")"}
-                            </VerifiedNickname>
-                          </button>
+                              <VerifiedNickname
+                                isVerifiedDealer={account.is_verified_dealer}
+                              >
+                                {account.nickname ?? "닉네임 없음"}
+                              </VerifiedNickname>
+                            </button>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-black text-zinc-500 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                              onClick={() => toggleExpandedUserIdRow(account.id)}
+                            >
+                              {isUserIdExpanded ? "ID 숨김" : "ID"}
+                            </button>
+                          </div>
+                          {isUserIdExpanded ? (
+                            <p className="mt-1 max-w-52 truncate font-mono text-[11px] font-semibold text-zinc-500">
+                              {account.id}
+                            </p>
+                          ) : null}
                         </div>
                       </td>
                       <td className={tableCellClassName}>
-                        <div className="min-w-48 max-w-64">
+                        <div className="min-w-44 max-w-60">
                           <div className="flex items-center gap-2">
                             <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
                               {formatProviderLabel(account.login_provider)}
@@ -6276,20 +6307,21 @@ export default function AdminPage() {
                               : "OFF"}
                         </span>
                       </td>
-                      <td className={cn(tableCellClassName, "whitespace-nowrap")}>
+                      <td className={cn(tableCellClassName, "min-w-20 whitespace-nowrap")}>
                         <AccountStatusBadge
                           isSuspended={account.is_suspended}
                         />
                       </td>
-                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
+                      <td className={cn(tableCellClassName, "min-w-40 whitespace-nowrap text-xs")}>
                         {formatDate(account.created_at)}
                       </td>
-                      <td className={cn(tableCellClassName, "whitespace-nowrap text-xs")}>
+                      <td className={cn(tableCellClassName, "min-w-40 whitespace-nowrap text-xs")}>
                         {formatOptionalDate(account.last_sign_in_at)}
                       </td>
                       <td className={tableActionCellClassName}>
                         <div className={desktopActionGroupClassName}>
                           <UserActionButtons
+                            variant="inline"
                             account={account}
                             isSuperAdmin={isSuperAdmin}
                             isVerifiedDealerFeatureReady={
@@ -6314,7 +6346,8 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 ) : (
                   <EmptyTableRow colSpan={10} message="회원이 없습니다." />
                 )}
@@ -12859,6 +12892,7 @@ function UserActionButtons({
   onSetRole,
   onSetSuspended,
   onSetVerifiedDealer,
+  variant = "menu",
 }: {
   account: AdminUserProfile;
   isSuperAdmin: boolean;
@@ -12868,9 +12902,10 @@ function UserActionButtons({
   onSetRole: (account: AdminUserProfile, nextRole: "user" | "admin") => void;
   onSetSuspended: (account: AdminUserProfile) => void;
   onSetVerifiedDealer: (account: AdminUserProfile) => void;
+  variant?: "inline" | "menu";
 }) {
-  return (
-    <ActionMenu>
+  const buttons = (
+    <>
       <button
         type="button"
         className={actionButtonClassName}
@@ -12897,14 +12932,14 @@ function UserActionButtons({
         className={actionButtonClassName}
         onClick={() => onGrantNicknameChangeTicket(account)}
       >
-        닉네임 변경
+        닉네임
       </button>
       <button
         type="button"
         className={actionButtonClassName}
         onClick={() => onResetKotsaQuota(account)}
       >
-        KOTSA 초기화
+        KOTSA
       </button>
       <button
         type="button"
@@ -12912,7 +12947,7 @@ function UserActionButtons({
         disabled={!isSuperAdmin || account.role !== "user"}
         onClick={() => onSetRole(account, "admin")}
       >
-        관리자 부여
+        관리자
       </button>
       <button
         type="button"
@@ -12920,8 +12955,18 @@ function UserActionButtons({
         disabled={!isSuperAdmin || account.role !== "admin"}
         onClick={() => onSetRole(account, "user")}
       >
-        관리자 회수
+        회수
       </button>
+    </>
+  );
+
+  if (variant === "inline") {
+    return <div className="flex flex-nowrap justify-end gap-1.5">{buttons}</div>;
+  }
+
+  return (
+    <ActionMenu>
+      {buttons}
     </ActionMenu>
   );
 }
