@@ -5899,7 +5899,6 @@ export default function AdminPage() {
             <div className={mobileListClassName}>
               {paginatedReviews.length ? (
                 paginatedReviews.map((review) => {
-                  const reviewDetailHref = getReviewDetailHref(review);
                   return (
                   <article className={mobileCardClassName} key={review.id}>
                     <div className="min-w-0">
@@ -5922,21 +5921,16 @@ export default function AdminPage() {
                           <p className={mobileCardMetaClassName}>
                             {getReviewVehicleModel(review)}
                           </p>
-                          {reviewDetailHref ? (
-                            <Link
-                              href={reviewDetailHref}
-                              className={cn(
-                                mobileCardTitleClassName,
-                                "mt-1 block hover:text-blue-700",
-                              )}
-                            >
-                              {review.content}
-                            </Link>
-                          ) : (
-                            <p className={cn(mobileCardTitleClassName, "mt-1")}>
-                              {review.content}
-                            </p>
-                          )}
+                          <button
+                            type="button"
+                            className={cn(
+                              mobileCardTitleClassName,
+                              "mt-1 block text-left hover:text-blue-700",
+                            )}
+                            onClick={() => setSelectedReviewId(review.id)}
+                          >
+                            {review.content}
+                          </button>
                           <p className={mobileCardMetaClassName}>
                             {review.author_nickname ??
                               (review.author_id
@@ -6008,7 +6002,6 @@ export default function AdminPage() {
               <tbody className="divide-y divide-zinc-200">
                 {paginatedReviews.length ? (
                   paginatedReviews.map((review) => {
-                    const reviewDetailHref = getReviewDetailHref(review);
                     return (
                     <tr key={review.id}>
                       <td className={tableCellClassName}>
@@ -6033,18 +6026,13 @@ export default function AdminPage() {
                         </p>
                       </td>
                       <td className={tableCellClassName}>
-                        {reviewDetailHref ? (
-                          <Link
-                            href={reviewDetailHref}
-                            className="block max-w-[30rem] truncate text-sm leading-5 text-zinc-950 hover:text-blue-700"
-                          >
-                            {review.content}
-                          </Link>
-                        ) : (
-                          <p className="max-w-[30rem] truncate text-sm leading-5 text-zinc-950">
-                            {review.content}
-                          </p>
-                        )}
+                        <button
+                          type="button"
+                          className="block max-w-[30rem] truncate text-left text-sm leading-5 text-zinc-950 hover:text-blue-700"
+                          onClick={() => setSelectedReviewId(review.id)}
+                        >
+                          {review.content}
+                        </button>
                       </td>
                       <td className={tableCellClassName}>
                         <span className="block max-w-32 truncate text-sm">
@@ -6066,6 +6054,7 @@ export default function AdminPage() {
                       <td className={cn(tableCellClassName, "min-w-36 text-right")}>
                         <div className={desktopActionGroupClassName}>
                           <ReviewActionButtons
+                            variant="inline"
                             isSuperAdmin={isSuperAdmin}
                             review={review}
                             onDelete={(target) => void deleteReview(target)}
@@ -12855,14 +12844,16 @@ function ReviewActionButtons({
   onDelete,
   onToggleHidden,
   review,
+  variant = "menu",
 }: {
   isSuperAdmin: boolean;
   onDelete: (review: AdminReview) => void;
   onToggleHidden: (review: AdminReview) => void;
   review: AdminReview;
+  variant?: "inline" | "menu";
 }) {
-  return (
-    <ActionMenu>
+  const buttons = (
+    <>
       <button
         type="button"
         className={actionButtonClassName}
@@ -12879,6 +12870,16 @@ function ReviewActionButtons({
           영구삭제
         </button>
       ) : null}
+    </>
+  );
+
+  if (variant === "inline") {
+    return <div className="flex flex-nowrap justify-end gap-1.5">{buttons}</div>;
+  }
+
+  return (
+    <ActionMenu>
+      {buttons}
     </ActionMenu>
   );
 }
