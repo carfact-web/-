@@ -29,7 +29,6 @@ const sectionTitleClassName = cn(
 const overviewClassName = cn(
   "text-sm font-semibold leading-6 text-zinc-300 sm:text-[15px]",
 );
-const keywordListClassName = cn("flex flex-wrap gap-2");
 const keywordTagClassName = cn(
   "rounded-full border border-[rgba(150,220,255,0.25)] bg-[rgba(150,220,255,0.10)] px-3 py-1.5 text-sm font-black text-[#b9e8ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
 );
@@ -42,11 +41,7 @@ const compactPlateFrameClassName = cn(
 const compactPlateNumberClassName = cn(
   "plate-number-input flex items-center justify-center whitespace-nowrap",
 );
-const maintenancePillListClassName = cn("flex flex-wrap gap-2");
-const maintenancePillClassName = cn(
-  "rounded-full border border-white/[0.12] bg-zinc-950 px-3 py-1.5 text-xs font-black text-zinc-200 transition hover:border-red-400/70 hover:bg-red-500/12 hover:text-red-100 sm:text-sm",
-);
-const maxMaintenancePillCount = 12;
+const maxOverviewKeywordCount = 3;
 
 const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
   const subject = analysis.vehicle.generation || analysis.vehicle.modelName;
@@ -56,22 +51,6 @@ const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
 
 const getFocusedReviewKeywordLabels = (keywords: ReviewKeywordStat[]) =>
   keywords.slice(0, 3).map((keyword) => keyword.label);
-
-const normalizeMaintenancePillLabel = (label: string) =>
-  label.replace(/\s*점검$/, "").trim();
-
-const getMaintenancePillLabels = (analysis: StructuredAiSummary) => {
-  const labels = analysis.maintenanceIssues.flatMap((issue) =>
-    issue.replacementParts.length > 0
-      ? issue.replacementParts
-      : [normalizeMaintenancePillLabel(issue.title)],
-  );
-  const uniqueLabels = Array.from(
-    new Set(labels.map(normalizeMaintenancePillLabel).filter(Boolean)),
-  );
-
-  return uniqueLabels.slice(0, maxMaintenancePillCount);
-};
 
 const getAnalysisLabel = (analysis: StructuredAiSummary) => {
   const analysisSubject = formatAnalysisSubject(analysis);
@@ -93,14 +72,24 @@ const getFocusedReviewMessage = (keywordLabels: string[]) => {
   return "이 차량에서는 " + keywordLabels.join(", ") + " 관련 언급이 확인되었습니다.";
 };
 
-const getOverviewMessage = (keywords: ReviewKeywordStat[]) => {
-  if (keywords.length === 0) {
-    return "현재 해당 차종은 반복적으로 언급되는 이슈가 아직 없습니다. 😉";
+const getOverviewMessage = (subject: string, keywords: ReviewKeywordStat[]) => {
+  const keywordLabels = keywords
+    .slice(0, maxOverviewKeywordCount)
+    .map((keyword) => "#" + keyword.label);
+
+  if (keywordLabels.length === 0) {
+    return (
+      subject +
+      "는 현재 등록된 후기 기준으로 반복적으로 언급되는 주요 이슈가 아직 없습니다."
+    );
   }
 
-  const keywordLabels = keywords.map((keyword) => "#" + keyword.label).join(" ");
-
-  return "해당 차종은 " + keywordLabels + " 키워드가 주로 언급되고 있네요 🔎";
+  return (
+    subject +
+    "는 " +
+    keywordLabels.join(" ") +
+    " 키워드가 주로 언급되고 있습니다."
+  );
 };
 
 export function AiSummaryCard({
@@ -131,11 +120,14 @@ export function AiSummaryCard({
 
   const focusedReviewKeywordLabels =
     getFocusedReviewKeywordLabels(focusedReviewKeywords);
-  const maintenancePillLabels = getMaintenancePillLabels(analysis);
   const plateNumber = normalizeVehiclePlateNumber(
     analysis.vehicle.vehicleNumber ?? "",
   );
-  const overviewMessage = getOverviewMessage(analysis.reviewKeywords);
+  const analysisSubject = formatAnalysisSubject(analysis);
+  const overviewMessage = getOverviewMessage(
+    analysisSubject,
+    analysis.reviewKeywords,
+  );
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -149,25 +141,14 @@ export function AiSummaryCard({
       </div>
 
       <section className={sectionClassName}>
+        <h3 className={sectionTitleClassName}>차종 전체 요약</h3>
         <div className={overviewClassName}>
           <p>{overviewMessage}</p>
         </div>
       </section>
 
-      {analysis.reviewKeywords.length > 0 ? (
-        <section className={sectionClassName}>
-          <h3 className={sectionTitleClassName}>많이 언급된 키워드</h3>
-          <ul className={keywordListClassName}>
-            {analysis.reviewKeywords.map((keyword) => (
-              <li key={keyword.label} className={keywordTagClassName}>
-                {"#" + keyword.label}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       <section className={focusReviewCardClassName}>
+        <h3 className={sectionTitleClassName}>조회 차량번호 요약</h3>
         <div className={compactPlateFrameClassName}>
           <div
             className={compactPlateNumberClassName}
@@ -199,25 +180,6 @@ export function AiSummaryCard({
         <p className="mt-2 text-xs font-semibold leading-5 text-blue-100/70 sm:text-sm">
           자세한 내용은 아래 실제 후기를 확인해보세요.👇
         </p>
-      </section>
-
-      <section className="border-t border-zinc-800/80 pt-3">
-        <h3 className={sectionTitleClassName}>
-          차종 관련 참고하면 좋은 정비 항목
-        </h3>
-        {maintenancePillLabels.length > 0 ? (
-          <div className={maintenancePillListClassName}>
-            {maintenancePillLabels.map((label) => (
-              <span key={label} className={maintenancePillClassName}>
-                {"#" + label}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm leading-6 text-zinc-500">
-            자주 확인되는 정비 항목이 아직 없습니다.
-          </p>
-        )}
       </section>
     </section>
   );
