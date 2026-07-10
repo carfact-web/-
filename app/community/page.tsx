@@ -1153,9 +1153,9 @@ export default function CommunityPage() {
       range.deleteContents();
       const leadingBreak = document.createElement("br");
       const trailingBreak = document.createElement("br");
-      range.insertNode(trailingBreak);
-      range.insertNode(imageBlock);
-      range.insertNode(leadingBreak);
+      const imageFragment = document.createDocumentFragment();
+      imageFragment.append(leadingBreak, imageBlock, trailingBreak);
+      range.insertNode(imageFragment);
       range.setStartAfter(trailingBreak);
       range.collapse(true);
       selection.removeAllRanges();

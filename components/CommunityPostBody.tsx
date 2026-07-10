@@ -57,15 +57,17 @@ export function CommunityPostBody({
   className,
   content,
   images,
-  showUnplacedImages = true,
+  showUnplacedImages = false,
 }: CommunityPostBodyProps) {
   const blocks = parseCommunityRichContentBlocks(content, images);
+  const hasImagePlacementToken = /\[\[image:[^\]]+\]\]/.test(content);
   const placedImageIds = new Set(
     blocks
       .filter((block) => block.kind === "image")
       .map((block) => block.image.id),
   );
-  const unplacedImages = showUnplacedImages
+  const shouldShowUnplacedImages = showUnplacedImages || !hasImagePlacementToken;
+  const unplacedImages = shouldShowUnplacedImages
     ? images.filter((image) => !placedImageIds.has(image.id))
     : [];
 

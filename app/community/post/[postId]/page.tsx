@@ -8,6 +8,7 @@ import {
   createCommunityArticleJsonLd,
 } from "@/lib/structuredData";
 import { getCommunityCategoryLabel } from "@/lib/communityCategories";
+import { getCommunityPreviewText } from "@/utils/communityRichContent";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import CommunityPostDetailPageClient from "./CommunityPostDetailPageClient";
 
@@ -38,7 +39,10 @@ export async function generateMetadata({
   }
 
   const title = stripCommunityTextColorMarkup(post.title);
-  const description = getTextExcerpt(stripCommunityTextColorMarkup(post.content), 90);
+  const description = getTextExcerpt(
+    getCommunityPreviewText(stripCommunityTextColorMarkup(post.content)),
+    90,
+  );
 
   return createPageMetadata({
     description: description || "카팩트 커뮤니티 글과 댓글을 확인하세요.",
