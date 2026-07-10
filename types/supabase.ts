@@ -1137,9 +1137,12 @@ export interface Database {
           login_provider: string | null;
           email: string | null;
           provider_profile_name: string | null;
+          login_profile_name: string | null;
           provider_avatar_url: string | null;
           provider_user_id: string | null;
           last_sign_in_at: string | null;
+          review_count: number;
+          post_count: number;
           created_at: string;
           updated_at: string;
         }[];

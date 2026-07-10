@@ -671,9 +671,12 @@ interface AdminUserProfile {
   login_provider: string | null;
   email: string | null;
   provider_profile_name: string | null;
+  login_profile_name: string | null;
   provider_avatar_url: string | null;
   provider_user_id: string | null;
   last_sign_in_at: string | null;
+  review_count: number;
+  post_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -2944,8 +2947,10 @@ export default function AdminPage() {
       .filter((account) =>
         [
           account.nickname,
+          account.login_profile_name,
           account.email,
           account.provider_profile_name,
+          account.login_provider,
           account.id,
         ].some(matches),
       )
@@ -5953,6 +5958,10 @@ export default function AdminPage() {
                         {formatDate(account.created_at)}
                       </p>
                       <p className={mobileCardMetaClassName}>
+                        로그인 프로필명{" "}
+                        {getDisplayValue(account.login_profile_name)}
+                      </p>
+                      <p className={mobileCardMetaClassName}>
                         최근 로그인 {formatOptionalDate(account.last_sign_in_at)}
                       </p>
                       <div className={mobileCardSubMetaClassName}>
@@ -6007,6 +6016,7 @@ export default function AdminPage() {
                 <tr>
                   <th className={tableHeadCellClassName}>닉네임</th>
                   <th className={tableHeadCellClassName}>로그인 정보</th>
+                  <th className={tableHeadCellClassName}>로그인 프로필명</th>
                   <th className={tableHeadCellClassName}>변경권</th>
                   <th className={tableHeadCellClassName}>Role</th>
                   <th className={tableHeadCellClassName}>인증딜러</th>
@@ -6041,7 +6051,7 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className={tableCellClassName}>
-                        <div className="min-w-56 max-w-72">
+                        <div className="min-w-48 max-w-64">
                           <div className="flex items-center gap-2">
                             <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
                               {formatProviderLabel(account.login_provider)}
@@ -6050,6 +6060,11 @@ export default function AdminPage() {
                               {getDisplayValue(account.email)}
                             </span>
                           </div>
+                        </div>
+                      </td>
+                      <td className={tableCellClassName}>
+                        <div className="min-w-32 max-w-44 truncate text-sm font-semibold text-zinc-800">
+                          {getDisplayValue(account.login_profile_name)}
                         </div>
                       </td>
                       <td className={tableCellClassName}>
@@ -6118,7 +6133,7 @@ export default function AdminPage() {
                     </tr>
                   ))
                 ) : (
-                  <EmptyTableRow colSpan={9} message="회원이 없습니다." />
+                  <EmptyTableRow colSpan={10} message="회원이 없습니다." />
                 )}
               </tbody>
             </table>
@@ -7726,17 +7741,37 @@ export default function AdminPage() {
             onClose={() => setSelectedUserId(null)}
           >
             <div className="grid gap-3 text-sm text-zinc-700 sm:grid-cols-2">
+              <DetailField label="회원 UUID" value={selectedUser.id} />
+              <DetailField
+                label="닉네임"
+                value={getDisplayValue(selectedUser.nickname)}
+              />
               <DetailField label="이메일" value={getDisplayValue(selectedUser.email)} />
               <DetailField
-                label="로그인"
+                label="로그인 제공자"
                 value={formatProviderLabel(selectedUser.login_provider)}
+              />
+              <DetailField
+                label="로그인 프로필명"
+                value={getDisplayValue(selectedUser.login_profile_name)}
+              />
+              <DetailField
+                label="Provider UID"
+                value={getDisplayValue(selectedUser.provider_user_id)}
               />
               <DetailField label="가입일" value={formatDate(selectedUser.created_at)} />
               <DetailField
                 label="최근 로그인"
                 value={formatOptionalDate(selectedUser.last_sign_in_at)}
               />
-              <DetailField label="회원 ID" value={selectedUser.id} />
+              <DetailField
+                label="작성 후기 수"
+                value={selectedUser.review_count.toLocaleString()}
+              />
+              <DetailField
+                label="작성 게시글 수"
+                value={selectedUser.post_count.toLocaleString()}
+              />
               <div>
                 <p className="text-xs font-black text-zinc-400">상태</p>
                 <div className="mt-2 flex flex-wrap gap-2">
