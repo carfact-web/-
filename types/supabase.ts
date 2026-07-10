@@ -944,6 +944,22 @@ export interface Database {
           recent_view_count: number;
         }[];
       };
+      public_get_model_review_keyword_stats: {
+        Args: {
+          p_manufacturer: string;
+          p_model: string;
+          p_generation?: string;
+          p_fuel_type?: string;
+          p_keyword_definitions?: Json;
+          p_limit?: number;
+        };
+        Returns: {
+          keyword_label: string | null;
+          mention_count: number;
+          model_review_count: number;
+          percentage: number;
+        }[];
+      };
       public_list_ai_keyword_rules: {
         Args: Record<PropertyKey, never>;
         Returns: {

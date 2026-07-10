@@ -14,13 +14,19 @@ import { useReviews } from "@/hooks/useReviews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { fetchPublicAiKeywordRules } from "@/lib/aiKeywordRules";
 import { recordPageView } from "@/lib/pageViews";
-import { fetchSupabaseReviewsByVehicleModel } from "@/lib/supabaseData";
+import {
+  fetchSupabaseModelReviewKeywordStats,
+  fetchSupabaseReviewsByVehicleModel,
+} from "@/lib/supabaseData";
 import { fetchVehicleInspectionProfile } from "@/lib/vehicleInspectionProfiles";
 import type { VehicleInspectionProfile } from "@/data/vehicleInspectionData";
 import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
-import { getReviewKeywordStats } from "@/utils/reviewKeywordStats";
+import {
+  getReviewKeywordStats,
+  type ReviewKeywordStat,
+} from "@/utils/reviewKeywordStats";
 import { getVehicleModelKey } from "@/utils/vehicleModelKey";
 import {
   getHelpfulCountsSnapshot,
@@ -94,9 +100,10 @@ export default function CarReportPage() {
   const [aiKeywordRules, setAiKeywordRules] = useState<
     VehicleIssueKeywordRule[]
   >([]);
-  const [modelReviewsSnapshot, setModelReviewsSnapshot] = useState<{
+  const [modelReviewStatsSnapshot, setModelReviewStatsSnapshot] = useState<{
+    keywordStats: ReviewKeywordStat[];
     modelKey: string;
-    reviews: Review[];
+    reviewCount: number;
   } | null>(null);
   const carNumber = sanitizeVehiclePlateNumber(
     decodeURIComponent(params.carNumber as string),
@@ -167,23 +174,18 @@ export default function CarReportPage() {
       }),
     [carNumber, helpfulCounts, reviewSort, reviews],
   );
-  const modelReviews = useMemo(
+  const modelReviewStats = useMemo(
     () =>
-      modelReviewsSnapshot?.modelKey === currentVehicleModelKey
-        ? modelReviewsSnapshot.reviews
-        : [],
-    [currentVehicleModelKey, modelReviewsSnapshot],
+      modelReviewStatsSnapshot?.modelKey === currentVehicleModelKey
+        ? modelReviewStatsSnapshot
+        : null,
+    [currentVehicleModelKey, modelReviewStatsSnapshot],
   );
   const modelReviewKeywordStats = useMemo(
-    () =>
-      getReviewKeywordStats(modelReviews, 5, 1, {
-        fuelType,
-        generation,
-        keywordRules: aiKeywordRules,
-        modelName: model,
-      }),
-    [aiKeywordRules, fuelType, generation, model, modelReviews],
+    () => modelReviewStats?.keywordStats ?? [],
+    [modelReviewStats],
   );
+  const modelReviewCount = modelReviewStats?.reviewCount ?? 0;
   const focusedReviewKeywordStats = useMemo(
     () =>
       getReviewKeywordStats(reviews, 5, 1, {
@@ -200,7 +202,7 @@ export default function CarReportPage() {
         fuelType,
         generation,
         inspectionProfile,
-        reviewCount: modelReviews.length,
+        reviewCount: modelReviewCount,
         reviewKeywordStats: modelReviewKeywordStats,
         vehicleNumber: carNumber,
       }),
@@ -212,7 +214,7 @@ export default function CarReportPage() {
       inspectionProfile,
       mileage,
       model,
-      modelReviews.length,
+      modelReviewCount,
       modelReviewKeywordStats,
       year,
     ],
@@ -347,7 +349,7 @@ export default function CarReportPage() {
     if (!vehicle || !currentVehicleModelKey) {
       void Promise.resolve().then(() => {
         if (isActive) {
-          setModelReviewsSnapshot(null);
+          setModelReviewStatsSnapshot(null);
         }
       });
       return () => {
@@ -355,20 +357,39 @@ export default function CarReportPage() {
       };
     }
 
-    fetchSupabaseReviewsByVehicleModel(vehicle)
-      .then((modelReviewsResult) => {
+    fetchSupabaseModelReviewKeywordStats(vehicle, aiKeywordRules)
+      .then(async (statsResult) => {
+        if (statsResult) {
+          return statsResult;
+        }
+
+        const fallbackReviews = (await fetchSupabaseReviewsByVehicleModel(vehicle)) ?? [];
+
+        return {
+          keywordStats: getReviewKeywordStats(fallbackReviews, 5, 1, {
+            fuelType,
+            generation,
+            keywordRules: aiKeywordRules,
+            modelName: model,
+          }),
+          reviewCount: fallbackReviews.length,
+        };
+      })
+      .then((statsResult) => {
         if (isActive) {
-          setModelReviewsSnapshot({
+          setModelReviewStatsSnapshot({
+            keywordStats: statsResult.keywordStats,
             modelKey: currentVehicleModelKey,
-            reviews: modelReviewsResult ?? [],
+            reviewCount: statsResult.reviewCount,
           });
         }
       })
       .catch(() => {
         if (isActive) {
-          setModelReviewsSnapshot({
+          setModelReviewStatsSnapshot({
+            keywordStats: [],
             modelKey: currentVehicleModelKey,
-            reviews: [],
+            reviewCount: 0,
           });
         }
       });
@@ -376,7 +397,7 @@ export default function CarReportPage() {
     return () => {
       isActive = false;
     };
-  }, [currentVehicleModelKey, vehicle]);
+  }, [aiKeywordRules, currentVehicleModelKey, fuelType, generation, model, vehicle]);
 
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);

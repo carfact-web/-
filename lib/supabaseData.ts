@@ -14,7 +14,12 @@ import {
 } from "@/lib/reviewImages";
 import { fetchVerifiedDealerMap } from "@/lib/verifiedDealers";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
 import { hasSameVehicleModelKey } from "@/utils/vehicleModelKey";
+import {
+  getGroupedVehicleIssueKeywordDefinitions,
+  type VehicleIssueKeywordRule,
+} from "@/utils/vehicleIssueKeywords";
 import type { Json } from "@/types/supabase";
 import type {
   Review,
@@ -28,6 +33,18 @@ type ReviewRowWithTraffic = ReviewRow & {
   view_count?: number | string | null;
   recent_view_count?: number | string | null;
 };
+
+interface ModelReviewKeywordStatsResult {
+  keywordStats: ReviewKeywordStat[];
+  reviewCount: number;
+}
+
+interface ModelReviewKeywordStatsRow {
+  keyword_label: string | null;
+  mention_count: number | string | null;
+  model_review_count: number | string | null;
+  percentage: number | string | null;
+}
 
 const toLocaleDateTime = (value: string) => {
   const date = new Date(value);
@@ -310,6 +327,65 @@ export const fetchSupabaseReviewsByVehicleModel = async (vehicle: Vehicle) => {
   );
 
   return data.map((review) => mapReviewRow(review, verifiedDealers));
+};
+
+const toModelReviewKeywordDefinitionPayload = (
+  keywordRules: VehicleIssueKeywordRule[],
+) =>
+  getGroupedVehicleIssueKeywordDefinitions(keywordRules).map(
+    (definition, index) => ({
+      aliases: definition.aliases,
+      exclude_aliases: definition.excludeAliases ?? [],
+      fuel_type: definition.fuelType ?? "",
+      label: definition.label,
+      sort_order: index,
+      target_model: definition.targetModel ?? "",
+    }),
+  );
+
+export const fetchSupabaseModelReviewKeywordStats = async (
+  vehicle: Vehicle,
+  keywordRules: VehicleIssueKeywordRule[] = [],
+): Promise<ModelReviewKeywordStatsResult | null> => {
+  if (!supabase || !vehicle.brand || !vehicle.model) {
+    return null;
+  }
+
+  const { data, error } = await supabase.rpc(
+    "public_get_model_review_keyword_stats",
+    {
+      p_fuel_type: vehicle.fuelType ?? "",
+      p_generation: vehicle.generation ?? "",
+      p_keyword_definitions: toModelReviewKeywordDefinitionPayload(keywordRules),
+      p_limit: 5,
+      p_manufacturer: vehicle.brand,
+      p_model: vehicle.model,
+    },
+  );
+
+  if (error) {
+    if (error.message.includes("public_get_model_review_keyword_stats")) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  const rows = (data ?? []) as ModelReviewKeywordStatsRow[];
+  const reviewCount = Number(rows[0]?.model_review_count ?? 0);
+  const keywordStats = rows
+    .filter((row) => row.keyword_label)
+    .map((row) => ({
+      count: Number(row.mention_count ?? 0),
+      label: row.keyword_label ?? "",
+      percentage: Number(row.percentage ?? 0),
+    }))
+    .filter((stat) => stat.label && stat.count > 0);
+
+  return {
+    keywordStats,
+    reviewCount,
+  };
 };
 
 export const fetchSupabaseReviewById = async (reviewId: string) => {
