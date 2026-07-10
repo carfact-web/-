@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import { cn } from "@/utils/cn";
 import type { StructuredAiSummary } from "@/utils/aiSummary";
 import type { ReviewKeywordStat } from "@/utils/reviewKeywordStats";
@@ -43,7 +40,6 @@ const compactPlateNumberClassName = cn(
   "plate-number-input flex items-center justify-center whitespace-nowrap",
 );
 const maxOverviewKeywordCount = 5;
-const defaultMaintenanceIssueCount = 3;
 
 const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
   const subject = analysis.vehicle.generation || analysis.vehicle.modelName;
@@ -90,7 +86,7 @@ const getOverviewMessage = (subject: string, keywords: ReviewKeywordStat[]) => {
     subject +
     "는 " +
     keywordLabels.join(" ") +
-    " 키워드가 주로 언급되고 있습니다."
+    " 키워드가 주로 언급되고 있네요 🔎"
   );
 };
 
@@ -101,9 +97,6 @@ export function AiSummaryCard({
   title = "카팩트 AI 분석",
   emptyMessage = "차량 정보를 입력하면 AI 요약이 표시됩니다.",
 }: AiSummaryCardProps) {
-  const [showAllMaintenanceIssues, setShowAllMaintenanceIssues] =
-    useState(false);
-
   if (!analysis) {
     return (
       <section className={cardClassName}>
@@ -133,14 +126,6 @@ export function AiSummaryCard({
     analysisSubject,
     analysis.reviewKeywords,
   );
-  const maintenanceIssues = analysis.maintenanceIssues;
-  const hiddenMaintenanceIssueCount = Math.max(
-    maintenanceIssues.length - defaultMaintenanceIssueCount,
-    0,
-  );
-  const visibleMaintenanceIssues = showAllMaintenanceIssues
-    ? maintenanceIssues
-    : maintenanceIssues.slice(0, defaultMaintenanceIssueCount);
 
   return (
     <section className={cardClassName} aria-labelledby="ai-summary-title">
@@ -194,69 +179,6 @@ export function AiSummaryCard({
           자세한 내용은 아래 실제 후기를 확인해보세요.👇
         </p>
       </section>
-
-      {maintenanceIssues.length > 0 ? (
-        <section className={sectionClassName}>
-          <h3 className={sectionTitleClassName}>자주 발생하는 정비 이슈</h3>
-          <div className="grid gap-2.5">
-            {visibleMaintenanceIssues.map((issue, index) => (
-              <article
-                key={issue.title + "-" + index}
-                className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-3"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-xs font-black text-red-200">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-sm font-black text-zinc-100">
-                      {issue.title}
-                    </h4>
-                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-zinc-400 sm:text-sm">
-                      {issue.description}
-                    </p>
-                    <p className="mt-2 text-xs font-black text-red-200/90">
-                      💰 예상수리비 {issue.estimatedRepairCost}
-                    </p>
-                    <details className="mt-2 group">
-                      <summary className="cursor-pointer list-none text-xs font-black text-blue-200 transition group-open:text-blue-100">
-                        자세히 보기
-                      </summary>
-                      <div className="mt-2 grid gap-1.5 text-xs font-semibold leading-5 text-zinc-400">
-                        {issue.symptoms.length > 0 ? (
-                          <p>주요 증상: {issue.symptoms.join(", ")}</p>
-                        ) : null}
-                        {issue.causes.length > 0 ? (
-                          <p>원인: {issue.causes.join(", ")}</p>
-                        ) : null}
-                        {issue.replacementParts.length > 0 ? (
-                          <p>교체 부품: {issue.replacementParts.join(", ")}</p>
-                        ) : null}
-                        {issue.additionalDescription ? (
-                          <p>{issue.additionalDescription}</p>
-                        ) : null}
-                      </div>
-                    </details>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-          {hiddenMaintenanceIssueCount > 0 ? (
-            <button
-              type="button"
-              className="mt-3 min-h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-black text-zinc-200 transition hover:border-white/[0.16] hover:bg-white/[0.07]"
-              onClick={() =>
-                setShowAllMaintenanceIssues((current) => !current)
-              }
-            >
-              {showAllMaintenanceIssues
-                ? "접기"
-                : "더보기 (" + hiddenMaintenanceIssueCount + ")"}
-            </button>
-          ) : null}
-        </section>
-      ) : null}
     </section>
   );
 }
