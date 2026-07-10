@@ -7,6 +7,7 @@ import {
   saveAuthRedirect,
 } from "@/lib/authRedirect";
 import { createRandomNickname } from "@/lib/nickname";
+import { recordPageView } from "@/lib/pageViews";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Database } from "@/types/supabase";
 import type { Session, User } from "@supabase/supabase-js";
@@ -119,6 +120,16 @@ const syncUserProfile = async (user: User | null) => {
       }
 
       return null;
+    }
+
+    if (typeof window !== "undefined") {
+      void recordPageView({
+        eventType: "sign_up",
+        path: window.location.pathname + window.location.search,
+        referrer: document.referrer || null,
+      }).catch(() => {
+        // Analytics must never block sign-up profile creation.
+      });
     }
 
     return createdProfile;

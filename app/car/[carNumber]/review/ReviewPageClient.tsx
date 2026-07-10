@@ -8,6 +8,7 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { useReviews } from "@/hooks/useReviews";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useVehicle } from "@/hooks/useVehicle";
+import { recordPageView } from "@/lib/pageViews";
 import { fetchSupabaseReviewById } from "@/lib/supabaseData";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
@@ -428,6 +429,17 @@ export default function ReviewPage() {
     }
 
     setShowSuccessToast(true);
+
+    if (!editingReviewId) {
+      void recordPageView({
+        eventType: "review_create",
+        path: window.location.pathname + window.location.search,
+        referrer: document.referrer || null,
+        vehicleId: vehicle?.id ?? null,
+      }).catch(() => {
+        // Analytics must never block the review completion flow.
+      });
+    }
 
     window.setTimeout(() => {
       setShowSuccessToast(false);

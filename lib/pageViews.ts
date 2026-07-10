@@ -1,9 +1,16 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
+import { sendGaEvent } from "@/lib/gaEvents";
 
 interface RecordPageViewInput {
-  eventType?: "page_view" | "vehicle_view" | "review_view";
+  eventType?:
+    | "page_view"
+    | "vehicle_view"
+    | "review_view"
+    | "vehicle_search"
+    | "review_create"
+    | "sign_up";
   path?: string | null;
   referrer?: string | null;
   vehicleId?: string | null;
@@ -46,6 +53,14 @@ export const recordPageView = async ({
     vehicleId && uuidPattern.test(vehicleId) ? vehicleId : null;
   const normalizedReviewId =
     reviewId && uuidPattern.test(reviewId) ? reviewId : null;
+  const normalizedPath = path ?? window.location.pathname + window.location.search;
+  const normalizedReferrer = referrer ?? (document.referrer || null);
+
+  sendGaEvent(eventType, {
+    page_location: window.location.href,
+    page_path: normalizedPath,
+    page_referrer: normalizedReferrer,
+  });
 
   const sessionResult = await supabase?.auth.getSession();
   const accessToken = sessionResult?.data.session?.access_token;
@@ -59,8 +74,8 @@ export const recordPageView = async ({
       vehicleId: normalizedVehicleId,
       reviewId: normalizedReviewId,
       eventType,
-      path: path ?? window.location.pathname + window.location.search,
-      referrer: referrer ?? (document.referrer || null),
+      path: normalizedPath,
+      referrer: normalizedReferrer,
       sessionId: getPageViewSessionId(),
       userAgent: navigator.userAgent,
     }),

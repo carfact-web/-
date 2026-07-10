@@ -322,7 +322,13 @@ export interface Database {
           referrer_keyword: string;
           landing_page: string | null;
           path: string | null;
-          event_type: "page_view" | "vehicle_view" | "review_view";
+          event_type:
+            | "page_view"
+            | "vehicle_view"
+            | "review_view"
+            | "vehicle_search"
+            | "review_create"
+            | "sign_up";
         };
         Insert: {
           id?: string;
@@ -341,7 +347,13 @@ export interface Database {
           referrer_keyword?: string;
           landing_page?: string | null;
           path?: string | null;
-          event_type?: "page_view" | "vehicle_view" | "review_view";
+          event_type?:
+            | "page_view"
+            | "vehicle_view"
+            | "review_view"
+            | "vehicle_search"
+            | "review_create"
+            | "sign_up";
         };
         Update: {
           id?: string;
@@ -360,7 +372,13 @@ export interface Database {
           referrer_keyword?: string;
           landing_page?: string | null;
           path?: string | null;
-          event_type?: "page_view" | "vehicle_view" | "review_view";
+          event_type?:
+            | "page_view"
+            | "vehicle_view"
+            | "review_view"
+            | "vehicle_search"
+            | "review_create"
+            | "sign_up";
         };
         Relationships: [
           {
@@ -385,6 +403,129 @@ export interface Database {
             referencedColumns: ["id"];
           },
         ];
+      };
+      external_analytics_daily_metrics: {
+        Row: {
+          id: string;
+          metric_date: string;
+          provider: "manual" | "google_analytics" | "google_search_console";
+          visitors: number;
+          page_views: number;
+          new_visitors: number;
+          returning_visitors: number;
+          average_engagement_seconds: number | null;
+          signups: number;
+          reviews: number;
+          vehicle_searches: number;
+          realtime_active_users: number | null;
+          source_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          metric_date: string;
+          provider?: "manual" | "google_analytics" | "google_search_console";
+          visitors?: number;
+          page_views?: number;
+          new_visitors?: number;
+          returning_visitors?: number;
+          average_engagement_seconds?: number | null;
+          signups?: number;
+          reviews?: number;
+          vehicle_searches?: number;
+          realtime_active_users?: number | null;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          metric_date?: string;
+          provider?: "manual" | "google_analytics" | "google_search_console";
+          visitors?: number;
+          page_views?: number;
+          new_visitors?: number;
+          returning_visitors?: number;
+          average_engagement_seconds?: number | null;
+          signups?: number;
+          reviews?: number;
+          vehicle_searches?: number;
+          realtime_active_users?: number | null;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      external_analytics_top_pages: {
+        Row: {
+          id: string;
+          metric_date: string;
+          provider: "manual" | "google_analytics" | "google_search_console";
+          page_path: string;
+          page_title: string | null;
+          visitors: number;
+          page_views: number;
+          average_engagement_seconds: number | null;
+          source_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          metric_date: string;
+          provider?: "manual" | "google_analytics" | "google_search_console";
+          page_path: string;
+          page_title?: string | null;
+          visitors?: number;
+          page_views?: number;
+          average_engagement_seconds?: number | null;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          metric_date?: string;
+          provider?: "manual" | "google_analytics" | "google_search_console";
+          page_path?: string;
+          page_title?: string | null;
+          visitors?: number;
+          page_views?: number;
+          average_engagement_seconds?: number | null;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      external_analytics_realtime_metrics: {
+        Row: {
+          provider: "manual" | "google_analytics";
+          active_users: number;
+          top_pages: Json;
+          source_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          provider: "manual" | "google_analytics";
+          active_users?: number;
+          top_pages?: Json;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          provider?: "manual" | "google_analytics";
+          active_users?: number;
+          top_pages?: Json;
+          source_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       review_reports: {
         Row: {
@@ -859,6 +1000,13 @@ export interface Database {
           reports_count: number;
         }[];
       };
+      admin_get_analytics_dashboard_data: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          analytics_summary: Json;
+          popular_page_rows: Json;
+        }[];
+      };
       admin_get_traffic_stats: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -1233,7 +1381,13 @@ export interface Database {
           view_os?: string;
           view_referrer?: string | null;
           view_path?: string | null;
-          view_event_type?: "page_view" | "vehicle_view" | "review_view";
+          view_event_type?:
+            | "page_view"
+            | "vehicle_view"
+            | "review_view"
+            | "vehicle_search"
+            | "review_create"
+            | "sign_up";
         };
         Returns: boolean;
       };

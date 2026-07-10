@@ -570,6 +570,33 @@ interface AdminDashboardSearchConsoleSummary {
   updatedAt: string | null;
 }
 
+interface AdminDashboardAnalyticsSummary {
+  averageEngagementSeconds: number | null;
+  isGa4Connected: boolean;
+  isSearchConsoleConnected: boolean;
+  newVisitors: number;
+  realtimeActiveUsers: number | null;
+  returningVisitors: number;
+  source: string;
+  todayPageViews: number;
+  todayReviews: number;
+  todaySignups: number;
+  todayVisitors: number;
+  updatedAt: string | null;
+  vehicleSearches: number;
+}
+
+interface AdminDashboardPopularPageRow {
+  averageEngagementSeconds: number | null;
+  pagePath: string;
+  pageTitle: string | null;
+  pageViews: number;
+  rank: number;
+  source: string;
+  updatedAt: string | null;
+  visitors: number;
+}
+
 interface AdminDashboardAiCandidate {
   candidateKey: string;
   exampleSentences?: string[];
@@ -609,8 +636,10 @@ interface AdminAiCandidateStatusRow {
 
 interface AdminOperatorDashboardData {
   totalViews: number;
+  analyticsSummary: AdminDashboardAnalyticsSummary;
   trafficRows: AdminDashboardTrafficRow[];
   viewRankings: AdminDashboardViewRanking[];
+  popularPageRows: AdminDashboardPopularPageRow[];
   keywordRows: AdminDashboardAcquisitionKeywordRow[];
   acquisitionRows: AdminDashboardAcquisitionEventRow[];
   searchConsoleSummary: AdminDashboardSearchConsoleSummary;
@@ -787,8 +816,24 @@ const emptyTrafficStats: AdminTrafficStats = {
 
 const emptyOperatorDashboardData: AdminOperatorDashboardData = {
   totalViews: 0,
+  analyticsSummary: {
+    averageEngagementSeconds: null,
+    isGa4Connected: false,
+    isSearchConsoleConnected: false,
+    newVisitors: 0,
+    realtimeActiveUsers: null,
+    returningVisitors: 0,
+    source: "internal",
+    todayPageViews: 0,
+    todayReviews: 0,
+    todaySignups: 0,
+    todayVisitors: 0,
+    updatedAt: null,
+    vehicleSearches: 0,
+  },
   trafficRows: [],
   viewRankings: [],
+  popularPageRows: [],
   keywordRows: [],
   acquisitionRows: [],
   searchConsoleSummary: {
@@ -1959,6 +2004,56 @@ const toOperatorSearchConsoleSummary = (
   };
 };
 
+const toOperatorAnalyticsSummary = (
+  value: Json,
+): AdminDashboardAnalyticsSummary => {
+  const item = isRecord(value) ? value : {};
+
+  return {
+    averageEngagementSeconds:
+      item.average_engagement_seconds === null ||
+      item.average_engagement_seconds === undefined
+        ? null
+        : toNumber(item.average_engagement_seconds),
+    isGa4Connected: Boolean(item.is_ga4_connected),
+    isSearchConsoleConnected: Boolean(item.is_search_console_connected),
+    newVisitors: toNumber(item.new_visitors),
+    realtimeActiveUsers:
+      item.realtime_active_users === null ||
+      item.realtime_active_users === undefined
+        ? null
+        : toNumber(item.realtime_active_users),
+    returningVisitors: toNumber(item.returning_visitors),
+    source: String(item.source ?? "internal"),
+    todayPageViews: toNumber(item.today_page_views),
+    todayReviews: toNumber(item.today_reviews),
+    todaySignups: toNumber(item.today_signups),
+    todayVisitors: toNumber(item.today_visitors),
+    updatedAt: toNullableString(item.updated_at),
+    vehicleSearches: toNumber(item.vehicle_searches),
+  };
+};
+
+const toOperatorPopularPageRows = (
+  value: Json,
+): AdminDashboardPopularPageRow[] =>
+  Array.isArray(value)
+    ? (value as unknown[]).filter(isRecord).map((item) => ({
+        averageEngagementSeconds:
+          item.average_engagement_seconds === null ||
+          item.average_engagement_seconds === undefined
+            ? null
+            : toNumber(item.average_engagement_seconds),
+        pagePath: String(item.page_path ?? "/"),
+        pageTitle: toNullableString(item.page_title),
+        pageViews: toNumber(item.page_views),
+        rank: toNumber(item.rank),
+        source: String(item.source ?? "internal"),
+        updatedAt: toNullableString(item.updated_at),
+        visitors: toNumber(item.visitors),
+      }))
+    : [];
+
 const toOperatorKeywordRows = (
   value: Json,
 ): AdminDashboardKeywordRow[] =>
@@ -3118,6 +3213,7 @@ export default function AdminPage() {
         aiKeywordRulesResult,
         trafficStatsResult,
         operatorDashboardResult,
+        analyticsDashboardResult,
         verifiedDealerFeatureResult,
         aiCandidateStatusRows,
         nextKotsaAuditLogs,
@@ -3153,6 +3249,7 @@ export default function AdminPage() {
         supabase.rpc("admin_list_ai_keyword_rules"),
         supabase.rpc("admin_get_traffic_stats"),
         supabase.rpc("admin_get_operator_dashboard_data"),
+        supabase.rpc("admin_get_analytics_dashboard_data"),
         supabase.rpc("list_verified_dealer_profiles", {
           target_user_ids: [],
         }),
@@ -3209,6 +3306,9 @@ export default function AdminPage() {
       const nextOperatorDashboard = operatorDashboardResult.error
         ? null
         : operatorDashboardResult.data?.[0];
+      const nextAnalyticsDashboard = analyticsDashboardResult.error
+        ? null
+        : analyticsDashboardResult.data?.[0];
 
       setStats({
         comments: Number(nextStats?.comments_count ?? 0),
@@ -3252,11 +3352,17 @@ export default function AdminPage() {
       setAiCandidateStatusRows(aiCandidateStatusRows);
       setOperatorDashboardData({
         totalViews: toNumber(nextOperatorDashboard?.total_views),
+        analyticsSummary: toOperatorAnalyticsSummary(
+          nextAnalyticsDashboard?.analytics_summary ?? {},
+        ),
         trafficRows: toOperatorTrafficRows(
           nextOperatorDashboard?.traffic_rows ?? [],
         ),
         viewRankings: toOperatorViewRankings(
           nextOperatorDashboard?.view_rankings ?? [],
+        ),
+        popularPageRows: toOperatorPopularPageRows(
+          nextAnalyticsDashboard?.popular_page_rows ?? [],
         ),
         keywordRows: toOperatorAcquisitionKeywordRows(
           nextOperatorDashboard?.keyword_rows ?? [],
@@ -8313,6 +8419,20 @@ const formatLandingPageLabel = (path: string) => {
 const formatDashboardPercent = (value: number | null) =>
   value === null ? "연동 대기" : value.toFixed(1) + "%";
 
+const formatEngagementDuration = (seconds: number | null) => {
+  if (seconds === null) {
+    return "연동 대기";
+  }
+
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  return minutes > 0
+    ? minutes + "분 " + remainingSeconds + "초"
+    : remainingSeconds + "초";
+};
+
 const dayMs = 24 * 60 * 60 * 1000;
 
 const countReviewsFrom = (reviews: AdminReview[], startTime: number) =>
@@ -8576,6 +8696,69 @@ function DashboardPanel({
   const searchConsoleUpdatedLabel = searchSummary.updatedAt
     ? "최근 갱신 " + formatOptionalDate(searchSummary.updatedAt)
     : "Search Console 연동 대기";
+  const analyticsSummary = operatorDashboardData.analyticsSummary;
+  const analyticsSourceLabel =
+    analyticsSummary.source === "google_analytics"
+      ? "GA4 연동값"
+      : "내부 로그 기준";
+  const analyticsUpdatedLabel = analyticsSummary.updatedAt
+    ? "최근 갱신 " + formatOptionalDate(analyticsSummary.updatedAt)
+    : analyticsSourceLabel;
+  const realtimeActiveUsersLabel =
+    analyticsSummary.realtimeActiveUsers === null
+      ? "연동 대기"
+      : analyticsSummary.realtimeActiveUsers.toLocaleString() + "명";
+  const analyticsKpiItems = [
+    {
+      detail: analyticsUpdatedLabel,
+      label: "오늘 방문자(UV)",
+      value: analyticsSummary.todayVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: analyticsUpdatedLabel,
+      label: "오늘 페이지뷰(PV)",
+      value: analyticsSummary.todayPageViews.toLocaleString() + "회",
+    },
+    {
+      detail: analyticsSummary.isGa4Connected ? "GA4 신규 사용자" : "GA4 연동 후 표시",
+      label: "신규 방문자",
+      value: analyticsSummary.newVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: analyticsSummary.isGa4Connected ? "GA4 재방문 사용자" : "GA4 연동 후 표시",
+      label: "재방문자",
+      value: analyticsSummary.returningVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: analyticsSummary.isGa4Connected ? "GA4 평균 참여 시간" : "GA4 연동 후 표시",
+      label: "평균 체류시간",
+      value: formatEngagementDuration(analyticsSummary.averageEngagementSeconds),
+    },
+    {
+      detail: "회원 DB 기준 fallback",
+      label: "오늘 회원가입",
+      value: analyticsSummary.todaySignups.toLocaleString() + "명",
+    },
+    {
+      detail: "후기 DB 기준 fallback",
+      label: "오늘 후기 작성",
+      value: analyticsSummary.todayReviews.toLocaleString() + "건",
+    },
+    {
+      detail: analyticsSummary.isGa4Connected ? "GA4 실시간" : "연동 시 표시",
+      label: "실시간 접속자",
+      value: realtimeActiveUsersLabel,
+    },
+  ];
+  const popularPageRows = operatorDashboardData.popularPageRows.map((row) => ({
+    detail:
+      row.pageTitle ??
+      row.visitors.toLocaleString() +
+        "명 · " +
+        (row.source === "external" ? "GA/Search Console" : "내부 로그"),
+    label: formatLandingPageLabel(row.pagePath),
+    value: row.pageViews,
+  }));
 
   return (
     <div>
@@ -8636,6 +8819,27 @@ function DashboardPanel({
             />
           </div>
         </section>
+        <section className={panelClassName}>
+          <div>
+            <p className="text-xs font-black text-blue-600">GA4/Search Console 준비</p>
+            <h2 className="mt-1 text-base font-black text-zinc-950">
+              오늘 핵심 KPI
+            </h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              {analyticsSourceLabel}으로 표시합니다.
+            </p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {analyticsKpiItems.map((item) => (
+              <GrowthMetricCard
+                key={item.label}
+                detail={item.detail}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
+          </div>
+        </section>
         <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
         <TrafficSourceDonutCard
           description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
@@ -8661,6 +8865,11 @@ function DashboardPanel({
           emptyMessage="인기 증상 키워드 데이터가 없습니다."
           rows={topSymptomRows}
           title="인기 증상 키워드 TOP"
+        />
+        <DashboardBarCard
+          emptyMessage="인기 페이지 데이터가 없습니다."
+          rows={popularPageRows}
+          title="인기 페이지 TOP"
         />
         <section className="grid grid-cols-2 gap-3">
           <ReviewTotalStatCard
@@ -8822,6 +9031,34 @@ function DashboardPanel({
         </div>
       </section>
 
+      <section className={panelClassName}>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-black text-blue-600">GA4/Search Console 준비</p>
+            <h2 className="mt-1 text-lg font-black text-zinc-950">
+              오늘 핵심 KPI
+            </h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              {analyticsSourceLabel}으로 표시하며, GA4/Search Console 적재 시 자동 갱신됩니다.
+            </p>
+          </div>
+          <p className="text-xs font-bold text-zinc-500">
+            GA4 {analyticsSummary.isGa4Connected ? "연동 감지" : "연동 대기"} · Search Console{" "}
+            {analyticsSummary.isSearchConsoleConnected ? "연동 감지" : "연동 대기"}
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {analyticsKpiItems.map((item) => (
+            <GrowthMetricCard
+              key={item.label}
+              detail={item.detail}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </div>
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
         <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
         <TrafficSourceDonutCard
@@ -8851,6 +9088,14 @@ function DashboardPanel({
           emptyMessage="인기 증상 키워드 데이터가 없습니다."
           rows={topSymptomRows}
           title="인기 증상 키워드 TOP"
+        />
+      </section>
+
+      <section className="grid gap-4">
+        <DashboardBarCard
+          emptyMessage="인기 페이지 데이터가 없습니다."
+          rows={popularPageRows}
+          title="인기 페이지 TOP"
         />
       </section>
 

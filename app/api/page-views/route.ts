@@ -4,7 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
 interface PageViewPayload {
-  eventType?: "page_view" | "vehicle_view" | "review_view";
+  eventType?:
+    | "page_view"
+    | "vehicle_view"
+    | "review_view"
+    | "vehicle_search"
+    | "review_create"
+    | "sign_up";
   path?: string | null;
   referrer?: string | null;
   vehicleId?: string | null;
@@ -13,7 +19,14 @@ interface PageViewPayload {
   userAgent?: string | null;
 }
 
-const eventTypes = new Set(["page_view", "vehicle_view", "review_view"]);
+const eventTypes = new Set([
+  "page_view",
+  "vehicle_view",
+  "review_view",
+  "vehicle_search",
+  "review_create",
+  "sign_up",
+]);
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
