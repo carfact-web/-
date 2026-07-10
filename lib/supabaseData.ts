@@ -44,6 +44,8 @@ interface ModelReviewKeywordStatsRow {
   mention_count: number | string | null;
   model_review_count: number | string | null;
   percentage: number | string | null;
+  priority?: number | string | null;
+  recent_mentioned_at?: string | null;
 }
 
 const toLocaleDateTime = (value: string) => {
@@ -338,6 +340,7 @@ const toModelReviewKeywordDefinitionPayload = (
       exclude_aliases: definition.excludeAliases ?? [],
       fuel_type: definition.fuelType ?? "",
       label: definition.label,
+      priority: 0,
       sort_order: index,
       target_model: definition.targetModel ?? "",
     }),

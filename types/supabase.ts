@@ -958,6 +958,8 @@ export interface Database {
           mention_count: number;
           model_review_count: number;
           percentage: number;
+          priority: number;
+          recent_mentioned_at: string | null;
         }[];
       };
       public_list_ai_keyword_rules: {

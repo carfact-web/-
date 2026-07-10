@@ -41,7 +41,7 @@ const compactPlateFrameClassName = cn(
 const compactPlateNumberClassName = cn(
   "plate-number-input flex items-center justify-center whitespace-nowrap",
 );
-const maxOverviewKeywordCount = 3;
+const maxOverviewKeywordCount = 5;
 
 const formatAnalysisSubject = (analysis: StructuredAiSummary) => {
   const subject = analysis.vehicle.generation || analysis.vehicle.modelName;
