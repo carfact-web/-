@@ -323,7 +323,10 @@ export interface Database {
           landing_page: string | null;
           path: string | null;
           event_type:
+            | "ai_analysis_complete"
+            | "login"
             | "page_view"
+            | "post_view"
             | "vehicle_view"
             | "review_view"
             | "vehicle_search"
@@ -348,7 +351,10 @@ export interface Database {
           landing_page?: string | null;
           path?: string | null;
           event_type?:
+            | "ai_analysis_complete"
+            | "login"
             | "page_view"
+            | "post_view"
             | "vehicle_view"
             | "review_view"
             | "vehicle_search"
@@ -373,7 +379,10 @@ export interface Database {
           landing_page?: string | null;
           path?: string | null;
           event_type?:
+            | "ai_analysis_complete"
+            | "login"
             | "page_view"
+            | "post_view"
             | "vehicle_view"
             | "review_view"
             | "vehicle_search"
@@ -1382,7 +1391,10 @@ export interface Database {
           view_referrer?: string | null;
           view_path?: string | null;
           view_event_type?:
+            | "ai_analysis_complete"
+            | "login"
             | "page_view"
+            | "post_view"
             | "vehicle_view"
             | "review_view"
             | "vehicle_search"

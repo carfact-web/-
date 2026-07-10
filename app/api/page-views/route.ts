@@ -5,7 +5,10 @@ import type { Database } from "@/types/supabase";
 
 interface PageViewPayload {
   eventType?:
+    | "ai_analysis_complete"
+    | "login"
     | "page_view"
+    | "post_view"
     | "vehicle_view"
     | "review_view"
     | "vehicle_search"
@@ -20,7 +23,10 @@ interface PageViewPayload {
 }
 
 const eventTypes = new Set([
+  "ai_analysis_complete",
+  "login",
   "page_view",
+  "post_view",
   "vehicle_view",
   "review_view",
   "vehicle_search",

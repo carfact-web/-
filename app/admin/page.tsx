@@ -8708,11 +8708,43 @@ function DashboardPanel({
     analyticsSummary.realtimeActiveUsers === null
       ? "연동 대기"
       : analyticsSummary.realtimeActiveUsers.toLocaleString() + "명";
+  const yesterday = new Date(todayStartTime - dayMs);
+  const yesterdayLabel = [
+    yesterday.getFullYear(),
+    String(yesterday.getMonth() + 1).padStart(2, "0"),
+    String(yesterday.getDate()).padStart(2, "0"),
+  ].join("-");
+  const yesterdayVisitors =
+    operatorDashboardData.trafficRows.find((row) => row.date === yesterdayLabel)
+      ?.visitors ?? 0;
+  const visitorDeltaFromYesterday =
+    analyticsSummary.todayVisitors - yesterdayVisitors;
+  const visitorDeltaLabel =
+    visitorDeltaFromYesterday === 0
+      ? "변화 없음"
+      : (visitorDeltaFromYesterday > 0 ? "▲ " : "▼ ") +
+        Math.abs(visitorDeltaFromYesterday).toLocaleString() +
+        "명";
   const analyticsKpiItems = [
     {
       detail: analyticsUpdatedLabel,
       label: "오늘 방문자(UV)",
       value: analyticsSummary.todayVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: "전일 방문자 대비",
+      label: "어제 대비",
+      value: visitorDeltaLabel,
+    },
+    {
+      detail: "최근 7일 누적",
+      label: "최근 7일",
+      value: trafficStats.sevenDayVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: "최근 30일 누적",
+      label: "최근 30일",
+      value: trafficStats.thirtyDayVisitors.toLocaleString() + "명",
     },
     {
       detail: analyticsUpdatedLabel,

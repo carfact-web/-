@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommunityPostBody, renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getCommunityCategoryLabel } from "@/lib/communityCategories";
+import { recordPageView } from "@/lib/pageViews";
 import {
   deleteCommunityPost,
   fetchCommunityComments,
@@ -59,6 +60,7 @@ export default function CommunityPostDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const recordedPostViewIdRef = useRef<string | null>(null);
 
   const canManagePost = Boolean(user && post && (post.userId === user.id || isAdmin));
   const postIndex = useMemo(
@@ -108,6 +110,21 @@ export default function CommunityPostDetailPage() {
       void loadPost();
     });
   }, [loadPost]);
+
+  useEffect(() => {
+    if (!post?.id || recordedPostViewIdRef.current === post.id) {
+      return;
+    }
+
+    recordedPostViewIdRef.current = post.id;
+    void recordPageView({
+      eventType: "post_view",
+      path: window.location.pathname + window.location.search,
+      referrer: document.referrer || null,
+    }).catch(() => {
+      // Analytics should never block community post reading.
+    });
+  }, [post?.id]);
 
   const goToLogin = () => {
     router.push("/login?redirectTo=" + encodeURIComponent(window.location.href));

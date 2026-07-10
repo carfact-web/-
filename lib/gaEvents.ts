@@ -1,6 +1,9 @@
 "use client";
 
 type AnalyticsEventName =
+  | "ai_analysis_complete"
+  | "login"
+  | "post_view"
   | "page_view"
   | "review_create"
   | "review_view"
@@ -24,7 +27,10 @@ declare global {
 }
 
 const gaEventNameMap: Record<AnalyticsEventName, string> = {
+  ai_analysis_complete: "ai_analysis_complete",
+  login: "login",
   page_view: "page_view",
+  post_view: "post_view",
   review_create: "review_create",
   review_view: "review_view",
   sign_up: "sign_up",

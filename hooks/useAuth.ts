@@ -80,6 +80,33 @@ const isMissingAuthProfileSyncError = (error: unknown) =>
     "sync_current_user_auth_profile"
   );
 
+const recordAuthAnalyticsEvent = (
+  eventType: "login" | "sign_up",
+  userId: string,
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (eventType === "login") {
+    const storageKey = "carfact_login_event_sent_" + userId;
+
+    if (sessionStorage.getItem(storageKey)) {
+      return;
+    }
+
+    sessionStorage.setItem(storageKey, "1");
+  }
+
+  void recordPageView({
+    eventType,
+    path: window.location.pathname + window.location.search,
+    referrer: document.referrer || null,
+  }).catch(() => {
+    // Analytics must never block auth profile sync.
+  });
+};
+
 const syncUserProfile = async (user: User | null) => {
   if (!supabase || !user) {
     return null;
@@ -122,15 +149,8 @@ const syncUserProfile = async (user: User | null) => {
       return null;
     }
 
-    if (typeof window !== "undefined") {
-      void recordPageView({
-        eventType: "sign_up",
-        path: window.location.pathname + window.location.search,
-        referrer: document.referrer || null,
-      }).catch(() => {
-        // Analytics must never block sign-up profile creation.
-      });
-    }
+    recordAuthAnalyticsEvent("sign_up", user.id);
+    recordAuthAnalyticsEvent("login", user.id);
 
     return createdProfile;
   }
@@ -160,6 +180,8 @@ const syncUserProfile = async (user: User | null) => {
 
     return existingProfile;
   }
+
+  recordAuthAnalyticsEvent("login", user.id);
 
   return updatedProfile;
 };

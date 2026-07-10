@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
@@ -121,6 +121,7 @@ export default function CarReportPage() {
   const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
+  const aiAnalysisEventKeyRef = useRef<string | null>(null);
   const brand = vehicle?.brand ?? "";
   const model = vehicle?.model ?? "";
   const generation = vehicle?.generation ?? "";
@@ -285,12 +286,42 @@ export default function CarReportPage() {
     }
 
     void recordPageView({
-      eventType: "vehicle_view",
+      eventType: "vehicle_search",
       vehicleId: vehicle.id,
     }).catch(() => {
       // Traffic analytics should never block the vehicle report page.
     });
   }, [isGuestReportAllowed, vehicle?.id]);
+
+  useEffect(() => {
+    if (
+      !isGuestReportAllowed ||
+      !vehicle?.id ||
+      !modelReviewStatsSnapshot ||
+      modelReviewStatsSnapshot.modelKey !== currentVehicleModelKey
+    ) {
+      return;
+    }
+
+    const eventKey = vehicle.id + ":" + modelReviewStatsSnapshot.modelKey;
+
+    if (aiAnalysisEventKeyRef.current === eventKey) {
+      return;
+    }
+
+    aiAnalysisEventKeyRef.current = eventKey;
+    void recordPageView({
+      eventType: "ai_analysis_complete",
+      vehicleId: vehicle.id,
+    }).catch(() => {
+      // Analytics should never block the vehicle report page.
+    });
+  }, [
+    currentVehicleModelKey,
+    isGuestReportAllowed,
+    modelReviewStatsSnapshot,
+    vehicle?.id,
+  ]);
 
   useEffect(() => {
     let isActive = true;

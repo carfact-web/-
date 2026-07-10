@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BottomTabNav } from "@/components/BottomTabNav";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { JsonLd } from "@/components/JsonLd";
 import { MaintenanceModeGate } from "@/components/MaintenanceModeGate";
 import { PageViewTracker } from "@/components/PageViewTracker";
@@ -80,8 +82,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <GoogleAnalytics />
         <JsonLd data={createWebSiteJsonLd()} />
-        <PageViewTracker />
+        <Suspense fallback={null}>
+          <PageViewTracker />
+        </Suspense>
         <MaintenanceModeGate />
         <div className="flex-1 pb-24">{children}</div>
         <BottomTabNav />
