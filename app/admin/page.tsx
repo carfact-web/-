@@ -30,6 +30,7 @@ Chart.register(ArcElement, DoughnutController, Tooltip);
 
 type AdminTab =
   | "dashboard"
+  | "analytics"
   | "reviews"
   | "posts"
   | "users"
@@ -776,6 +777,7 @@ interface AdminKnowledgeTermFormValues {
 
 const tabs: { label: string; value: AdminTab }[] = [
   { label: "Dashboard", value: "dashboard" },
+  { label: "Analytics", value: "analytics" },
   { label: "후기 관리", value: "reviews" },
   { label: "게시글 관리", value: "posts" },
   { label: "회원 관리", value: "users" },
@@ -1408,13 +1410,11 @@ const dashboardViewFilters: {
   { label: "조회수 TOP 후기", value: "review" },
 ];
 
-const dashboardBoardTabs: { label: string; value: DashboardBoardTab }[] = [
+const analyticsMenuTabs: { label: string; value: DashboardBoardTab }[] = [
   { label: "트래픽", value: "traffic" },
-  { label: "조회수", value: "views" },
-  { label: "콘텐츠", value: "content" },
-  { label: "유입 키워드", value: "keywords" },
-  { label: "내부 키워드", value: "internalKeywords" },
-  { label: "AI DB 업데이트 추천", value: "ai" },
+  { label: "검색", value: "keywords" },
+  { label: "콘텐츠", value: "views" },
+  { label: "AI 분석", value: "ai" },
 ];
 
 const dashboardPeriods: { label: string; value: DashboardPeriod }[] = [
@@ -5106,7 +5106,44 @@ export default function AdminPage() {
           </div>
           <nav className="mt-4 grid gap-1">
             {tabs.map((tab) =>
-              tab.value === "knowledge" ? (
+              tab.value === "analytics" ? (
+                <div key={tab.value} className="grid gap-1">
+                  <button
+                    type="button"
+                    className={cn(
+                      tabButtonClassName,
+                      "justify-start text-left",
+                      activeTab === tab.value && activeTabButtonClassName,
+                    )}
+                    onClick={() => {
+                      setActiveTab(tab.value);
+                      setIsNotificationOpen(false);
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                  {analyticsMenuTabs.map((analyticsTab) => (
+                    <button
+                      key={analyticsTab.value}
+                      type="button"
+                      className={cn(
+                        tabButtonClassName,
+                        "ml-3 justify-start text-left text-xs",
+                        activeTab === "analytics" &&
+                          activeDashboardTab === analyticsTab.value &&
+                          activeTabButtonClassName,
+                      )}
+                      onClick={() => {
+                        setActiveTab("analytics");
+                        setActiveDashboardTab(analyticsTab.value);
+                        setIsNotificationOpen(false);
+                      }}
+                    >
+                      └ {analyticsTab.label}
+                    </button>
+                  ))}
+                </div>
+              ) : tab.value === "knowledge" ? (
                 <div key={tab.value} className="grid gap-1">
                   <button
                     type="button"
@@ -5187,7 +5224,7 @@ export default function AdminPage() {
                   {formatDate(new Date().toISOString())}
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-zinc-950">
-                  운영 Dashboard
+                  {activeTab === "analytics" ? "Analytics" : "운영 Dashboard"}
                 </h2>
               </div>
               <div className="relative flex min-w-0 flex-1 flex-col gap-2 xl:max-w-2xl">
@@ -5289,7 +5326,7 @@ export default function AdminPage() {
                       label="후기 급증 차량"
                       count={trafficStats.topVehicles.length}
                       onClick={() => {
-                        setActiveTab("dashboard");
+                        setActiveTab("analytics");
                         setDashboardViewFilter("vehicle");
                         setActiveDashboardTab("views");
                         setIsNotificationOpen(false);
@@ -5326,6 +5363,19 @@ export default function AdminPage() {
 
         {activeTab === "dashboard" ? (
           <DashboardPanel
+            operatorDashboardData={operatorDashboardData}
+            onNavigate={setActiveTab}
+            posts={posts}
+            reports={reports}
+            reviews={reviews}
+            stats={stats}
+            trafficStats={trafficStats}
+            users={users}
+          />
+        ) : null}
+
+        {activeTab === "analytics" ? (
+          <AnalyticsPanel
             activeDashboardTab={activeDashboardTab}
             dashboardViewFilter={dashboardViewFilter}
             onChangeAiCandidateStatus={(candidate, nextStatus) =>
@@ -8009,7 +8059,7 @@ function SearchBar({
   setReviewSearch,
   setUserSearch,
 }: {
-  activeTab: Exclude<AdminTab, "dashboard">;
+  activeTab: Exclude<AdminTab, "dashboard" | "analytics">;
   setKnowledgeSearch: (value: string) => void;
   setKotsaAuditSearch: (value: string) => void;
   searchValue: string;
@@ -8461,6 +8511,302 @@ const formatReviewDeltaLabel = (value: number, label: string) => {
 };
 
 function DashboardPanel({
+  onNavigate,
+  operatorDashboardData,
+  posts,
+  reports,
+  reviews,
+  stats,
+  trafficStats,
+  users,
+}: {
+  onNavigate: (tab: AdminTab) => void;
+  operatorDashboardData: AdminOperatorDashboardData;
+  posts: AdminCommunityPost[];
+  reports: AdminReport[];
+  reviews: AdminReview[];
+  stats: AdminStats;
+  trafficStats: AdminTrafficStats;
+  users: AdminUserProfile[];
+}) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartTime = todayStart.getTime();
+  const yesterdayStartTime = todayStartTime - dayMs;
+  const sevenDayStartTime = todayStartTime - 6 * dayMs;
+  const analyticsSummary = operatorDashboardData.analyticsSummary;
+  const todayReviews = reviews.filter(
+    (review) => Date.parse(review.created_at) >= todayStartTime,
+  );
+  const yesterdayReviews = reviews.filter((review) => {
+    const createdAt = Date.parse(review.created_at);
+    return createdAt >= yesterdayStartTime && createdAt < todayStartTime;
+  });
+  const todayUsers = users.filter(
+    (account) => Date.parse(account.created_at) >= todayStartTime,
+  );
+  const pendingReports = reports.filter((report) => !report.is_hidden);
+  const reviewingAiCandidates = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "reviewing",
+  );
+  const appliedAiCandidates = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "applied",
+  );
+  const totalReviewCount = Math.max(
+    stats.reviews,
+    trafficStats.totalReviews,
+    reviews.length,
+  );
+  const todayReviewCount = Math.max(
+    todayReviews.length,
+    analyticsSummary.todayReviews,
+    trafficStats.todayReviews,
+  );
+  const sevenDayReviewCount = countReviewsFrom(reviews, sevenDayStartTime);
+  const yesterdayDelta = todayReviewCount - yesterdayReviews.length;
+  const yesterday = new Date(yesterdayStartTime);
+  const yesterdayLabel = [
+    yesterday.getFullYear(),
+    String(yesterday.getMonth() + 1).padStart(2, "0"),
+    String(yesterday.getDate()).padStart(2, "0"),
+  ].join("-");
+  const yesterdayVisitors =
+    operatorDashboardData.trafficRows.find((row) => row.date === yesterdayLabel)
+      ?.visitors ?? 0;
+  const visitorDelta = analyticsSummary.todayVisitors - yesterdayVisitors;
+  const visitorDeltaLabel =
+    visitorDelta === 0
+      ? "변화 없음"
+      : (visitorDelta > 0 ? "▲ " : "▼ ") +
+        Math.abs(visitorDelta).toLocaleString() +
+        "명 어제 대비";
+  const realtimeActiveUsersLabel =
+    analyticsSummary.realtimeActiveUsers === null
+      ? "연동 대기"
+      : analyticsSummary.realtimeActiveUsers.toLocaleString() + "명";
+  const chartRows = createDashboardChartRows({
+    aiCandidates: appliedAiCandidates,
+    posts,
+    reports,
+    reviews,
+    users,
+  });
+  const todoItems = [
+    {
+      count: reviewingAiCandidates.length,
+      detail: "AI 관리로 이동",
+      label: "AI 반영 후보",
+      tab: "ai" as AdminTab,
+      tone: "red",
+    },
+    {
+      count: pendingReports.length,
+      detail: "신고 관리로 이동",
+      label: "미처리 신고",
+      tab: "reports" as AdminTab,
+      tone: "yellow",
+    },
+    {
+      count: todayUsers.length,
+      detail: "회원 관리로 이동",
+      label: "신규 회원",
+      tab: "users" as AdminTab,
+      tone: "green",
+    },
+    {
+      count: todayReviewCount,
+      detail: "후기 관리로 이동",
+      label: "오늘 등록 후기",
+      tab: "reviews" as AdminTab,
+      tone: "blue",
+    },
+  ];
+  const overviewItems = [
+    {
+      detail: visitorDeltaLabel,
+      label: "오늘 방문자(UV)",
+      value: analyticsSummary.todayVisitors.toLocaleString() + "명",
+    },
+    {
+      detail: analyticsSummary.realtimeActiveUsers === null ? "GA4 실시간 연동 시 표시" : "GA4 실시간",
+      label: "실시간 접속자",
+      value: realtimeActiveUsersLabel,
+    },
+    {
+      detail: analyticsSummary.source === "google_analytics" ? "GA4 기준" : "내부 로그 기준",
+      label: "오늘 페이지뷰(PV)",
+      value: analyticsSummary.todayPageViews.toLocaleString() + "회",
+    },
+    {
+      detail: "최근 7일 +" + sevenDayReviewCount.toLocaleString() + "건",
+      label: "전체 후기",
+      tab: "reviews" as AdminTab,
+      value: totalReviewCount.toLocaleString() + "건",
+    },
+    {
+      detail:
+        yesterdayDelta === 0
+          ? "변화 없음"
+          : formatReviewDeltaLabel(yesterdayDelta, "어제 대비"),
+      label: "오늘 등록 후기",
+      tab: "reviews" as AdminTab,
+      value: todayReviewCount.toLocaleString() + "건",
+    },
+    {
+      detail: "오늘 가입",
+      label: "신규 회원",
+      tab: "users" as AdminTab,
+      value: todayUsers.length.toLocaleString() + "명",
+    },
+    {
+      detail: "검토 필요",
+      label: "AI 반영 후보",
+      tab: "ai" as AdminTab,
+      value: reviewingAiCandidates.length.toLocaleString() + "건",
+    },
+    {
+      detail: "처리 대기",
+      label: "미처리 신고",
+      tab: "reports" as AdminTab,
+      value: pendingReports.length.toLocaleString() + "건",
+    },
+  ];
+  const recentReviews = reviews.slice(0, 5);
+  const recentPosts = posts.filter((post) => !post.is_notice).slice(0, 5);
+  const recentUsers = users.slice(0, 5).map((account) => ({
+    id: account.id,
+    meta: formatDate(account.created_at),
+    title:
+      (account.nickname ?? "닉네임 없음") +
+      " (" +
+      formatCompactId(account.id, 8) +
+      ")",
+  }));
+
+  return (
+    <div className="mx-auto max-w-[1280px] space-y-4">
+      <section className={panelClassName}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-black text-blue-600">Dashboard</p>
+            <h2 className="mt-1 text-xl font-black text-zinc-950">
+              핵심 운영 현황
+            </h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              상세 트래픽과 검색 통계는 Analytics에서 확인합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={categoryFilterButtonClassName}
+            onClick={() => onNavigate("analytics")}
+          >
+            Analytics 보기
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {overviewItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              className="rounded-lg border border-zinc-200 bg-white p-4 text-left shadow-sm shadow-zinc-200/60 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+              onClick={() => (item.tab ? onNavigate(item.tab) : undefined)}
+            >
+              <p className="text-xs font-black text-zinc-500">{item.label}</p>
+              <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
+                {item.value}
+              </p>
+              <p className="mt-2 text-xs font-bold leading-5 text-blue-600">
+                {item.detail}
+              </p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
+        <div className={panelClassName}>
+          <h2 className="text-lg font-black text-zinc-950">오늘 해야 할 일</h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            승인 또는 검토 대기 항목만 모았습니다.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {todoItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className="flex min-h-12 items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                onClick={() => onNavigate(item.tab)}
+              >
+                <span>
+                  <span className="block text-sm font-black text-zinc-800">
+                    <ToneDot tone={item.tone} /> {item.label}
+                  </span>
+                  <span className="block text-xs font-bold text-zinc-500">
+                    {item.detail}
+                  </span>
+                </span>
+                <span className="text-sm font-black text-zinc-950">
+                  {item.count.toLocaleString()}건
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={panelClassName}>
+          <h2 className="text-lg font-black text-zinc-950">
+            최근 30일 운영 추이
+          </h2>
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            방문자, 회원가입, 후기, 게시글, AI 반영, 신고 흐름을 한 그래프에서 봅니다.
+          </p>
+          <DashboardLineChart rows={chartRows} />
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-4">
+        <DashboardRecentList
+          emptyMessage="최근 후기가 없습니다."
+          items={recentReviews.map((review) => ({
+            id: review.id,
+            meta: formatDate(review.created_at),
+            title:
+              formatAdminPlateNumber(getReviewPlateNumber(review)) +
+              " · " +
+              review.content,
+          }))}
+          title="최근 후기"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 게시글이 없습니다."
+          items={recentPosts.map((post) => ({
+            id: post.id,
+            meta:
+              getPostCategoryLabel(post) + " · " + formatDate(post.created_at),
+            title: post.title,
+          }))}
+          title="최근 게시글"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 가입 회원이 없습니다."
+          items={recentUsers}
+          title="최근 가입 회원"
+        />
+        <DashboardRecentList
+          emptyMessage="최근 신고가 없습니다."
+          items={reports.slice(0, 5).map((report) => ({
+            id: report.report_id,
+            meta: report.report_type + " · " + formatDate(report.created_at),
+            title: report.target_title ?? report.target_content,
+          }))}
+          title="최근 신고"
+        />
+      </section>
+    </div>
+  );
+}
+
+function AnalyticsPanel({
   activeDashboardTab,
   dashboardViewFilter,
   onChangeAiCandidateStatus,
@@ -8798,12 +9144,12 @@ function DashboardPanel({
         <section className={panelClassName}>
           <div className="flex flex-col gap-3">
             <div>
-              <p className="text-xs font-black text-blue-600">운영 Dashboard</p>
+              <p className="text-xs font-black text-blue-600">Analytics</p>
               <h2 className="mt-1 text-lg font-black text-zinc-950">
-                사이트 성장 현황
+                상세 운영 분석
               </h2>
               <p className="mt-1 text-xs font-medium text-zinc-500">
-                {periodLabel} 기준 검색 유입과 AI(GEO) 준비 지표입니다.
+                {periodLabel} 기준 트래픽, 검색, 콘텐츠, AI 분석 지표입니다.
               </p>
             </div>
             <DashboardPeriodSelector
@@ -9012,12 +9358,12 @@ function DashboardPanel({
       <section className={panelClassName}>
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-xs font-black text-blue-600">운영 Dashboard</p>
+            <p className="text-xs font-black text-blue-600">Analytics</p>
             <h2 className="mt-1 text-xl font-black text-zinc-950">
-              사이트 성장 현황
+              상세 운영 분석
             </h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
-              {periodLabel} 기준 검색 유입, Search Console 준비 지표, AI(GEO) 성장 현황입니다.
+              {periodLabel} 기준 트래픽, 검색, 콘텐츠, AI 분석 지표입니다.
             </p>
           </div>
           <DashboardPeriodSelector onChange={onChangePeriod} value={period} />
@@ -9246,13 +9592,13 @@ function DashboardPanel({
       <section className={panelClassName}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-black text-zinc-950">운영 분석</h2>
+            <h2 className="text-lg font-black text-zinc-950">Analytics 상세</h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
-              트래픽, 조회수, 콘텐츠, 키워드, AI DB 업데이트 추천을 탭으로 확인합니다.
+              Dashboard 홈에서 분리한 상세 통계를 영역별로 확인합니다.
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {dashboardBoardTabs.map((tab) => (
+            {analyticsMenuTabs.map((tab) => (
               <button
                 key={tab.value}
                 type="button"
