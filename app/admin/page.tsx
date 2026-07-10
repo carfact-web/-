@@ -2542,6 +2542,7 @@ export default function AdminPage() {
     useState<AdminOperatorDashboardData>(emptyOperatorDashboardData);
   const [activeDashboardTab, setActiveDashboardTab] =
     useState<DashboardBoardTab>("traffic");
+  const [isMobileAdminNavOpen, setIsMobileAdminNavOpen] = useState(false);
   const [dashboardPeriod, setDashboardPeriod] =
     useState<DashboardPeriod>("30days");
   const [dashboardViewFilter, setDashboardViewFilter] =
@@ -5093,18 +5094,34 @@ export default function AdminPage() {
     <main className={pageClassName}>
       <div className={cn(shellClassName, "lg:grid lg:grid-cols-[240px_minmax(0,1fr)]")}>
         <aside className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm shadow-zinc-200/60 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
-          <div className="px-2 py-2">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">
-              CARFACT OPS
-            </p>
-            <h1 className="mt-2 text-xl font-black tracking-tight text-zinc-950">
-              Admin
-            </h1>
-            <p className="mt-1 truncate text-xs font-medium text-zinc-500">
-              {profile?.nickname ?? user?.email ?? "관리자"}
-            </p>
+          <div className="flex items-center justify-between gap-3 px-2 py-2 lg:block">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">
+                CARFACT OPS
+              </p>
+              <h1 className="mt-2 text-xl font-black tracking-tight text-zinc-950">
+                Admin
+              </h1>
+              <p className="mt-1 truncate text-xs font-medium text-zinc-500">
+                {profile?.nickname ?? user?.email ?? "관리자"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-200 px-3 text-sm font-black text-zinc-700 lg:hidden"
+              aria-expanded={isMobileAdminNavOpen}
+              aria-label="관리자 메뉴 열기"
+              onClick={() => setIsMobileAdminNavOpen((current) => !current)}
+            >
+              메뉴
+            </button>
           </div>
-          <nav className="mt-4 grid gap-1">
+          <nav
+            className={cn(
+              "mt-4 gap-1 lg:grid",
+              isMobileAdminNavOpen ? "grid" : "hidden",
+            )}
+          >
             {tabs.map((tab) =>
               tab.value === "analytics" ? (
                 <div key={tab.value} className="grid gap-1">
@@ -5118,6 +5135,7 @@ export default function AdminPage() {
                     onClick={() => {
                       setActiveTab(tab.value);
                       setIsNotificationOpen(false);
+                      setIsMobileAdminNavOpen(false);
                     }}
                   >
                     {tab.label}
@@ -5137,6 +5155,7 @@ export default function AdminPage() {
                         setActiveTab("analytics");
                         setActiveDashboardTab(analyticsTab.value);
                         setIsNotificationOpen(false);
+                        setIsMobileAdminNavOpen(false);
                       }}
                     >
                       └ {analyticsTab.label}
@@ -5155,6 +5174,7 @@ export default function AdminPage() {
                     onClick={() => {
                       setActiveTab(tab.value);
                       setIsNotificationOpen(false);
+                      setIsMobileAdminNavOpen(false);
                     }}
                   >
                     {tab.label}
@@ -5169,6 +5189,7 @@ export default function AdminPage() {
                     onClick={() => {
                       setActiveTab(tab.value);
                       setIsNotificationOpen(false);
+                      setIsMobileAdminNavOpen(false);
                     }}
                   >
                     └ 용어/증상 DB
@@ -5186,6 +5207,7 @@ export default function AdminPage() {
                   onClick={() => {
                     setActiveTab(tab.value);
                     setIsNotificationOpen(false);
+                    setIsMobileAdminNavOpen(false);
                   }}
                 >
                   {tab.label}
@@ -5193,7 +5215,12 @@ export default function AdminPage() {
               ),
             )}
           </nav>
-          <div className="mt-5 grid gap-2 border-t border-zinc-100 pt-4">
+          <div
+            className={cn(
+              "mt-5 gap-2 border-t border-zinc-100 pt-4 lg:grid",
+              isMobileAdminNavOpen ? "grid" : "hidden",
+            )}
+          >
             <button
               type="button"
               className={actionButtonClassName}
@@ -8156,7 +8183,7 @@ function AdminDetailModal({
 
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="mx-auto max-w-[1280px]">
       <p className="text-xs font-black text-zinc-400">{label}</p>
       <p className="mt-1 break-words font-bold text-zinc-800">{value}</p>
     </div>
@@ -9592,9 +9619,13 @@ function AnalyticsPanel({
       <section className={panelClassName}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-black text-zinc-950">Analytics 상세</h2>
+            <h2 className="text-lg font-black text-zinc-950">
+              {activeDashboardTab === "traffic" ? "운영 로그" : "Analytics 상세"}
+            </h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
-              Dashboard 홈에서 분리한 상세 통계를 영역별로 확인합니다.
+              {activeDashboardTab === "traffic"
+                ? "일반 운영 트래픽 기록입니다. KOTSA 로그는 별도 메뉴에서 확인합니다."
+                : "Dashboard 홈에서 분리한 상세 통계를 영역별로 확인합니다."}
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
