@@ -275,7 +275,7 @@ export default function CommercialPlatePage() {
                 setPlateNumber(sanitizeVehiclePlateNumber(event.target.value));
               }}
               type="text"
-              placeholder="예) 서울38아8000"
+              placeholder="예) 서울38아1234"
               className={inputClassName}
               aria-invalid={showValidationError}
               aria-describedby={
@@ -286,7 +286,7 @@ export default function CommercialPlatePage() {
 
           <div className="mt-3 space-y-3 px-1 text-sm leading-6 text-zinc-400">
             <p>
-              예) 경기70바1234
+              예) 서울38아1234
               <br />
               지역명이 있는 번호판은 반드시 지역명까지 입력해주세요.
             </p>
