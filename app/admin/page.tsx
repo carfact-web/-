@@ -56,8 +56,8 @@ type KnowledgeSortOption =
   | "category_asc"
   | "visible_first";
 type DashboardBoardTab =
+  | "main"
   | "traffic"
-  | "views"
   | "content"
   | "keywords"
   | "internalKeywords"
@@ -1411,9 +1411,10 @@ const dashboardViewFilters: {
 ];
 
 const analyticsMenuTabs: { label: string; value: DashboardBoardTab }[] = [
+  { label: "메인", value: "main" },
   { label: "트래픽", value: "traffic" },
   { label: "검색", value: "keywords" },
-  { label: "콘텐츠", value: "views" },
+  { label: "콘텐츠", value: "content" },
   { label: "AI 분석", value: "ai" },
 ];
 
@@ -2541,7 +2542,7 @@ export default function AdminPage() {
   const [operatorDashboardData, setOperatorDashboardData] =
     useState<AdminOperatorDashboardData>(emptyOperatorDashboardData);
   const [activeDashboardTab, setActiveDashboardTab] =
-    useState<DashboardBoardTab>("traffic");
+    useState<DashboardBoardTab>("main");
   const [isMobileAdminNavOpen, setIsMobileAdminNavOpen] = useState(false);
   const [dashboardPeriod, setDashboardPeriod] =
     useState<DashboardPeriod>("30days");
@@ -5151,6 +5152,7 @@ export default function AdminPage() {
                     )}
                     onClick={() => {
                       setActiveTab(tab.value);
+                      setActiveDashboardTab("main");
                       setIsNotificationOpen(false);
                       setIsMobileAdminNavOpen(false);
                     }}
@@ -5372,7 +5374,7 @@ export default function AdminPage() {
                       onClick={() => {
                         setActiveTab("analytics");
                         setDashboardViewFilter("vehicle");
-                        setActiveDashboardTab("views");
+                        setActiveDashboardTab("content");
                         setIsNotificationOpen(false);
                       }}
                     />
@@ -8414,27 +8416,6 @@ const getDashboardPeriodStartTime = (period: DashboardPeriod) => {
   return todayStart.getTime() - (days - 1) * 24 * 60 * 60 * 1000;
 };
 
-const getPreviousPeriodRange = (period: DashboardPeriod) => {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartTime = todayStart.getTime();
-
-  if (period === "today") {
-    return {
-      end: todayStartTime,
-      start: todayStartTime - 24 * 60 * 60 * 1000,
-    };
-  }
-
-  const days = period === "7days" ? 7 : period === "30days" ? 30 : 90;
-  const currentStart = todayStartTime - (days - 1) * 24 * 60 * 60 * 1000;
-
-  return {
-    end: currentStart,
-    start: currentStart - days * 24 * 60 * 60 * 1000,
-  };
-};
-
 const filterAcquisitionRowsByPeriod = (
   rows: AdminDashboardAcquisitionEventRow[],
   period: DashboardPeriod,
@@ -8450,14 +8431,6 @@ const filterAcquisitionRowsByPeriod = (
 
 const sumVisits = (rows: AdminDashboardAcquisitionEventRow[]) =>
   rows.reduce((sum, row) => sum + row.visits, 0);
-
-const calculateGrowthRate = (currentValue: number, previousValue: number) => {
-  if (previousValue <= 0) {
-    return currentValue > 0 ? 100 : 0;
-  }
-
-  return ((currentValue - previousValue) / previousValue) * 100;
-};
 
 const createSearchTrendRows = (
   rows: AdminDashboardAcquisitionEventRow[],
@@ -8905,16 +8878,11 @@ function AnalyticsPanel({
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayStartTime = todayStart.getTime();
-  const yesterdayStartTime = todayStartTime - dayMs;
   const sevenDayStartTime = todayStartTime - 6 * dayMs;
   const thirtyDayStartTime = todayStartTime - 29 * dayMs;
   const todayReviews = reviews.filter(
     (review) => Date.parse(review.created_at) >= todayStartTime,
   );
-  const yesterdayReviews = reviews.filter((review) => {
-    const createdAt = Date.parse(review.created_at);
-    return createdAt >= yesterdayStartTime && createdAt < todayStartTime;
-  });
   const todayPosts = posts.filter(
     (post) => Date.parse(post.created_at) >= todayStartTime,
   );
@@ -8942,75 +8910,11 @@ function AnalyticsPanel({
   );
   const sevenDayReviewCount = countReviewsFrom(reviews, sevenDayStartTime);
   const thirtyDayReviewCount = countReviewsFrom(reviews, thirtyDayStartTime);
-  const visibleReviewCount = reviews.filter((review) => !review.is_hidden).length;
   const hiddenReviewCount = reviews.filter((review) => review.is_hidden).length;
-  const yesterdayDelta = todayReviewCount - yesterdayReviews.length;
-  const reviewTotalDetails = [
-    "오늘 " + formatSignedReviewCount(todayReviewCount),
-    formatReviewDeltaLabel(yesterdayDelta, "어제 대비"),
-    formatReviewDeltaLabel(sevenDayReviewCount, "최근 7일"),
-    formatReviewDeltaLabel(thirtyDayReviewCount, "최근 30일"),
-  ];
-  const reviewVisibilityLabel =
-    "노출 " +
-    visibleReviewCount.toLocaleString() +
-    " / 비노출 " +
-    hiddenReviewCount.toLocaleString();
-  const summaryItems = [
-    {
-      label: "오늘 등록 후기",
-      value: todayReviewCount,
-      detail:
-        yesterdayDelta === 0
-          ? "변화 없음"
-          : formatReviewDeltaLabel(yesterdayDelta, "어제 대비"),
-      tab: "reviews" as AdminTab,
-    },
-    {
-      label: "신규 회원",
-      value: todayUsers.length,
-      detail: "최근 가입 확인",
-      tab: "users" as AdminTab,
-    },
-    {
-      label: "신고 접수",
-      value: todayReports.length,
-      detail: "오늘 접수",
-      tab: "reports" as AdminTab,
-    },
-    {
-      label: "AI 반영 후보",
-      value: reviewingAiCandidates.length,
-      detail: "검토 대기",
-      tab: "ai" as AdminTab,
-    },
-    {
-      label: "미처리 신고",
-      value: pendingReports.length,
-      detail: "운영 처리 필요",
-      tab: "reports" as AdminTab,
-    },
-    {
-      label: "오늘 게시글",
-      value: todayPosts.length,
-      detail: "공지 제외 포함",
-      tab: "posts" as AdminTab,
-    },
-  ];
   const filteredRankings = operatorDashboardData.viewRankings.filter(
     (item) => item.type === dashboardViewFilter,
   );
-  const recentReviews = reviews.slice(0, 5);
   const recentPosts = posts.filter((post) => !post.is_notice).slice(0, 5);
-  const recentUsers = users.slice(0, 5).map((account) => ({
-    id: account.id,
-    meta: formatDate(account.created_at),
-    title:
-      (account.nickname ?? "닉네임 없음") +
-      " (" +
-      formatCompactId(account.id, 8) +
-      ")",
-  }));
   const chartRows = createDashboardChartRows({
     aiCandidates: appliedAiCandidates,
     posts,
@@ -9031,32 +8935,7 @@ function AnalyticsPanel({
     operatorDashboardData.acquisitionRows,
     period,
   );
-  const previousRange = period === "all" ? null : getPreviousPeriodRange(period);
-  const previousAcquisitionRows = previousRange
-    ? operatorDashboardData.acquisitionRows.filter((row) => {
-        const time = Date.parse(row.day);
-        return time >= previousRange.start && time < previousRange.end;
-      })
-    : [];
   const currentSearchVisits = sumVisits(filteredAcquisitionRows);
-  const previousSearchVisits = sumVisits(previousAcquisitionRows);
-  const periodGrowthRate = calculateGrowthRate(
-    currentSearchVisits,
-    previousSearchVisits,
-  );
-  const weekStartRange = getPreviousPeriodRange("7days");
-  const thisWeekVisits = sumVisits(
-    operatorDashboardData.acquisitionRows.filter(
-      (row) => Date.parse(row.day) >= getDashboardPeriodStartTime("7days")!,
-    ),
-  );
-  const previousWeekVisits = sumVisits(
-    operatorDashboardData.acquisitionRows.filter((row) => {
-      const time = Date.parse(row.day);
-      return time >= weekStartRange.start && time < weekStartRange.end;
-    }),
-  );
-  const weekGrowthRate = calculateGrowthRate(thisWeekVisits, previousWeekVisits);
   const searchTrendRows = createSearchTrendRows(filteredAcquisitionRows);
   const searchChannelItems = createChannelRows(filteredAcquisitionRows);
   const topKeywordRows = createBarRows(
@@ -9064,20 +8943,10 @@ function AnalyticsPanel({
     (row) => row.keyword,
     (row) => row.channel,
   );
-  const topModelRows = createBarRows(
-    filteredAcquisitionRows,
-    (row) => row.modelName,
-    (row) => row.keyword,
-  );
   const topLandingRows = createBarRows(
     filteredAcquisitionRows,
     (row) => formatLandingPageLabel(row.landingPage),
     (row) => row.landingPage,
-  );
-  const topSymptomRows = createBarRows(
-    filteredAcquisitionRows,
-    (row) => row.symptomKeyword ?? "",
-    (row) => row.keyword,
   );
   const searchSummary = operatorDashboardData.searchConsoleSummary;
   const periodImpressions = filteredAcquisitionRows.reduce(
@@ -9090,13 +8959,6 @@ function AnalyticsPanel({
   );
   const periodCtr =
     periodImpressions > 0 ? (periodClicks / periodImpressions) * 100 : null;
-  const geoScoreValues = filteredAcquisitionRows
-    .map((row) => row.geoScore)
-    .filter((value): value is number => value !== null);
-  const periodGeoScore = geoScoreValues.length
-    ? geoScoreValues.reduce((sum, value) => sum + value, 0) /
-      geoScoreValues.length
-    : null;
   const periodLabel =
     dashboardPeriods.find((item) => item.value === period)?.label ?? "30일";
   const searchConsoleUpdatedLabel = searchSummary.updatedAt
@@ -9188,87 +9050,138 @@ function AnalyticsPanel({
       value: realtimeActiveUsersLabel,
     },
   ];
-  const popularPageRows = operatorDashboardData.popularPageRows.map((row) => ({
-    detail:
-      row.pageTitle ??
-      row.visitors.toLocaleString() +
-        "명 · " +
-        (row.source === "external" ? "GA/Search Console" : "내부 로그"),
-    label: formatLandingPageLabel(row.pagePath),
-    value: row.pageViews,
+  const trafficTrendRows = trafficStats.dailyVisitors.map((row) => ({
+    label: row.label,
+    value: row.visitor_count,
   }));
+  const landingPageRows = trafficStats.pathTop.map((row) => ({
+    detail:
+      row.percentage === undefined
+        ? undefined
+        : "전체 " + row.percentage.toFixed(1) + "%",
+    label: formatLandingPageLabel(row.label),
+    value: row.visitor_count,
+  }));
+  const deviceRows = trafficStats.deviceBreakdown.map((row) => ({
+    detail:
+      row.percentage === undefined
+        ? undefined
+        : "전체 " + row.percentage.toFixed(1) + "%",
+    label: row.label,
+    value: row.visitor_count,
+  }));
+  const browserRows = trafficStats.browserBreakdown.map((row) => ({
+    detail:
+      row.percentage === undefined
+        ? undefined
+        : "전체 " + row.percentage.toFixed(1) + "%",
+    label: row.label,
+    value: row.visitor_count,
+  }));
+  const osRows = trafficStats.osBreakdown.map((row) => ({
+    detail:
+      row.percentage === undefined
+        ? undefined
+        : "전체 " + row.percentage.toFixed(1) + "%",
+    label: row.label,
+    value: row.visitor_count,
+  }));
+  const contentMetricItems = [
+    {
+      detail:
+        "오늘 " +
+        todayReviewCount.toLocaleString() +
+        "건 · 7일 " +
+        sevenDayReviewCount.toLocaleString() +
+        "건",
+      label: "후기 등록 수",
+      value: totalReviewCount.toLocaleString() + "건",
+    },
+    {
+      detail: "오늘 " + todayPosts.length.toLocaleString() + "건",
+      label: "게시글 등록 수",
+      value: stats.communityPosts.toLocaleString() + "건",
+    },
+    {
+      detail:
+        "차량/차종/후기 조회 합산 · 30일 후기 " +
+        thirtyDayReviewCount.toLocaleString() +
+        "건",
+      label: "콘텐츠 조회수",
+      value: operatorDashboardData.totalViews.toLocaleString() + "회",
+    },
+    {
+      detail: "숨김 후기 " + hiddenReviewCount.toLocaleString() + "건",
+      label: "신고/숨김 현황",
+      value: stats.reports.toLocaleString() + "건",
+    },
+  ];
+  const aiPendingCount = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "pending",
+  ).length;
+  const aiExcludedCount = operatorDashboardData.aiCandidates.filter(
+    (candidate) => candidate.status === "excluded",
+  ).length;
+  const latestAiUpdatedAt =
+    operatorDashboardData.aiCandidates
+      .map((candidate) => candidate.updatedAt)
+      .filter((value): value is string => Boolean(value))
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
+  const pageTitle =
+    activeDashboardTab === "main"
+      ? "Analytics 메인"
+      : analyticsMenuTabs.find((tab) => tab.value === activeDashboardTab)
+          ?.label ?? "Analytics";
+  const pageDescription =
+    activeDashboardTab === "main"
+      ? "전체 운영 상태를 요약하고 상세 분석 화면으로 이동합니다."
+      : activeDashboardTab === "traffic"
+        ? "방문, 유입, 랜딩, 기기 환경과 날짜별 트래픽 로그만 표시합니다."
+        : activeDashboardTab === "keywords"
+          ? "Search Console 및 외부 검색 유입 성과를 확인합니다."
+          : activeDashboardTab === "content"
+            ? "후기, 게시글, 인기 콘텐츠와 신고/숨김 현황만 확인합니다."
+            : "AI 분석 처리 상태와 DB 반영 후보만 확인합니다.";
 
   return (
-    <div>
-      <div className="space-y-4 md:hidden">
-        <section className={panelClassName}>
-          <div className="flex flex-col gap-3">
-            <div>
-              <p className="text-xs font-black text-blue-600">Analytics</p>
-              <h2 className="mt-1 text-lg font-black text-zinc-950">
-                상세 운영 분석
-              </h2>
-              <p className="mt-1 text-xs font-medium text-zinc-500">
-                {periodLabel} 기준 트래픽, 검색, 콘텐츠, AI 분석 지표입니다.
-              </p>
-            </div>
-            <DashboardPeriodSelector
-              onChange={onChangePeriod}
-              value={period}
-            />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <GrowthMetricCard
-              detail="외부 유입 기준"
-              label="검색 유입"
-              value={currentSearchVisits.toLocaleString() + "회"}
-            />
-            <GrowthMetricCard
-              detail="선택 기간 직전 대비"
-              label="성장률"
-              tone={periodGrowthRate >= 0 ? "green" : "zinc"}
-              value={(periodGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(periodGrowthRate).toFixed(1) + "%"}
-            />
-            <GrowthMetricCard
-              detail={"최근 30일 " + formatSignedReviewCount(thirtyDayReviewCount) + "건"}
-              label="후기 성장"
-              tone={sevenDayReviewCount > 0 ? "green" : "zinc"}
-              value={
-                sevenDayReviewCount > 0
-                  ? "▲ " + formatSignedReviewCount(sevenDayReviewCount) + "건"
-                  : "변화 없음"
-              }
-            />
-            <GrowthMetricCard
-              detail="Search Console 연동 대기"
-              label="CTR"
-              tone="purple"
-              value={formatDashboardPercent(periodCtr)}
-            />
-            <GrowthMetricCard
-              detail="AI 검색 대응 지표 준비"
-              label="AI(GEO) 점수"
-              tone="purple"
-              value={
-                periodGeoScore === null
-                  ? "준비중"
-                  : periodGeoScore.toFixed(1)
-              }
-            />
-          </div>
-        </section>
-        <section className={panelClassName}>
+    <div className="space-y-4">
+      <section className={panelClassName}>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p className="text-xs font-black text-blue-600">GA4/Search Console 준비</p>
-            <h2 className="mt-1 text-base font-black text-zinc-950">
-              오늘 핵심 KPI
+            <p className="text-xs font-black text-blue-600">Analytics</p>
+            <h2 className="mt-1 text-xl font-black text-zinc-950">
+              {pageTitle}
             </h2>
             <p className="mt-1 text-xs font-medium text-zinc-500">
-              {analyticsSourceLabel}으로 표시합니다.
+              {periodLabel} 기준 · {pageDescription}
             </p>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {analyticsKpiItems.map((item) => (
+          <div className="grid gap-2">
+            <DashboardPeriodSelector onChange={onChangePeriod} value={period} />
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {analyticsMenuTabs.map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  className={cn(
+                    categoryFilterButtonClassName,
+                    activeDashboardTab === tab.value &&
+                      activeCategoryFilterButtonClassName,
+                  )}
+                  onClick={() => onChangeDashboardTab(tab.value)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {activeDashboardTab === "main" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {analyticsKpiItems.slice(0, 4).map((item) => (
               <GrowthMetricCard
                 key={item.label}
                 detail={item.detail}
@@ -9276,509 +9189,482 @@ function AnalyticsPanel({
                 value={item.value}
               />
             ))}
-          </div>
-        </section>
-        <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
-        <TrafficSourceDonutCard
-          description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
-          items={searchChannelItems}
-          title="검색엔진 비율"
-        />
-        <DashboardBarCard
-          emptyMessage="외부 검색 키워드 데이터가 없습니다."
-          rows={topKeywordRows}
-          title="TOP 검색 키워드"
-        />
-        <DashboardBarCard
-          emptyMessage="유입 차종 데이터가 없습니다."
-          rows={topModelRows}
-          title="인기 차종 검색"
-        />
-        <DashboardBarCard
-          emptyMessage="랜딩페이지 데이터가 없습니다."
-          rows={topLandingRows}
-          title="랜딩페이지 TOP"
-        />
-        <DashboardBarCard
-          emptyMessage="인기 증상 키워드 데이터가 없습니다."
-          rows={topSymptomRows}
-          title="인기 증상 키워드 TOP"
-        />
-        <DashboardBarCard
-          emptyMessage="인기 페이지 데이터가 없습니다."
-          rows={popularPageRows}
-          title="인기 페이지 TOP"
-        />
-        <section className="grid grid-cols-2 gap-3">
-          <ReviewTotalStatCard
-            detailLines={reviewTotalDetails}
-            visibilityLabel={reviewVisibilityLabel}
-            value={totalReviewCount}
-            onClick={() => onNavigate("reviews")}
-          />
-          {summaryItems.slice(0, 4).map((item) => (
-            <StatCard
-              key={item.label}
-              detail={item.detail}
-              label={item.label}
-              value={item.value}
-              onClick={() => onNavigate(item.tab)}
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className={panelClassName}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-black text-zinc-950">
+                    최근 운영 추이
+                  </h2>
+                  <p className="mt-1 text-xs font-medium text-zinc-500">
+                    같은 데이터 소스의 최근 30일 흐름입니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onChangeDashboardTab("traffic")}
+                >
+                  자세히 보기
+                </button>
+              </div>
+              <DashboardLineChart rows={chartRows} />
+            </div>
+            <div className={panelClassName}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-black text-zinc-950">
+                    오늘 해야 할 일
+                  </h2>
+                  <p className="mt-1 text-xs font-medium text-zinc-500">
+                    처리가 필요한 운영 항목만 표시합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {todoItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                    onClick={() => onNavigate(item.tab)}
+                  >
+                    <span className="text-sm font-black text-zinc-800">
+                      <ToneDot tone={item.tone} /> {item.label}
+                    </span>
+                    <span className="text-sm font-black text-zinc-950">
+                      {item.count.toLocaleString()}건
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AnalyticsDetailLinkCard
+              count={trafficStats.thirtyDayVisitors.toLocaleString() + "명"}
+              detail="방문/유입/기기/로그"
+              label="트래픽"
+              onClick={() => onChangeDashboardTab("traffic")}
             />
-          ))}
-        </section>
-
-        <section className={panelClassName}>
-          <h2 className="text-base font-black text-zinc-950">오늘 해야 할 일</h2>
-          <div className="mt-3 grid gap-2">
-            {todoItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className="flex min-h-12 items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left"
-                onClick={() => onNavigate(item.tab)}
-              >
-                <span className="text-sm font-black text-zinc-800">
-                  <ToneDot tone={item.tone} /> {item.label}
-                </span>
-                <span className="text-sm font-black text-zinc-950">
-                  {item.count.toLocaleString()}건
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className={panelClassName}>
-          <h2 className="text-base font-black text-zinc-950">운영 알림</h2>
-          <div className="mt-3 divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-zinc-50">
-            <NotificationItem
-              count={pendingReports.length}
-              label="미처리 신고"
-              tone="red"
-              onClick={() => onNavigate("reports")}
+            <AnalyticsDetailLinkCard
+              count={currentSearchVisits.toLocaleString() + "회"}
+              detail="Search Console/검색어/랜딩"
+              label="검색"
+              onClick={() => onChangeDashboardTab("keywords")}
             />
-            <NotificationItem
-              count={reviewingAiCandidates.length}
-              label="AI 검토 대기"
-              tone="purple"
-              onClick={() => onNavigate("ai")}
+            <AnalyticsDetailLinkCard
+              count={operatorDashboardData.totalViews.toLocaleString() + "회"}
+              detail="후기/게시글/인기 콘텐츠"
+              label="콘텐츠"
+              onClick={() => onChangeDashboardTab("content")}
             />
-            <NotificationItem
-              count={todayPosts.length}
-              label="오늘 게시글"
-              tone="blue"
-              onClick={() => onNavigate("posts")}
+            <AnalyticsDetailLinkCard
+              count={reviewingAiCandidates.length.toLocaleString() + "건"}
+              detail="분석 상태/DB 반영"
+              label="AI 분석"
+              onClick={() => onChangeDashboardTab("ai")}
             />
-            <NotificationItem
-              count={appliedAiCandidates.length}
-              label="AI 반영 완료"
-              tone="green"
-              onClick={() => onNavigate("ai")}
-            />
-          </div>
-        </section>
+          </section>
 
-        <DashboardMobileList
-          emptyMessage="최근 후기가 없습니다."
-          items={recentReviews.map((review) => ({
-            id: review.id,
-            meta: formatDate(review.created_at),
-            title:
-              formatAdminPlateNumber(getReviewPlateNumber(review)) +
-              " · " +
-              review.content,
-          }))}
-          title="최근 후기"
-        />
-        <DashboardMobileList
-          emptyMessage="최근 가입 회원이 없습니다."
-          items={recentUsers}
-          title="최근 회원"
-        />
-        <DashboardMobileList
-          emptyMessage="최근 신고가 없습니다."
-          items={reports.slice(0, 5).map((report) => ({
-            id: report.report_id,
-            meta: report.report_type + " · " + formatDate(report.created_at),
-            title: report.target_title ?? report.target_content,
-          }))}
-          title="최근 신고"
-        />
+          <section className={panelClassName}>
+            <h2 className="text-lg font-black text-zinc-950">주요 이상 상태</h2>
+            <div className="mt-3 divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-zinc-50">
+              <NotificationItem
+                count={pendingReports.length}
+                label="미처리 신고"
+                tone="red"
+                onClick={() => onNavigate("reports")}
+              />
+              <NotificationItem
+                count={reviewingAiCandidates.length}
+                label="AI DB 미반영 후보"
+                tone="purple"
+                onClick={() => onChangeDashboardTab("ai")}
+              />
+              <NotificationItem
+                count={todayReports.length}
+                label="오늘 신규 신고"
+                tone="yellow"
+                onClick={() => onNavigate("reports")}
+              />
+            </div>
+          </section>
+        </>
+      ) : null}
 
-        <section className={panelClassName}>
-          <h2 className="text-base font-black text-zinc-950">통계</h2>
-          <p className="mt-1 text-xs font-medium text-zinc-500">
-            최근 30일 운영 흐름입니다.
-          </p>
-          <DashboardLineChart rows={chartRows} />
-        </section>
-      </div>
-
-      <div className="hidden space-y-4 md:block">
-      <section className={panelClassName}>
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-xs font-black text-blue-600">Analytics</p>
-            <h2 className="mt-1 text-xl font-black text-zinc-950">
-              상세 운영 분석
-            </h2>
-            <p className="mt-1 text-xs font-medium text-zinc-500">
-              {periodLabel} 기준 트래픽, 검색, 콘텐츠, AI 분석 지표입니다.
-            </p>
-          </div>
-          <DashboardPeriodSelector onChange={onChangePeriod} value={period} />
-        </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-5">
-          <GrowthMetricCard
-            detail="외부 유입 기준"
-            label="검색 유입"
-            value={currentSearchVisits.toLocaleString() + "회"}
-          />
-          <GrowthMetricCard
-            detail="선택 기간 직전 대비"
-            label="기간 성장률"
-            tone={periodGrowthRate >= 0 ? "green" : "zinc"}
-            value={(periodGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(periodGrowthRate).toFixed(1) + "%"}
-          />
-          <GrowthMetricCard
-            detail="지난 7일 vs 직전 7일"
-            label="지난주 대비"
-            tone={weekGrowthRate >= 0 ? "green" : "zinc"}
-            value={(weekGrowthRate >= 0 ? "▲ " : "▼ ") + Math.abs(weekGrowthRate).toFixed(1) + "%"}
-          />
-          <GrowthMetricCard
-            detail={"최근 30일 " + formatSignedReviewCount(thirtyDayReviewCount) + "건"}
-            label="후기 성장"
-            tone={sevenDayReviewCount > 0 ? "green" : "zinc"}
-            value={
-              sevenDayReviewCount > 0
-                ? "▲ " + formatSignedReviewCount(sevenDayReviewCount) + "건"
-                : "변화 없음"
-            }
-          />
-          <GrowthMetricCard
-            detail="AI 검색 대응 지표 구조 준비"
-            label="AI(GEO) 점수"
-            tone="purple"
-            value={
-              periodGeoScore === null
-                ? "준비중"
-                : periodGeoScore.toFixed(1)
-            }
-          />
-        </div>
-      </section>
-
-      <section className={panelClassName}>
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-black text-blue-600">GA4/Search Console 준비</p>
-            <h2 className="mt-1 text-lg font-black text-zinc-950">
-              오늘 핵심 KPI
-            </h2>
-            <p className="mt-1 text-xs font-medium text-zinc-500">
-              {analyticsSourceLabel}으로 표시하며, GA4/Search Console 적재 시 자동 갱신됩니다.
-            </p>
-          </div>
-          <p className="text-xs font-bold text-zinc-500">
-            GA4 {analyticsSummary.isGa4Connected ? "연동 감지" : "연동 대기"} · Search Console{" "}
-            {analyticsSummary.isSearchConsoleConnected ? "연동 감지" : "연동 대기"}
-          </p>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {analyticsKpiItems.map((item) => (
+      {activeDashboardTab === "traffic" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <GrowthMetricCard
-              key={item.label}
-              detail={item.detail}
-              label={item.label}
-              value={item.value}
+              detail={analyticsUpdatedLabel}
+              label="방문자"
+              value={analyticsSummary.todayVisitors.toLocaleString() + "명"}
             />
-          ))}
-        </div>
-      </section>
+            <GrowthMetricCard
+              detail="세션 수집 필드 준비 전"
+              label="세션"
+              tone="zinc"
+              value="데이터 없음"
+            />
+            <GrowthMetricCard
+              detail={analyticsUpdatedLabel}
+              label="페이지뷰"
+              value={analyticsSummary.todayPageViews.toLocaleString() + "회"}
+            />
+            <GrowthMetricCard
+              detail={analyticsSummary.isGa4Connected ? "GA4 기준" : "GA4 연동 후 표시"}
+              label="체류시간"
+              value={formatEngagementDuration(analyticsSummary.averageEngagementSeconds)}
+            />
+            <GrowthMetricCard
+              detail="이탈률 수집 필드 준비 전"
+              label="이탈률"
+              tone="zinc"
+              value="데이터 없음"
+            />
+          </section>
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+            <SearchTrendCard rows={trafficTrendRows} title="날짜별 트래픽 추이" />
+            <TrafficSourceDonutCard items={trafficSourceItems} />
+          </section>
+          <section className="grid gap-4 xl:grid-cols-4">
+            <DashboardBarCard
+              emptyMessage="랜딩페이지 데이터가 없습니다."
+              rows={landingPageRows}
+              title="랜딩페이지"
+            />
+            <DashboardBarCard
+              emptyMessage="기기 데이터가 없습니다."
+              rows={deviceRows}
+              title="기기"
+            />
+            <DashboardBarCard
+              emptyMessage="브라우저 데이터가 없습니다."
+              rows={browserRows}
+              title="브라우저"
+            />
+            <DashboardBarCard
+              emptyMessage="운영체제 데이터가 없습니다."
+              rows={osRows}
+              title="운영체제"
+            />
+          </section>
+          <section className={panelClassName}>
+            <h2 className="text-lg font-black text-zinc-950">트래픽 로그</h2>
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+              <DashboardTrafficTable rows={operatorDashboardData.trafficRows} />
+            </div>
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-        <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
-        <TrafficSourceDonutCard
-          description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
-          items={searchChannelItems}
-          title="검색엔진 비율"
-        />
-      </section>
+      {activeDashboardTab === "keywords" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <GrowthMetricCard
+              detail={searchConsoleUpdatedLabel}
+              label="노출"
+              value={periodImpressions.toLocaleString() + "회"}
+            />
+            <GrowthMetricCard
+              detail="Search Console/GA 클릭 지표"
+              label="클릭"
+              value={periodClicks.toLocaleString() + "회"}
+            />
+            <GrowthMetricCard
+              detail="노출 대비 클릭률"
+              label="CTR"
+              tone="purple"
+              value={formatDashboardPercent(periodCtr)}
+            />
+            <GrowthMetricCard
+              detail="평균 순위 수집 필드 준비 전"
+              label="평균 순위"
+              tone="zinc"
+              value="데이터 없음"
+            />
+          </section>
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+            <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
+            <TrafficSourceDonutCard
+              description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
+              items={searchChannelItems}
+              title="검색엔진 비율"
+            />
+          </section>
+          <section className="grid gap-4 xl:grid-cols-4">
+            <DashboardBarCard
+              emptyMessage="외부 검색 키워드 데이터가 없습니다."
+              rows={topKeywordRows}
+              title="검색어별 성과"
+            />
+            <DashboardBarCard
+              emptyMessage="검색 유입 랜딩페이지 데이터가 없습니다."
+              rows={topLandingRows}
+              title="검색 유입 랜딩페이지"
+            />
+            <DashboardBarCard
+              emptyMessage="순위 상승/하락 검색어 데이터가 없습니다."
+              rows={[]}
+              title="순위 상승/하락 검색어"
+            />
+            <DashboardBarCard
+              emptyMessage="노출 대비 클릭이 낮은 검색어 데이터가 없습니다."
+              rows={[]}
+              title="낮은 CTR 검색어"
+            />
+          </section>
+          <section className={panelClassName}>
+            <h2 className="text-lg font-black text-zinc-950">
+              검색어 및 랜딩페이지
+            </h2>
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+              <DashboardAcquisitionKeywordTable
+                rows={operatorDashboardData.keywordRows}
+              />
+            </div>
+          </section>
+          <section className={panelClassName}>
+            <h2 className="text-lg font-black text-zinc-950">내부 검색</h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              사이트 내부 차량번호/후기 키워드는 외부 검색과 분리합니다.
+            </p>
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+              <DashboardInternalKeywordTable
+                rows={operatorDashboardData.internalKeywordRows}
+              />
+            </div>
+          </section>
+          <section className="grid gap-4 md:grid-cols-2">
+            <DashboardStatusPanel
+              message="Search Console 색인 상태 수집 데이터가 없습니다."
+              title="색인 상태"
+            />
+            <DashboardStatusPanel
+              message="Search Console 검색 오류 수집 데이터가 없습니다."
+              title="검색 오류"
+            />
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-4">
-        <DashboardBarCard
-          emptyMessage="외부 검색 키워드 데이터가 없습니다."
-          rows={topKeywordRows}
-          title="TOP 검색 키워드"
-        />
-        <DashboardBarCard
-          emptyMessage="유입 차종 데이터가 없습니다."
-          rows={topModelRows}
-          title="인기 차종 검색"
-        />
-        <DashboardBarCard
-          emptyMessage="랜딩페이지 데이터가 없습니다."
-          rows={topLandingRows}
-          title="랜딩페이지 TOP"
-        />
-        <DashboardBarCard
-          emptyMessage="인기 증상 키워드 데이터가 없습니다."
-          rows={topSymptomRows}
-          title="인기 증상 키워드 TOP"
-        />
-      </section>
+      {activeDashboardTab === "content" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {contentMetricItems.map((item) => (
+              <GrowthMetricCard
+                key={item.label}
+                detail={item.detail}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
+          </section>
+          <section className="grid gap-4 xl:grid-cols-4">
+            <DashboardBarCard
+              emptyMessage="인기 후기 데이터가 없습니다."
+              rows={operatorDashboardData.viewRankings
+                .filter((item) => item.type === "review")
+                .map((item) => ({
+                  detail: item.modelName,
+                  label: item.title,
+                  value: item.viewCount,
+                }))}
+              title="인기 후기"
+            />
+            <DashboardBarCard
+              emptyMessage="인기 게시글 데이터가 없습니다."
+              rows={recentPosts.map((post) => ({
+                detail: getPostCategoryLabel(post),
+                label: post.title,
+                value: post.like_count + post.comment_count,
+              }))}
+              title="인기 게시글"
+            />
+            <DashboardBarCard
+              emptyMessage="인기 차량 데이터가 없습니다."
+              rows={operatorDashboardData.viewRankings
+                .filter((item) => item.type === "vehicle")
+                .map((item) => ({
+                  detail: item.modelName,
+                  label: item.title,
+                  value: item.viewCount,
+                }))}
+              title="인기 차량"
+            />
+            <DashboardBarCard
+              emptyMessage="인기 차종 데이터가 없습니다."
+              rows={operatorDashboardData.viewRankings
+                .filter((item) => item.type === "model")
+                .map((item) => ({
+                  detail: item.recentViewedAt
+                    ? "최근 조회 " + formatOptionalDate(item.recentViewedAt)
+                    : undefined,
+                  label: item.title,
+                  value: item.viewCount,
+                }))}
+              title="인기 차종"
+            />
+          </section>
+          <section className={panelClassName}>
+            <h2 className="text-lg font-black text-zinc-950">조회 상세</h2>
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+              <DashboardViewsTable
+                filter={dashboardViewFilter}
+                onChangeFilter={onChangeViewFilter}
+                rows={filteredRankings}
+              />
+            </div>
+          </section>
+          <section className="grid gap-4 lg:grid-cols-2">
+            <DashboardStatusPanel
+              message="조회는 많지만 후기가 없는 차량을 판별할 전용 집계가 없습니다."
+              title="조회는 많지만 후기가 없는 차량"
+            />
+            <div className={panelClassName}>
+              <h2 className="text-lg font-black text-zinc-950">
+                신고, 삭제, 숨김 콘텐츠
+              </h2>
+              <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+                <DashboardContentTable
+                  posts={posts.filter((post) => post.is_hidden).slice(0, 5)}
+                  reports={reports}
+                  reviews={reviews.filter((review) => review.is_hidden).slice(0, 5)}
+                  stats={stats}
+                />
+              </div>
+            </div>
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-4">
-        <DashboardBarCard
-          emptyMessage="인기 페이지 데이터가 없습니다."
-          rows={popularPageRows}
-          title="인기 페이지 TOP"
-        />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <GrowthMetricCard
-          detail={searchConsoleUpdatedLabel}
-          label="노출수"
-          tone="zinc"
-          value={periodImpressions.toLocaleString()}
-        />
-        <GrowthMetricCard
-          detail="Search Console/GA 클릭 지표"
-          label="클릭수"
-          tone="zinc"
-          value={periodClicks.toLocaleString()}
-        />
-        <GrowthMetricCard
-          detail="노출수 대비 클릭률"
-          label="CTR"
-          tone="purple"
-          value={formatDashboardPercent(periodCtr)}
-        />
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 2xl:grid-cols-7">
-        <ReviewTotalStatCard
-          detailLines={reviewTotalDetails}
-          visibilityLabel={reviewVisibilityLabel}
-          value={totalReviewCount}
-          onClick={() => onNavigate("reviews")}
-        />
-        {summaryItems.map((item) => (
-          <StatCard
-            key={item.label}
-            detail={item.detail}
-            label={item.label}
-            value={item.value}
-            onClick={() => onNavigate(item.tab)}
-          />
-        ))}
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,1.15fr)_minmax(0,0.8fr)]">
-        <div className={panelClassName}>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-zinc-950">오늘 해야 할 일</h2>
-              <p className="mt-1 text-xs font-medium text-zinc-500">
-                처리 우선순위가 높은 항목입니다.
+      {activeDashboardTab === "ai" ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <GrowthMetricCard
+              detail="후보 전체 기준"
+              label="분석 요청"
+              value={operatorDashboardData.aiCandidates.length.toLocaleString() + "건"}
+            />
+            <GrowthMetricCard
+              detail="DB 반영 완료"
+              label="성공"
+              tone="green"
+              value={appliedAiCandidates.length.toLocaleString() + "건"}
+            />
+            <GrowthMetricCard
+              detail="실패 사유 필드 준비 전"
+              label="실패"
+              tone="zinc"
+              value="데이터 없음"
+            />
+            <GrowthMetricCard
+              detail="pending/reviewing 합산"
+              label="대기"
+              value={(aiPendingCount + reviewingAiCandidates.length).toLocaleString() + "건"}
+            />
+            <GrowthMetricCard
+              detail="처리시간 수집 필드 준비 전"
+              label="평균 처리시간"
+              tone="zinc"
+              value="데이터 없음"
+            />
+          </section>
+          <section className="grid gap-4 lg:grid-cols-3">
+            <MetricCard
+              label="AI DB 반영 완료"
+              tone="blue"
+              value={appliedAiCandidates.length.toLocaleString() + "건"}
+            />
+            <MetricCard
+              label="AI DB 미반영"
+              value={(aiPendingCount + reviewingAiCandidates.length).toLocaleString() + "건"}
+            />
+            <MetricCard
+              label="재처리 필요"
+              tone="orange"
+              value={aiExcludedCount.toLocaleString() + "건"}
+            />
+          </section>
+          <section className={panelClassName}>
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-zinc-950">
+                  차량별 분석 결과와 DB 반영
+                </h2>
+                <p className="mt-1 text-xs font-medium text-zinc-500">
+                  최근 분석 시각: {formatOptionalDate(latestAiUpdatedAt)}
+                </p>
+              </div>
+              <p className="text-xs font-bold text-zinc-500">
+                실패 사유는 수집 필드가 없어 데이터 없음으로 표시합니다.
               </p>
             </div>
-          </div>
-          <div className="mt-4 grid gap-2">
-            {todoItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
-                onClick={() => onNavigate(item.tab)}
-              >
-                <span className="text-sm font-black text-zinc-800">
-                  <ToneDot tone={item.tone} /> {item.label}
-                </span>
-                <span className="text-sm font-black text-zinc-950">
-                  {item.count.toLocaleString()}건
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={panelClassName}>
-          <h2 className="text-lg font-black text-zinc-950">최근 30일 운영 흐름</h2>
-          <p className="mt-1 text-xs font-medium text-zinc-500">
-            후기, 회원, 게시글, AI 반영, 신고 추이를 한 화면에서 봅니다.
-          </p>
-          <DashboardLineChart rows={chartRows} />
-        </div>
-        <TrafficSourceDonutCard items={trafficSourceItems} />
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-4">
-        <DashboardRecentList
-          emptyMessage="최근 후기가 없습니다."
-          items={recentReviews.map((review) => ({
-            id: review.id,
-            meta: formatDate(review.created_at),
-            title: formatAdminPlateNumber(getReviewPlateNumber(review)) + " · " + review.content,
-          }))}
-          title="최근 후기"
-        />
-        <DashboardRecentList
-          emptyMessage="최근 게시글이 없습니다."
-          items={recentPosts.map((post) => ({
-            id: post.id,
-            meta: getPostCategoryLabel(post) + " · " + formatDate(post.created_at),
-            title: post.title,
-          }))}
-          title="최근 게시글"
-        />
-        <DashboardRecentList
-          emptyMessage="최근 가입 회원은 회원 관리에서 확인하세요."
-          items={recentUsers}
-          title="최근 가입 회원"
-        />
-        <DashboardRecentList
-          emptyMessage="최근 신고가 없습니다."
-          items={reports.slice(0, 5).map((report) => ({
-            id: report.report_id,
-            meta: report.report_type + " · " + formatDate(report.created_at),
-            title: report.target_title ?? report.target_content,
-          }))}
-          title="최근 신고"
-        />
-      </section>
-
-      <section className={panelClassName}>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-zinc-950">
-              {activeDashboardTab === "traffic" ? "운영 로그" : "Analytics 상세"}
-            </h2>
-            <p className="mt-1 text-xs font-medium text-zinc-500">
-              {activeDashboardTab === "traffic"
-                ? "일반 운영 트래픽 기록입니다. KOTSA 로그는 별도 메뉴에서 확인합니다."
-                : "Dashboard 홈에서 분리한 상세 통계를 영역별로 확인합니다."}
-            </p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {analyticsMenuTabs.map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                className={cn(
-                  categoryFilterButtonClassName,
-                  activeDashboardTab === tab.value &&
-                    activeCategoryFilterButtonClassName,
-                )}
-                onClick={() => onChangeDashboardTab(tab.value)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
-          {activeDashboardTab === "traffic" ? (
-            <DashboardTrafficTable rows={operatorDashboardData.trafficRows} />
-          ) : null}
-          {activeDashboardTab === "views" ? (
-            <DashboardViewsTable
-              filter={dashboardViewFilter}
-              onChangeFilter={onChangeViewFilter}
-              rows={filteredRankings}
-            />
-          ) : null}
-          {activeDashboardTab === "content" ? (
-            <DashboardContentTable
-              posts={recentPosts}
-              reports={reports}
-              reviews={recentReviews}
-              stats={stats}
-            />
-          ) : null}
-          {activeDashboardTab === "keywords" ? (
-            <DashboardAcquisitionKeywordTable
-              rows={operatorDashboardData.keywordRows}
-            />
-          ) : null}
-          {activeDashboardTab === "internalKeywords" ? (
-            <DashboardInternalKeywordTable
-              rows={operatorDashboardData.internalKeywordRows}
-            />
-          ) : null}
-          {activeDashboardTab === "ai" ? (
-            <DashboardAiCandidateTable
-              candidates={operatorDashboardData.aiCandidates}
-              onChangeStatus={onChangeAiCandidateStatus}
-              reviews={reviews}
-            />
-          ) : null}
-        </div>
-      </section>
-      </div>
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+              <DashboardAiCandidateTable
+                candidates={operatorDashboardData.aiCandidates}
+                onChangeStatus={onChangeAiCandidateStatus}
+                reviews={reviews}
+              />
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }
 
-function StatCard({
+function AnalyticsDetailLinkCard({
+  count,
   detail,
   label,
   onClick,
-  value,
 }: {
-  detail?: string;
+  count: string;
+  detail: string;
   label: string;
-  onClick?: () => void;
-  value: number;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className="rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-sm shadow-zinc-200/60 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:p-4"
+      className="rounded-lg border border-zinc-200 bg-white p-4 text-left shadow-sm shadow-zinc-200/60 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
       onClick={onClick}
     >
-      <p className="truncate text-xs font-black text-zinc-500">{label}</p>
-      <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
-        {value.toLocaleString()}
-      </p>
-      {detail ? (
-        <p className="mt-2 truncate text-xs font-bold text-blue-600">{detail}</p>
-      ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black text-zinc-500">{label}</p>
+          <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
+            {count}
+          </p>
+          <p className="mt-2 text-xs font-bold leading-5 text-zinc-500">
+            {detail}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-black text-blue-700">
+          자세히 보기
+        </span>
+      </div>
     </button>
   );
 }
 
-function ReviewTotalStatCard({
-  detailLines,
-  onClick,
-  value,
-  visibilityLabel,
+function DashboardStatusPanel({
+  message,
+  title,
 }: {
-  detailLines: string[];
-  onClick?: () => void;
-  value: number;
-  visibilityLabel: string;
+  message: string;
+  title: string;
 }) {
   return (
-    <button
-      type="button"
-      className="rounded-lg border border-blue-200 bg-white p-3 text-left shadow-sm shadow-blue-100/80 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md sm:p-4"
-      onClick={onClick}
-    >
-      <p className="truncate text-xs font-black text-blue-600">전체 후기</p>
-      <p className="mt-2 text-2xl font-black tracking-tight text-zinc-950">
-        {value.toLocaleString()}건
-      </p>
-      <div className="mt-3 grid gap-1 text-xs font-bold leading-5 text-zinc-600">
-        {detailLines.map((line) => (
-          <span key={line}>{line}</span>
-        ))}
-      </div>
-      <p className="mt-2 truncate text-xs font-bold text-zinc-400">
-        {visibilityLabel}
-      </p>
-    </button>
+    <section className={panelClassName}>
+      <h2 className="text-lg font-black text-zinc-950">{title}</h2>
+      <DashboardEmptyState message={message} />
+    </section>
   );
 }
 
@@ -10125,41 +10011,6 @@ function DashboardBarCard({
           <p className={mutedTextClassName}>{emptyMessage}</p>
         )}
       </div>
-    </section>
-  );
-}
-
-function DashboardMobileList({
-  emptyMessage,
-  items,
-  title,
-}: {
-  emptyMessage: string;
-  items: { id: string; meta: string; title: string }[];
-  title: string;
-}) {
-  return (
-    <section className={panelClassName}>
-      <h2 className="text-base font-black text-zinc-950">{title}</h2>
-      {items.length ? (
-        <ul className="mt-3 space-y-2">
-          {items.slice(0, 5).map((item) => (
-            <li
-              key={item.id}
-              className="rounded-lg border border-zinc-200 bg-zinc-50 p-3"
-            >
-              <p className="line-clamp-2 break-words text-sm font-bold leading-5 text-zinc-900">
-                {item.title}
-              </p>
-              <p className="mt-1 line-clamp-1 break-words text-xs leading-5 text-zinc-500">
-                {item.meta}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={cn(mutedTextClassName, "mt-3")}>{emptyMessage}</p>
-      )}
     </section>
   );
 }
