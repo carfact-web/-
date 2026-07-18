@@ -312,6 +312,7 @@ export interface Database {
           review_id: string | null;
           user_id: string | null;
           session_id: string;
+          visitor_id: string;
           ip_hash: string | null;
           user_agent: string | null;
           device_type: "mobile" | "desktop" | "tablet" | "unknown";
@@ -340,6 +341,7 @@ export interface Database {
           review_id?: string | null;
           user_id?: string | null;
           session_id: string;
+          visitor_id?: string;
           ip_hash?: string | null;
           user_agent?: string | null;
           device_type?: "mobile" | "desktop" | "tablet" | "unknown";
@@ -368,6 +370,7 @@ export interface Database {
           review_id?: string | null;
           user_id?: string | null;
           session_id?: string;
+          visitor_id?: string;
           ip_hash?: string | null;
           user_agent?: string | null;
           device_type?: "mobile" | "desktop" | "tablet" | "unknown";
@@ -406,6 +409,74 @@ export interface Database {
           },
           {
             foreignKeyName: "page_views_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      member_daily_visit_settings: {
+        Row: {
+          id: boolean;
+          exclude_super_admin: boolean;
+          exclude_admin: boolean;
+          exclude_test_accounts: boolean;
+          exclude_bots: boolean;
+          exclude_health_checks: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          exclude_super_admin?: boolean;
+          exclude_admin?: boolean;
+          exclude_test_accounts?: boolean;
+          exclude_bots?: boolean;
+          exclude_health_checks?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          id?: boolean;
+          exclude_super_admin?: boolean;
+          exclude_admin?: boolean;
+          exclude_test_accounts?: boolean;
+          exclude_bots?: boolean;
+          exclude_health_checks?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      member_daily_visits: {
+        Row: {
+          id: string;
+          user_id: string;
+          visit_date: string;
+          first_visited_at: string;
+          last_visited_at: string;
+          visit_count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          visit_date: string;
+          first_visited_at?: string;
+          last_visited_at?: string;
+          visit_count?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          visit_date?: string;
+          first_visited_at?: string;
+          last_visited_at?: string;
+          visit_count?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_daily_visits_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "user_profiles";
@@ -1016,6 +1087,16 @@ export interface Database {
           popular_page_rows: Json;
         }[];
       };
+      admin_update_member_visit_exclusion_settings: {
+        Args: {
+          next_exclude_super_admin?: boolean | null;
+          next_exclude_admin?: boolean | null;
+          next_exclude_test_accounts?: boolean | null;
+          next_exclude_bots?: boolean | null;
+          next_exclude_health_checks?: boolean | null;
+        };
+        Returns: Json;
+      };
       admin_get_traffic_stats: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -1298,6 +1379,12 @@ export interface Database {
           provider_avatar_url: string | null;
           provider_user_id: string | null;
           last_sign_in_at: string | null;
+          first_visit_date: string | null;
+          recent_visit_date: string | null;
+          total_visit_days: number;
+          recent_7_day_visits: number;
+          recent_30_day_visits: number;
+          total_visit_count: number;
           review_count: number;
           post_count: number;
           created_at: string;
@@ -1383,6 +1470,7 @@ export interface Database {
           target_vehicle_id?: string | null;
           target_review_id?: string | null;
           view_session_id?: string;
+          view_visitor_id?: string;
           view_ip_hash?: string | null;
           view_user_agent?: string | null;
           view_device_type?: "mobile" | "desktop" | "tablet" | "unknown";
@@ -1400,6 +1488,12 @@ export interface Database {
             | "vehicle_search"
             | "review_create"
             | "sign_up";
+        };
+        Returns: boolean;
+      };
+      record_member_daily_visit: {
+        Args: {
+          throttle_minutes?: number;
         };
         Returns: boolean;
       };

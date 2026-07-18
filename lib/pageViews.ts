@@ -21,6 +21,9 @@ interface RecordPageViewInput {
 }
 
 const pageViewSessionStorageKey = "carfact_page_view_session_id";
+const pageViewVisitorStorageKey = "carfact_page_view_visitor_id";
+const memberDailyVisitStorageKey = "carfact_member_daily_visit_recorded_at";
+const memberDailyVisitThrottleMs = 30 * 60 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -43,6 +46,38 @@ const getPageViewSessionId = () => {
   localStorage.setItem(pageViewSessionStorageKey, nextSessionId);
 
   return nextSessionId;
+};
+
+const getPageViewVisitorId = () => {
+  const existingVisitorId = localStorage.getItem(pageViewVisitorStorageKey);
+
+  if (existingVisitorId) {
+    return existingVisitorId;
+  }
+
+  const nextVisitorId = createSessionId();
+  localStorage.setItem(pageViewVisitorStorageKey, nextVisitorId);
+
+  return nextVisitorId;
+};
+
+const shouldRecordMemberDailyVisit = (eventType: RecordPageViewInput["eventType"]) => {
+  if (eventType !== "page_view") {
+    return false;
+  }
+
+  const lastRecordedAt = Number(
+    localStorage.getItem(memberDailyVisitStorageKey) ?? "0",
+  );
+  const now = Date.now();
+
+  if (Number.isFinite(lastRecordedAt) && now - lastRecordedAt < memberDailyVisitThrottleMs) {
+    return false;
+  }
+
+  localStorage.setItem(memberDailyVisitStorageKey, String(now));
+
+  return true;
 };
 
 export const recordPageView = async ({
@@ -80,6 +115,8 @@ export const recordPageView = async ({
       path: normalizedPath,
       referrer: normalizedReferrer,
       sessionId: getPageViewSessionId(),
+      visitorId: getPageViewVisitorId(),
+      recordMemberVisit: shouldRecordMemberDailyVisit(eventType),
       userAgent: navigator.userAgent,
     }),
   });

@@ -14,6 +14,7 @@ import { getCommunityImagePublicUrl } from "@/lib/communityImages";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
+import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import {
   countVehicleIssueKeywordMentions,
   extractVehicleIssueKeywords,
@@ -556,10 +557,12 @@ interface AdminDashboardAcquisitionEventRow {
   landingPage: string;
   modelName: string;
   symptomKeyword: string | null;
+  source: "internal" | "google_search_console";
   visits: number;
   impressions: number;
   clicks: number;
   ctr: number | null;
+  averagePosition: number | null;
   geoScore: number | null;
 }
 
@@ -575,16 +578,31 @@ interface AdminDashboardAnalyticsSummary {
   averageEngagementSeconds: number | null;
   isGa4Connected: boolean;
   isSearchConsoleConnected: boolean;
+  memberVisitExclusion: AdminMemberVisitExclusionSettings;
   newVisitors: number;
   realtimeActiveUsers: number | null;
   returningVisitors: number;
+  sevenDayReturningMembers: number;
   source: string;
+  todayLoginMembers: number;
+  todayMemberReturnRate: number;
+  todayNewMemberVisits: number;
   todayPageViews: number;
+  todayReturningMembers: number;
   todayReviews: number;
   todaySignups: number;
   todayVisitors: number;
   updatedAt: string | null;
   vehicleSearches: number;
+}
+
+interface AdminMemberVisitExclusionSettings {
+  excludeAdmin: boolean;
+  excludeBots: boolean;
+  excludeHealthChecks: boolean;
+  excludeSuperAdmin: boolean;
+  excludeTestAccounts: boolean;
+  updatedAt: string | null;
 }
 
 interface AdminDashboardPopularPageRow {
@@ -705,6 +723,12 @@ interface AdminUserProfile {
   provider_avatar_url: string | null;
   provider_user_id: string | null;
   last_sign_in_at: string | null;
+  first_visit_date: string | null;
+  recent_visit_date: string | null;
+  total_visit_days: number;
+  recent_7_day_visits: number;
+  recent_30_day_visits: number;
+  total_visit_count: number;
   review_count: number;
   post_count: number;
   created_at: string;
@@ -822,11 +846,24 @@ const emptyOperatorDashboardData: AdminOperatorDashboardData = {
     averageEngagementSeconds: null,
     isGa4Connected: false,
     isSearchConsoleConnected: false,
+    memberVisitExclusion: {
+      excludeAdmin: true,
+      excludeBots: true,
+      excludeHealthChecks: true,
+      excludeSuperAdmin: true,
+      excludeTestAccounts: true,
+      updatedAt: null,
+    },
     newVisitors: 0,
     realtimeActiveUsers: null,
     returningVisitors: 0,
+    sevenDayReturningMembers: 0,
     source: "internal",
+    todayLoginMembers: 0,
+    todayMemberReturnRate: 0,
+    todayNewMemberVisits: 0,
     todayPageViews: 0,
+    todayReturningMembers: 0,
     todayReviews: 0,
     todaySignups: 0,
     todayVisitors: 0,
@@ -1158,6 +1195,12 @@ const getAdminPaginationPages = (totalPages: number, currentPage: number) => {
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
+
+const sanitizeAdminPostTitle = (title: string) =>
+  stripCommunityTextColorMarkup(title)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1974,11 +2017,22 @@ const toOperatorAcquisitionEventRows = (
         landingPage: String(item.landing_page ?? "/"),
         modelName: String(item.model_name ?? "차종 확인 불가"),
         symptomKeyword: toNullableString(item.symptom_keyword),
+        source:
+          item.source === "google_search_console" ||
+          toNumber(item.impressions) > 0 ||
+          toNumber(item.clicks) > 0 ||
+          (item.average_position !== null && item.average_position !== undefined)
+            ? "google_search_console"
+            : "internal",
         visits: toNumber(item.visits),
         impressions: toNumber(item.impressions),
         clicks: toNumber(item.clicks),
         ctr:
           item.ctr === null || item.ctr === undefined ? null : toNumber(item.ctr),
+        averagePosition:
+          item.average_position === null || item.average_position === undefined
+            ? null
+            : toNumber(item.average_position),
         geoScore:
           item.geo_score === null || item.geo_score === undefined
             ? null
@@ -2009,6 +2063,9 @@ const toOperatorAnalyticsSummary = (
   value: Json,
 ): AdminDashboardAnalyticsSummary => {
   const item = isRecord(value) ? value : {};
+  const memberVisitExclusion = isRecord(item.member_visit_exclusion)
+    ? item.member_visit_exclusion
+    : {};
 
   return {
     averageEngagementSeconds:
@@ -2018,6 +2075,17 @@ const toOperatorAnalyticsSummary = (
         : toNumber(item.average_engagement_seconds),
     isGa4Connected: Boolean(item.is_ga4_connected),
     isSearchConsoleConnected: Boolean(item.is_search_console_connected),
+    memberVisitExclusion: {
+      excludeAdmin: memberVisitExclusion.exclude_admin !== false,
+      excludeBots: memberVisitExclusion.exclude_bots !== false,
+      excludeHealthChecks:
+        memberVisitExclusion.exclude_health_checks !== false,
+      excludeSuperAdmin:
+        memberVisitExclusion.exclude_super_admin !== false,
+      excludeTestAccounts:
+        memberVisitExclusion.exclude_test_accounts !== false,
+      updatedAt: toNullableString(memberVisitExclusion.updated_at),
+    },
     newVisitors: toNumber(item.new_visitors),
     realtimeActiveUsers:
       item.realtime_active_users === null ||
@@ -2025,8 +2093,13 @@ const toOperatorAnalyticsSummary = (
         ? null
         : toNumber(item.realtime_active_users),
     returningVisitors: toNumber(item.returning_visitors),
+    sevenDayReturningMembers: toNumber(item.seven_day_returning_members),
     source: String(item.source ?? "internal"),
+    todayLoginMembers: toNumber(item.today_login_members),
+    todayMemberReturnRate: toNumber(item.today_member_return_rate),
+    todayNewMemberVisits: toNumber(item.today_new_member_visits),
     todayPageViews: toNumber(item.today_page_views),
+    todayReturningMembers: toNumber(item.today_returning_members),
     todayReviews: toNumber(item.today_reviews),
     todaySignups: toNumber(item.today_signups),
     todayVisitors: toNumber(item.today_visitors),
@@ -3034,12 +3107,17 @@ export default function AdminPage() {
       }));
     const postResults = posts
       .filter((post) =>
-        [post.title, post.content, post.author_nickname].some(matches),
+        [
+          post.title,
+          sanitizeAdminPostTitle(post.title),
+          post.content,
+          post.author_nickname,
+        ].some(matches),
       )
       .slice(0, 4)
       .map((post) => ({
         id: post.id,
-        label: post.title,
+        label: sanitizeAdminPostTitle(post.title),
         meta: "게시글 · " + getPostCategoryLabel(post),
         tab: "posts" as AdminTab,
       }));
@@ -3459,6 +3537,37 @@ export default function AdminPage() {
   }, [canAccess, loadAdminData]);
 
   const refreshCurrentTab = async () => {
+    await loadAdminData();
+  };
+
+  const updateMemberVisitExclusionSetting = async (
+    key: keyof AdminMemberVisitExclusionSettings,
+    nextValue: boolean,
+  ) => {
+    if (!supabase) {
+      return;
+    }
+
+    const rpcPayload = {
+      next_exclude_super_admin:
+        key === "excludeSuperAdmin" ? nextValue : null,
+      next_exclude_admin: key === "excludeAdmin" ? nextValue : null,
+      next_exclude_test_accounts:
+        key === "excludeTestAccounts" ? nextValue : null,
+      next_exclude_bots: key === "excludeBots" ? nextValue : null,
+      next_exclude_health_checks:
+        key === "excludeHealthChecks" ? nextValue : null,
+    };
+    const { error } = await supabase.rpc(
+      "admin_update_member_visit_exclusion_settings",
+      rpcPayload,
+    );
+
+    if (error) {
+      setActionMessage(error.message);
+      return;
+    }
+
     await loadAdminData();
   };
 
@@ -5428,6 +5537,7 @@ export default function AdminPage() {
               void updateAiCandidateStatus(candidate, nextStatus)
             }
             onChangeDashboardTab={setActiveDashboardTab}
+            onChangeMemberVisitExclusion={updateMemberVisitExclusionSetting}
             onChangePeriod={setDashboardPeriod}
             onChangeViewFilter={setDashboardViewFilter}
             operatorDashboardData={operatorDashboardData}
@@ -5563,7 +5673,7 @@ export default function AdminPage() {
                             )}
                             onClick={() => setSelectedPostId(post.id)}
                           >
-                            {post.title}
+                            {sanitizeAdminPostTitle(post.title)}
                           </button>
                           <p className={mobileCardMetaClassName}>
                             {getPostCategoryLabel(post)} ·{" "}
@@ -5661,7 +5771,7 @@ export default function AdminPage() {
                           className="block max-w-sm truncate text-left text-sm font-bold text-zinc-950 hover:text-blue-700"
                           onClick={() => setSelectedPostId(post.id)}
                         >
-                          {post.title}
+                          {sanitizeAdminPostTitle(post.title)}
                         </button>
                       </td>
                       <td className={cn(tableCellClassName, "whitespace-nowrap text-sm")}>
@@ -6166,8 +6276,23 @@ export default function AdminPage() {
                       <p className={mobileCardMetaClassName}>
                         최근 로그인 {formatOptionalDate(account.last_sign_in_at)}
                       </p>
+                      <p className={mobileCardMetaClassName}>
+                        최근 방문 {formatOptionalDate(account.recent_visit_date)} ·
+                        누적 {account.total_visit_days.toLocaleString()}일 · 7일{" "}
+                        {account.recent_7_day_visits.toLocaleString()}일
+                      </p>
                       <div className={mobileCardSubMetaClassName}>
                         <RoleBadge role={account.role} />
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-1 text-xs font-bold",
+                            account.total_visit_days >= 2
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-zinc-300 bg-zinc-100 text-zinc-500",
+                          )}
+                        >
+                          {formatMemberReturnStatus(account.total_visit_days)}
+                        </span>
                         <AccountStatusBadge
                           isSuspended={account.is_suspended}
                         />
@@ -6225,6 +6350,9 @@ export default function AdminPage() {
                   <th className={cn(tableHeadCellClassName, "min-w-20")}>상태</th>
                   <th className={cn(tableHeadCellClassName, "min-w-40")}>가입일</th>
                   <th className={cn(tableHeadCellClassName, "min-w-40")}>최근 로그인</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-32")}>최근 방문</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-32")}>방문일</th>
+                  <th className={cn(tableHeadCellClassName, "min-w-24")}>재방문</th>
                   <th className={cn(tableHeadCellClassName, "text-right")}>
                     관리
                   </th>
@@ -6320,6 +6448,27 @@ export default function AdminPage() {
                       <td className={cn(tableCellClassName, "min-w-40 whitespace-nowrap text-xs")}>
                         {formatOptionalDate(account.last_sign_in_at)}
                       </td>
+                      <td className={cn(tableCellClassName, "min-w-32 whitespace-nowrap text-xs")}>
+                        {formatOptionalDate(account.recent_visit_date)}
+                      </td>
+                      <td className={cn(tableCellClassName, "min-w-32 whitespace-nowrap text-xs")}>
+                        누적 {account.total_visit_days.toLocaleString()}일 · 7일{" "}
+                        {account.recent_7_day_visits.toLocaleString()}일
+                      </td>
+                      <td className={cn(tableCellClassName, "min-w-24 whitespace-nowrap")}>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-bold",
+                            account.total_visit_days >= 2
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : account.total_visit_days === 1
+                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                : "border-zinc-300 bg-zinc-100 text-zinc-500",
+                          )}
+                        >
+                          {formatMemberReturnStatus(account.total_visit_days)}
+                        </span>
+                      </td>
                       <td className={tableActionCellClassName}>
                         <div className={desktopActionGroupClassName}>
                           <UserActionButtons
@@ -6351,7 +6500,7 @@ export default function AdminPage() {
                     );
                   })
                 ) : (
-                  <EmptyTableRow colSpan={10} message="회원이 없습니다." />
+                  <EmptyTableRow colSpan={13} message="회원이 없습니다." />
                 )}
               </tbody>
             </table>
@@ -7884,7 +8033,7 @@ export default function AdminPage() {
                     id="admin-post-detail-title"
                     className="mt-1 break-words text-xl font-black text-zinc-950"
                   >
-                    {selectedPost.title}
+                    {sanitizeAdminPostTitle(selectedPost.title)}
                   </h2>
                 </div>
                 <button
@@ -7981,6 +8130,30 @@ export default function AdminPage() {
               <DetailField
                 label="최근 로그인"
                 value={formatOptionalDate(selectedUser.last_sign_in_at)}
+              />
+              <DetailField
+                label="첫 방문일"
+                value={formatOptionalDate(selectedUser.first_visit_date)}
+              />
+              <DetailField
+                label="최근 방문일"
+                value={formatOptionalDate(selectedUser.recent_visit_date)}
+              />
+              <DetailField
+                label="누적 방문일"
+                value={selectedUser.total_visit_days.toLocaleString() + "일"}
+              />
+              <DetailField
+                label="최근7일 방문"
+                value={selectedUser.recent_7_day_visits.toLocaleString() + "일"}
+              />
+              <DetailField
+                label="최근30일 방문"
+                value={selectedUser.recent_30_day_visits.toLocaleString() + "일"}
+              />
+              <DetailField
+                label="총 방문 횟수"
+                value={selectedUser.total_visit_count.toLocaleString() + "회"}
               />
               <DetailField
                 label="작성 후기 수"
@@ -8434,11 +8607,12 @@ const sumVisits = (rows: AdminDashboardAcquisitionEventRow[]) =>
 
 const createSearchTrendRows = (
   rows: AdminDashboardAcquisitionEventRow[],
+  valueKey: "visits" | "clicks" | "impressions" = "visits",
 ): DashboardSeriesRow[] => {
   const counts = new Map<string, number>();
 
   rows.forEach((row) => {
-    counts.set(row.day, (counts.get(row.day) ?? 0) + row.visits);
+    counts.set(row.day, (counts.get(row.day) ?? 0) + row[valueKey]);
   });
 
   return Array.from(counts.entries())
@@ -8451,6 +8625,7 @@ const createBarRows = (
   keyGetter: (row: AdminDashboardAcquisitionEventRow) => string,
   detailGetter?: (row: AdminDashboardAcquisitionEventRow) => string,
   limit = 7,
+  valueKey: "visits" | "clicks" | "impressions" = "visits",
 ): DashboardBarRow[] => {
   const counts = new Map<string, { detail?: string; value: number }>();
 
@@ -8462,7 +8637,7 @@ const createBarRows = (
     }
 
     const current = counts.get(label) ?? { detail: detailGetter?.(row), value: 0 };
-    current.value += row.visits;
+    current.value += row[valueKey];
     counts.set(label, current);
   });
 
@@ -8500,11 +8675,14 @@ const formatLandingPageLabel = (path: string) => {
 };
 
 const formatDashboardPercent = (value: number | null) =>
-  value === null ? "연동 대기" : value.toFixed(1) + "%";
+  value === null ? "데이터 없음" : value.toFixed(1) + "%";
+
+const formatMemberReturnStatus = (visitDays: number) =>
+  visitDays >= 2 ? "재방문" : visitDays === 1 ? "신규" : "방문 없음";
 
 const formatEngagementDuration = (seconds: number | null) => {
   if (seconds === null) {
-    return "연동 대기";
+    return "연동 필요";
   }
 
   const totalSeconds = Math.max(0, Math.round(seconds));
@@ -8615,7 +8793,7 @@ function DashboardPanel({
         "명 어제 대비";
   const realtimeActiveUsersLabel =
     analyticsSummary.realtimeActiveUsers === null
-      ? "연동 대기"
+      ? "연동 필요"
       : analyticsSummary.realtimeActiveUsers.toLocaleString() + "명";
   const chartRows = createDashboardChartRows({
     aiCandidates: appliedAiCandidates,
@@ -8816,7 +8994,7 @@ function DashboardPanel({
             id: post.id,
             meta:
               getPostCategoryLabel(post) + " · " + formatDate(post.created_at),
-            title: post.title,
+            title: sanitizeAdminPostTitle(post.title),
           }))}
           title="최근 게시글"
         />
@@ -8844,6 +9022,7 @@ function AnalyticsPanel({
   dashboardViewFilter,
   onChangeAiCandidateStatus,
   onChangeDashboardTab,
+  onChangeMemberVisitExclusion,
   onChangePeriod,
   onChangeViewFilter,
   onNavigate,
@@ -8863,6 +9042,10 @@ function AnalyticsPanel({
     nextStatus: AiCandidateStatus,
   ) => void;
   onChangeDashboardTab: (tab: DashboardBoardTab) => void;
+  onChangeMemberVisitExclusion: (
+    key: keyof AdminMemberVisitExclusionSettings,
+    nextValue: boolean,
+  ) => void;
   onChangePeriod: (period: DashboardPeriod) => void;
   onChangeViewFilter: (filter: DashboardViewFilter) => void;
   onNavigate: (tab: AdminTab) => void;
@@ -8931,50 +9114,79 @@ function AnalyticsPanel({
   const trafficSourceItems = createTrafficSourceDonutItems(
     trafficStats.referrerTop,
   );
+  const analyticsSummary = operatorDashboardData.analyticsSummary;
   const filteredAcquisitionRows = filterAcquisitionRowsByPeriod(
     operatorDashboardData.acquisitionRows,
     period,
   );
-  const currentSearchVisits = sumVisits(filteredAcquisitionRows);
-  const searchTrendRows = createSearchTrendRows(filteredAcquisitionRows);
-  const searchChannelItems = createChannelRows(filteredAcquisitionRows);
+  const searchConsoleRows = filteredAcquisitionRows.filter(
+    (row) => row.source === "google_search_console",
+  );
+  const internalAcquisitionRows = filteredAcquisitionRows.filter(
+    (row) => row.source === "internal",
+  );
+  const currentSearchVisits = sumVisits(internalAcquisitionRows);
+  const searchTrendRows = createSearchTrendRows(searchConsoleRows, "clicks");
+  const internalAcquisitionTrendRows = createSearchTrendRows(
+    internalAcquisitionRows,
+  );
+  const searchChannelItems = createChannelRows(internalAcquisitionRows);
+  const internalAcquisitionKeywordRows =
+    operatorDashboardData.keywordRows.filter(
+      (row) => row.channel !== "Direct" || row.keyword === "not provided",
+    );
   const topKeywordRows = createBarRows(
-    filteredAcquisitionRows,
+    searchConsoleRows,
     (row) => row.keyword,
     (row) => row.channel,
+    7,
+    "clicks",
   );
   const topLandingRows = createBarRows(
-    filteredAcquisitionRows,
+    searchConsoleRows,
     (row) => formatLandingPageLabel(row.landingPage),
     (row) => row.landingPage,
+    7,
+    "clicks",
   );
   const searchSummary = operatorDashboardData.searchConsoleSummary;
-  const periodImpressions = filteredAcquisitionRows.reduce(
+  const periodImpressions = searchConsoleRows.reduce(
     (sum, row) => sum + row.impressions,
     0,
   );
-  const periodClicks = filteredAcquisitionRows.reduce(
+  const periodClicks = searchConsoleRows.reduce(
     (sum, row) => sum + row.clicks,
     0,
   );
   const periodCtr =
     periodImpressions > 0 ? (periodClicks / periodImpressions) * 100 : null;
+  const positionedSearchRows = searchConsoleRows.filter(
+    (row) => row.averagePosition !== null,
+  );
+  const averageSearchPosition =
+    positionedSearchRows.length > 0
+      ? positionedSearchRows.reduce(
+          (sum, row) => sum + (row.averagePosition ?? 0),
+          0,
+        ) / positionedSearchRows.length
+      : null;
+  const searchConsoleConnected =
+    analyticsSummary.isSearchConsoleConnected || searchConsoleRows.length > 0;
   const periodLabel =
     dashboardPeriods.find((item) => item.value === period)?.label ?? "30일";
   const searchConsoleUpdatedLabel = searchSummary.updatedAt
     ? "최근 갱신 " + formatOptionalDate(searchSummary.updatedAt)
-    : "Search Console 연동 대기";
-  const analyticsSummary = operatorDashboardData.analyticsSummary;
+    : "Search Console API 연결 필요";
   const analyticsSourceLabel =
     analyticsSummary.source === "google_analytics"
       ? "GA4 연동값"
-      : "내부 로그 기준";
+      : "GA4 수집 중 / Data API 미연결";
   const analyticsUpdatedLabel = analyticsSummary.updatedAt
     ? "최근 갱신 " + formatOptionalDate(analyticsSummary.updatedAt)
     : analyticsSourceLabel;
   const realtimeActiveUsersLabel =
     analyticsSummary.realtimeActiveUsers === null
-      ? "연동 대기"
+      ? "연동 필요"
       : analyticsSummary.realtimeActiveUsers.toLocaleString() + "명";
   const yesterday = new Date(todayStartTime - dayMs);
   const yesterdayLabel = [
@@ -9020,17 +9232,17 @@ function AnalyticsPanel({
       value: analyticsSummary.todayPageViews.toLocaleString() + "회",
     },
     {
-      detail: analyticsSummary.isGa4Connected ? "GA4 신규 사용자" : "GA4 연동 후 표시",
+      detail: analyticsSummary.isGa4Connected ? "GA4 신규 사용자" : "GA4 Data API 연결 필요",
       label: "신규 방문자",
       value: analyticsSummary.newVisitors.toLocaleString() + "명",
     },
     {
-      detail: analyticsSummary.isGa4Connected ? "GA4 재방문 사용자" : "GA4 연동 후 표시",
+      detail: analyticsSummary.isGa4Connected ? "GA4 재방문 사용자" : "GA4 Data API 연결 필요",
       label: "재방문자",
       value: analyticsSummary.returningVisitors.toLocaleString() + "명",
     },
     {
-      detail: analyticsSummary.isGa4Connected ? "GA4 평균 참여 시간" : "GA4 연동 후 표시",
+      detail: analyticsSummary.isGa4Connected ? "GA4 평균 참여 시간" : "GA4 Data API 연결 필요",
       label: "평균 체류시간",
       value: formatEngagementDuration(analyticsSummary.averageEngagementSeconds),
     },
@@ -9045,9 +9257,63 @@ function AnalyticsPanel({
       value: analyticsSummary.todayReviews.toLocaleString() + "건",
     },
     {
-      detail: analyticsSummary.isGa4Connected ? "GA4 실시간" : "연동 시 표시",
+      detail: analyticsSummary.isGa4Connected ? "GA4 실시간" : "GA4 Data API 연결 필요",
       label: "실시간 접속자",
       value: realtimeActiveUsersLabel,
+    },
+  ];
+  const memberVisitKpiItems = [
+    {
+      detail: "auth.users 최근 로그인 기준",
+      label: "오늘 로그인 회원",
+      value: analyticsSummary.todayLoginMembers.toLocaleString() + "명",
+    },
+    {
+      detail: "누적 방문일 1일",
+      label: "오늘 신규회원 방문",
+      value: analyticsSummary.todayNewMemberVisits.toLocaleString() + "명",
+    },
+    {
+      detail: "누적 방문일 2일 이상",
+      label: "오늘 재방문 회원",
+      value: analyticsSummary.todayReturningMembers.toLocaleString() + "명",
+    },
+    {
+      detail: "재방문 회원 / 오늘 방문 회원",
+      label: "오늘 재방문율",
+      value: analyticsSummary.todayMemberReturnRate.toFixed(1) + "%",
+    },
+    {
+      detail: "최근 7일 방문자 중 누적 2일 이상",
+      label: "최근7일 재방문 회원",
+      value: analyticsSummary.sevenDayReturningMembers.toLocaleString() + "명",
+    },
+  ];
+  const memberVisitExclusionItems = [
+    {
+      key: "excludeSuperAdmin" as const,
+      label: "super_admin 제외",
+      value: analyticsSummary.memberVisitExclusion.excludeSuperAdmin,
+    },
+    {
+      key: "excludeAdmin" as const,
+      label: "관리자 제외",
+      value: analyticsSummary.memberVisitExclusion.excludeAdmin,
+    },
+    {
+      key: "excludeTestAccounts" as const,
+      label: "테스트계정 제외",
+      value: analyticsSummary.memberVisitExclusion.excludeTestAccounts,
+    },
+    {
+      key: "excludeBots" as const,
+      label: "bot 제외",
+      value: analyticsSummary.memberVisitExclusion.excludeBots,
+    },
+    {
+      key: "excludeHealthChecks" as const,
+      label: "health check 제외",
+      value: analyticsSummary.memberVisitExclusion.excludeHealthChecks,
     },
   ];
   const trafficTrendRows = trafficStats.dailyVisitors.map((row) => ({
@@ -9191,6 +9457,53 @@ function AnalyticsPanel({
             ))}
           </section>
 
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {memberVisitKpiItems.map((item) => (
+              <GrowthMetricCard
+                key={item.label}
+                detail={item.detail}
+                label={item.label}
+                tone={item.label.includes("재방문") ? "green" : "blue"}
+                value={item.value}
+              />
+            ))}
+          </section>
+
+          <section className={panelClassName}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-zinc-950">
+                  회원 방문 통계 제외
+                </h2>
+                <p className="mt-1 text-xs font-medium text-zinc-500">
+                  설정 변경 시 Analytics 재방문율과 회원 활동 지표에 즉시 반영됩니다.
+                </p>
+              </div>
+              <p className="text-xs font-bold text-zinc-500">
+                최근 변경 {formatOptionalDate(analyticsSummary.memberVisitExclusion.updatedAt)}
+              </p>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {memberVisitExclusionItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-xs font-black transition",
+                    item.value
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-zinc-200 bg-zinc-50 text-zinc-500",
+                  )}
+                  onClick={() =>
+                    onChangeMemberVisitExclusion(item.key, !item.value)
+                  }
+                >
+                  {item.label} {item.value ? "ON" : "OFF"}
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className={panelClassName}>
               <div className="flex items-start justify-between gap-3">
@@ -9316,7 +9629,7 @@ function AnalyticsPanel({
               value={analyticsSummary.todayPageViews.toLocaleString() + "회"}
             />
             <GrowthMetricCard
-              detail={analyticsSummary.isGa4Connected ? "GA4 기준" : "GA4 연동 후 표시"}
+              detail={analyticsSummary.isGa4Connected ? "GA4 기준" : "GA4 Data API 연결 필요"}
               label="체류시간"
               value={formatEngagementDuration(analyticsSummary.averageEngagementSeconds)}
             />
@@ -9368,63 +9681,104 @@ function AnalyticsPanel({
             <GrowthMetricCard
               detail={searchConsoleUpdatedLabel}
               label="노출"
-              value={periodImpressions.toLocaleString() + "회"}
+              value={
+                searchConsoleConnected
+                  ? periodImpressions.toLocaleString() + "회"
+                  : "연동 필요"
+              }
             />
             <GrowthMetricCard
-              detail="Search Console/GA 클릭 지표"
+              detail={searchConsoleUpdatedLabel}
               label="클릭"
-              value={periodClicks.toLocaleString() + "회"}
+              value={
+                searchConsoleConnected
+                  ? periodClicks.toLocaleString() + "회"
+                  : "연동 필요"
+              }
             />
             <GrowthMetricCard
               detail="노출 대비 클릭률"
               label="CTR"
               tone="purple"
-              value={formatDashboardPercent(periodCtr)}
+              value={
+                searchConsoleConnected
+                  ? formatDashboardPercent(periodCtr)
+                  : "연동 필요"
+              }
             />
             <GrowthMetricCard
-              detail="평균 순위 수집 필드 준비 전"
+              detail={searchConsoleUpdatedLabel}
               label="평균 순위"
               tone="zinc"
-              value="데이터 없음"
+              value={
+                searchConsoleConnected && averageSearchPosition !== null
+                  ? averageSearchPosition.toFixed(1) + "위"
+                  : searchConsoleConnected
+                    ? "데이터 없음"
+                    : "연동 필요"
+              }
             />
           </section>
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-            <SearchTrendCard rows={searchTrendRows} title="검색 유입 추이" />
+            <SearchTrendCard rows={searchTrendRows} title="Google Search Console 클릭 추이" />
             <TrafficSourceDonutCard
-              description="Google, Naver, Daum, Bing, SNS, Direct, 기타 비율입니다."
+              description="카팩트 자체 방문 로그의 referrer_channel 기준입니다."
               items={searchChannelItems}
-              title="검색엔진 비율"
+              title="자체 유입 채널"
             />
           </section>
           <section className="grid gap-4 xl:grid-cols-4">
             <DashboardBarCard
-              emptyMessage="외부 검색 키워드 데이터가 없습니다."
+              emptyMessage={
+                searchConsoleConnected
+                  ? "Search Console 검색어 데이터가 없습니다."
+                  : "Search Console API 연결 필요"
+              }
               rows={topKeywordRows}
-              title="검색어별 성과"
+              title="Search Console 검색어 TOP"
             />
             <DashboardBarCard
-              emptyMessage="검색 유입 랜딩페이지 데이터가 없습니다."
+              emptyMessage={
+                searchConsoleConnected
+                  ? "Search Console 랜딩페이지 데이터가 없습니다."
+                  : "Search Console API 연결 필요"
+              }
               rows={topLandingRows}
-              title="검색 유입 랜딩페이지"
+              title="Search Console 랜딩페이지 TOP"
             />
             <DashboardBarCard
-              emptyMessage="순위 상승/하락 검색어 데이터가 없습니다."
+              emptyMessage={
+                searchConsoleConnected
+                  ? "순위 상승/하락 검색어 데이터가 없습니다."
+                  : "Search Console API 연결 필요"
+              }
               rows={[]}
               title="순위 상승/하락 검색어"
             />
             <DashboardBarCard
-              emptyMessage="노출 대비 클릭이 낮은 검색어 데이터가 없습니다."
+              emptyMessage={
+                searchConsoleConnected
+                  ? "낮은 CTR 검색어 데이터가 없습니다."
+                  : "Search Console API 연결 필요"
+              }
               rows={[]}
               title="낮은 CTR 검색어"
             />
           </section>
+          <SearchTrendCard
+            rows={internalAcquisitionTrendRows}
+            title="자체 유입 추이"
+          />
           <section className={panelClassName}>
             <h2 className="text-lg font-black text-zinc-950">
-              검색어 및 랜딩페이지
+              자체 유입 추적
             </h2>
+            <p className="mt-1 text-xs font-medium text-zinc-500">
+              referrer_keyword, referrer_channel, landing_page 기준입니다. 내부 차량번호 검색은 외부 검색어로 취급하지 않습니다.
+            </p>
             <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
               <DashboardAcquisitionKeywordTable
-                rows={operatorDashboardData.keywordRows}
+                rows={internalAcquisitionKeywordRows}
               />
             </div>
           </section>
@@ -9480,7 +9834,7 @@ function AnalyticsPanel({
               emptyMessage="인기 게시글 데이터가 없습니다."
               rows={recentPosts.map((post) => ({
                 detail: getPostCategoryLabel(post),
-                label: post.title,
+                label: sanitizeAdminPostTitle(post.title),
                 value: post.like_count + post.comment_count,
               }))}
               title="인기 게시글"
@@ -10216,7 +10570,7 @@ function DashboardContentTable({
             ]
               .filter(Boolean)
               .join(" · "),
-            title: post.title,
+            title: sanitizeAdminPostTitle(post.title),
           }))}
           title="최근 등록된 게시글"
         />

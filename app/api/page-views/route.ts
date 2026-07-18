@@ -19,6 +19,8 @@ interface PageViewPayload {
   vehicleId?: string | null;
   reviewId?: string | null;
   sessionId?: string | null;
+  visitorId?: string | null;
+  recordMemberVisit?: boolean;
   userAgent?: string | null;
 }
 
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
   }
 
   const sessionId = payload.sessionId?.trim();
+  const visitorId = payload.visitorId?.trim();
 
   if (!sessionId) {
     return NextResponse.json({ recorded: false }, { status: 400 });
@@ -170,6 +173,7 @@ export async function POST(request: NextRequest) {
     target_vehicle_id: payload.vehicleId ?? null,
     target_review_id: payload.reviewId ?? null,
     view_session_id: sessionId,
+    view_visitor_id: visitorId || sessionId,
     view_ip_hash: hashIp(getClientIp(request)),
     view_user_agent: null,
     view_device_type: parseDeviceType(userAgent),
@@ -187,5 +191,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ recorded: Boolean(data) });
+  const { data: memberVisitRecorded } = payload.recordMemberVisit
+    ? await supabase.rpc("record_member_daily_visit", {
+        throttle_minutes: 30,
+      })
+    : { data: false };
+
+  return NextResponse.json({
+    recorded: Boolean(data),
+    memberVisitRecorded: Boolean(memberVisitRecorded),
+  });
 }
