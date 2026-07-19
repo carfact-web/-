@@ -13,6 +13,7 @@ export interface Database {
         Row: {
           id: string;
           category:
+            | "developer_note"
             | "free"
             | "maintenance"
             | "news"
@@ -37,6 +38,7 @@ export interface Database {
         Insert: {
           id?: string;
           category:
+            | "developer_note"
             | "free"
             | "maintenance"
             | "news"
@@ -61,6 +63,7 @@ export interface Database {
         Update: {
           id?: string;
           category?:
+            | "developer_note"
             | "free"
             | "maintenance"
             | "news"
@@ -1224,6 +1227,7 @@ export interface Database {
         Returns: {
           id: string;
           category:
+            | "developer_note"
             | "free"
             | "maintenance"
             | "news"

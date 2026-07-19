@@ -70,6 +70,7 @@ type AiCandidateSource = "traffic" | "review" | "keyword" | "mixed";
 type AiCandidateArchiveFilter = "today" | "recent3days" | "all";
 type AiManagementTab = "keywords" | "maintenance" | "candidates";
 type CommunityCategory =
+  | "developer_note"
   | "free"
   | "maintenance"
   | "news"

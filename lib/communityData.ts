@@ -22,9 +22,10 @@ import type { Json } from "@/types/supabase";
 
 const defaultCommunityNickname = "카팩트 사용자";
 const activeCommunityCategories: CommunityCategory[] = [
+  "developer_note",
+  "news",
   "free",
   "maintenance",
-  "news",
   "electric",
   "imported",
   "domestic",

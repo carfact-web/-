@@ -1,6 +1,7 @@
 import type { Database } from "@/types/supabase";
 
 export type CommunityCategory =
+  | "developer_note"
   | "free"
   | "maintenance"
   | "news"

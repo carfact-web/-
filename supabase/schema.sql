@@ -56,6 +56,7 @@ create table if not exists public.community_posts (
   id uuid primary key default gen_random_uuid(),
   category text not null check (
     category in (
+      'developer_note',
       'free',
       'news',
       'maintenance',

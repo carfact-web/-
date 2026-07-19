@@ -1,4 +1,5 @@
 import { fetchCommunityPostsByAuthor } from "@/lib/communityData";
+import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { mapReviewRow } from "@/lib/supabaseData";
 import { getCommunityPreviewText } from "@/utils/communityRichContent";
@@ -36,7 +37,7 @@ const getCommunityHref = (post: CommunityPost) =>
   encodeURIComponent(post.id);
 
 const getCommunityCategoryTitle = (category: CommunityCategory) =>
-  category === "maintenance" ? "정비후기" : "자유게시판";
+  getCommunityCategoryLabel(category);
 
 export const getEmptyAccountActivity = (): AccountActivity => ({
   communityLikeCount: 0,

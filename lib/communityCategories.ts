@@ -16,17 +16,17 @@ export const communityCategories: CommunityCategoryConfig[] = [
     label: "공지사항",
   },
   {
-    value: "all",
-    label: "전체",
+    value: "developer_note",
+    label: "개발자 노트",
+  },
+  {
+    value: "news",
+    label: "정보&소식",
   },
   {
     value: "free",
     label: "자유",
     shortLabel: "자유",
-  },
-  {
-    value: "news",
-    label: "정보&소식",
   },
   {
     value: "maintenance",
@@ -47,6 +47,10 @@ export const communityCategories: CommunityCategoryConfig[] = [
   {
     value: "partner",
     label: "제휴업체",
+  },
+  {
+    value: "all",
+    label: "전체",
   },
 ];
 
