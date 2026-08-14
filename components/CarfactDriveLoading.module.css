@@ -209,8 +209,13 @@
   width: min(47vw, 520px);
   min-width: 300px;
   transform: translate(-50%, -50%);
-  transform-origin: center;
   pointer-events: none;
+}
+
+.vehicleMotion {
+  position: relative;
+  width: 100%;
+  transform-origin: center;
 }
 
 .vehicleAura {
@@ -232,14 +237,18 @@
   filter: drop-shadow(0 25px 28px rgba(0, 0, 0, 0.88));
 }
 
-.status {
+.statusAnchor {
   position: absolute;
   left: 50%;
   bottom: clamp(48px, 8vh, 90px);
   z-index: 13;
-  display: grid;
   width: min(78vw, 430px);
   transform: translateX(-50%);
+}
+
+.status {
+  display: grid;
+  width: 100%;
   gap: 12px;
   text-align: center;
 }
@@ -269,12 +278,15 @@
   animation: progressScan 0.82s ease-in-out infinite;
 }
 
-.finish {
+.finishAnchor {
   position: absolute;
   top: 68%;
   left: 50%;
   z-index: 14;
   transform: translateX(-50%);
+}
+
+.finish {
   padding: 9px 17px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
@@ -366,12 +378,19 @@
   }
 
   .status {
+    width: 82vw;
+  }
+
+  .statusAnchor {
     bottom: 50px;
     width: 78vw;
   }
 
-  .finish {
+  .finishAnchor {
     top: 65%;
+  }
+
+  .finish {
     font-size: 15px;
   }
 }
@@ -380,8 +399,8 @@
   .brand { top: 18px; font-size: 20px; }
   .vehicleStage { top: 50%; width: min(37vw, 390px); }
   .radarScene { top: 51%; width: 65vw; }
-  .status { bottom: 22px; }
-  .finish { top: 70%; }
+  .statusAnchor { bottom: 22px; }
+  .finishAnchor { top: 70%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
