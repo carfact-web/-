@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import styles from "./CarfactDriveLoading.module.css";
 
 const statusMessages = [
@@ -38,7 +38,7 @@ export function CarfactDriveLoading({
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      statusTimers.forEach(window.clearTimeout);
+      statusTimers.forEach((timer) => window.clearTimeout(timer));
       window.clearTimeout(completionTimer);
     };
   }, [active, onComplete]);
@@ -57,7 +57,7 @@ export function CarfactDriveLoading({
       <div className={styles.skyGlow} />
       <div className={styles.speedField} aria-hidden="true">
         {Array.from({ length: 18 }, (_, index) => (
-          <i key={index} style={{ "--i": index } as React.CSSProperties} />
+          <i key={index} style={{ "--i": index } as CSSProperties} />
         ))}
       </div>
 
