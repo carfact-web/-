@@ -430,3 +430,225 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+
+/* WebGL premium drive composition */
+.world {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.world canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.documentField {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  z-index: 6;
+  width: min(78vw, 940px);
+  height: min(54vh, 520px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  perspective: 900px;
+}
+
+.documentCard {
+  --card-x: 0%;
+  --card-delay: 0s;
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  width: clamp(104px, 12vw, 148px);
+  min-height: 116px;
+  padding: 12px 12px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(131, 224, 255, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(11, 22, 30, 0.9), rgba(5, 8, 12, 0.58)),
+    repeating-linear-gradient(0deg, transparent 0 9px, rgba(108, 213, 247, 0.04) 9px 10px);
+  color: #dff7ff;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.035) inset,
+    0 0 28px rgba(62, 202, 249, 0.13);
+  opacity: 0;
+  transform: translate3d(var(--card-x), -70px, -260px) rotateX(13deg) scale(0.58);
+  transform-origin: center bottom;
+  animation: documentApproach 2.7s cubic-bezier(0.22, 0.7, 0.18, 1) infinite;
+  animation-delay: var(--card-delay);
+  backdrop-filter: blur(10px);
+}
+
+.documentCard::after {
+  position: absolute;
+  inset: -40% -20%;
+  content: "";
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.22) 49%, transparent 60%);
+  transform: translateX(-80%);
+  animation: documentScan 1.2s ease-in-out infinite;
+  animation-delay: var(--card-delay);
+}
+
+.documentTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 17px;
+  color: #55d8ff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.documentTop i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #ff3441;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #ff3441;
+}
+
+.documentCard strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #fff;
+  font-size: clamp(12px, 1.3vw, 15px);
+  letter-spacing: -0.02em;
+}
+
+.documentCard small {
+  display: block;
+  color: rgba(190, 224, 236, 0.62);
+  font-size: 8px;
+}
+
+.documentLines {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+}
+
+.documentLines b {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(93, 214, 250, 0.58), rgba(93, 214, 250, 0.05));
+}
+
+.documentLines b:nth-child(2) { width: 78%; }
+.documentLines b:nth-child(3) { width: 58%; }
+
+.statusAnchor {
+  top: clamp(112px, 18vh, 172px);
+  bottom: auto;
+  width: min(76vw, 440px);
+}
+
+.status {
+  padding: 10px 18px 12px;
+  border: 1px solid rgba(117, 218, 250, 0.16);
+  border-radius: 12px;
+  background: rgba(5, 9, 13, 0.54);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.status span {
+  text-shadow: 0 0 16px rgba(93, 214, 250, 0.24);
+}
+
+.vehicleStage {
+  top: 54%;
+  width: min(50vw, 550px);
+}
+
+.finishAnchor {
+  top: 73%;
+}
+
+@keyframes documentApproach {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--card-x), -80px, -320px) rotateX(18deg) scale(0.45);
+    filter: blur(5px);
+  }
+  12% {
+    opacity: 0.92;
+  }
+  48% {
+    opacity: 0.88;
+    transform: translate3d(var(--card-x), 24px, -20px) rotateX(7deg) scale(0.94);
+    filter: blur(0);
+  }
+  68% {
+    opacity: 0.8;
+    transform: translate3d(var(--card-x), 132px, 150px) rotateX(-4deg) scale(1.18);
+  }
+  84% {
+    opacity: 0;
+    transform: translate3d(var(--card-x), 230px, 380px) rotateX(-12deg) scale(1.5);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--card-x), 260px, 450px) rotateX(-14deg) scale(1.65);
+    filter: blur(12px);
+  }
+}
+
+@keyframes documentScan {
+  0%, 24% { transform: translateX(-90%); opacity: 0; }
+  45% { opacity: 1; }
+  68%, 100% { transform: translateX(90%); opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  .documentField {
+    top: 45%;
+    width: 102vw;
+    height: 48vh;
+  }
+
+  .documentCard {
+    width: 104px;
+    min-height: 104px;
+    padding: 10px;
+  }
+
+  .statusAnchor {
+    top: 104px;
+    bottom: auto;
+    width: 84vw;
+  }
+
+  .vehicleStage {
+    top: 55%;
+    width: 86vw;
+  }
+
+  .finishAnchor {
+    top: 72%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world {
+    opacity: 0.58;
+  }
+
+  .documentCard,
+  .documentCard::after {
+    animation: none;
+  }
+
+  .documentCard {
+    opacity: 0.55;
+    transform: translate3d(var(--card-x), 10px, 0) scale(0.82);
+    filter: none;
+  }
+}
