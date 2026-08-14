@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState, type CSSProperties } from "react";
+import { CarfactDriveWorld } from "./CarfactDriveWorld";
 import styles from "./CarfactDriveLoading.module.css";
 
 const statusMessages = [
@@ -10,50 +11,22 @@ const statusMessages = [
   "차량 기록 정리 중",
 ];
 
-const radarObjects = [
-  { type: "car", label: "차량", x: "18%", y: "42%", delay: "0s" },
-  { type: "bike", label: "자전거", x: "78%", y: "36%", delay: "0.22s" },
-  { type: "animal", label: "동물", x: "82%", y: "64%", delay: "0.4s" },
-  { type: "car", label: "차량", x: "22%", y: "68%", delay: "0.58s" },
+const documentCards = [
+  { code: "BASIC", title: "기본정보", meta: "차량 식별 · 등록", x: "-33%", delay: "0s" },
+  { code: "SPEC", title: "제원정보", meta: "차체 · 동력계", x: "31%", delay: "0.34s" },
+  { code: "MAINT", title: "정비이력", meta: "정비 · 주행거리", x: "-27%", delay: "0.68s" },
+  { code: "CHECK", title: "성능점검", meta: "사고 · 상태 확인", x: "29%", delay: "1.02s" },
 ] as const;
 
 interface CarfactDriveLoadingProps {
   active: boolean;
+  plateNumber: string;
   onComplete: () => void;
-}
-
-function RadarObject({ type }: { type: (typeof radarObjects)[number]["type"] }) {
-  if (type === "bike") {
-    return (
-      <svg viewBox="0 0 64 42" aria-hidden="true">
-        <circle cx="15" cy="30" r="9" />
-        <circle cx="49" cy="30" r="9" />
-        <path d="M15 30 27 15l10 15H15Zm12-15h10l12 15M31 12l-5-5m17 7h8" />
-      </svg>
-    );
-  }
-
-  if (type === "animal") {
-    return (
-      <svg viewBox="0 0 66 42" aria-hidden="true">
-        <path d="M10 29c3-11 11-17 24-16l10 4 8-8 3 3-4 9 5 8-8 1-5-5H25l-7 8H9l5-8" />
-        <circle cx="47" cy="16" r="1.5" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 70 42" aria-hidden="true">
-      <path d="M8 29 14 17l12-6h22l11 7 4 11v5H8Z" />
-      <path d="m22 15 8-4h15l8 7H18Z" />
-      <circle cx="20" cy="32" r="5" />
-      <circle cx="53" cy="32" r="5" />
-    </svg>
-  );
 }
 
 export function CarfactDriveLoading({
   active,
+  plateNumber,
   onComplete,
 }: CarfactDriveLoadingProps) {
   const [statusIndex, setStatusIndex] = useState(0);
@@ -91,42 +64,33 @@ export function CarfactDriveLoading({
       aria-live="polite"
       aria-label={statusMessages[statusIndex]}
     >
+      <div className={styles.world} aria-hidden="true">
+        <CarfactDriveWorld />
+      </div>
       <div className={styles.brand}>CAR<span>FACT</span></div>
       <div className={styles.horizonGlow} aria-hidden="true" />
-      <div className={styles.sensorGrid} aria-hidden="true" />
 
-      <div className={styles.speedField} aria-hidden="true">
-        {Array.from({ length: 20 }, (_, index) => (
-          <i key={index} style={{ "--i": index } as CSSProperties} />
-        ))}
-      </div>
-
-      <div className={styles.roadScene} aria-hidden="true">
-        <div className={styles.roadSurface}>
-          <span className={styles.roadEdgeLeft} />
-          <span className={styles.roadEdgeRight} />
-          <span className={styles.laneLeft} />
-          <span className={styles.laneRight} />
-          <span className={styles.roadPulse} />
-        </div>
-      </div>
-
-      <div className={styles.radarScene} aria-hidden="true">
-        <span className={styles.radarRingOne} />
-        <span className={styles.radarRingTwo} />
-        <span className={styles.radarRingThree} />
-        {radarObjects.map((object, index) => (
+      <div className={styles.documentField} aria-hidden="true">
+        {documentCards.map((card) => (
           <div
-            key={`${object.type}-${index}`}
-            className={styles.radarObject}
+            key={card.code}
+            className={styles.documentCard}
             style={{
-              left: object.x,
-              top: object.y,
-              animationDelay: object.delay,
-            }}
+              "--card-x": card.x,
+              "--card-delay": card.delay,
+            } as CSSProperties}
           >
-            <RadarObject type={object.type} />
-            <small>{object.label}</small>
+            <div className={styles.documentTop}>
+              <span>{card.code}</span>
+              <i />
+            </div>
+            <strong>{card.title}</strong>
+            <small>{card.meta}</small>
+            <div className={styles.documentLines}>
+              <b />
+              <b />
+              <b />
+            </div>
           </div>
         ))}
       </div>
@@ -169,7 +133,17 @@ export function CarfactDriveLoading({
           <path d="M431 151c-35 4-64 5-95 2l9 24c31 5 59 2 91-9Z" fill="#ff2535" filter="url(#redGlow)" />
           <path d="M181 153c49 7 109 7 158 0" fill="none" stroke="#fa303d" strokeWidth="5" opacity=".72" filter="url(#redGlow)" />
           <path d="M199 188h122l-8 34H207Z" fill="#050608" stroke="#3f444a" strokeWidth="2" />
-          <text x="260" y="212" textAnchor="middle" fill="#f4f4f5" fontSize="23" fontWeight="800" letterSpacing="8">CF</text>
+          <text
+            x="260"
+            y="212"
+            textAnchor="middle"
+            fill="#f4f4f5"
+            fontSize={plateNumber.length > 9 ? "15" : "19"}
+            fontWeight="800"
+            letterSpacing="2"
+          >
+            {plateNumber || "CARFACT"}
+          </text>
           <path d="M66 197h52l-13 44H75M454 197h-52l13 44h30" fill="#090a0c" stroke="#454a50" strokeWidth="3" />
           <path d="M121 220h52M347 220h52" stroke="#b9bdc2" strokeWidth="4" opacity=".62" />
           <path d="M82 128c23-14 49-23 77-28M438 128c-23-14-49-23-77-28" fill="none" stroke="#9ca2a9" strokeWidth="3" opacity=".55" />
