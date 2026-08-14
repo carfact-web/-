@@ -12,10 +12,10 @@ const statusMessages = [
 ];
 
 const documentCards = [
-  { code: "BASIC", title: "기본정보", meta: "차량 식별 · 등록", x: "-33%", delay: "0s" },
-  { code: "SPEC", title: "제원정보", meta: "차체 · 동력계", x: "31%", delay: "0.34s" },
-  { code: "MAINT", title: "정비이력", meta: "정비 · 주행거리", x: "-27%", delay: "0.68s" },
-  { code: "CHECK", title: "성능점검", meta: "사고 · 상태 확인", x: "29%", delay: "1.02s" },
+  { code: "BASIC", title: "기본정보", meta: "차량 식별 · 등록", x: "clamp(-210px, -23vw, -92px)", delay: "0s" },
+  { code: "SPEC", title: "제원정보", meta: "차체 · 동력계", x: "clamp(92px, 23vw, 210px)", delay: "0.18s" },
+  { code: "MAINT", title: "정비이력", meta: "정비 · 주행거리", x: "clamp(-180px, -20vw, -78px)", delay: "0.36s" },
+  { code: "CHECK", title: "성능점검", meta: "사고 · 상태 확인", x: "clamp(78px, 20vw, 180px)", delay: "0.54s" },
 ] as const;
 
 interface CarfactDriveLoadingProps {
