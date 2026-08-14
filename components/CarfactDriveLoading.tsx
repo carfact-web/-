@@ -131,14 +131,14 @@ export function CarfactDriveLoading({
         ))}
       </div>
 
-      <motion.div
-        className={styles.vehicleStage}
-        initial={{ opacity: 0, scale: 0.86, y: 24 }}
-        animate={{ opacity: 1, scale: [0.86, 1, 0.98, 1.03], y: [24, 0, 3, 0] }}
-        transition={{ duration: 2.7, times: [0, 0.2, 0.72, 1], ease: "easeInOut" }}
-        aria-hidden="true"
-      >
-        <div className={styles.vehicleAura} />
+      <div className={styles.vehicleStage} aria-hidden="true">
+        <motion.div
+          className={styles.vehicleMotion}
+          initial={{ opacity: 0, scale: 0.86, y: 24 }}
+          animate={{ opacity: 1, scale: [0.86, 1, 0.98, 1.03], y: [24, 0, 3, 0] }}
+          transition={{ duration: 2.7, times: [0, 0.2, 0.72, 1], ease: "easeInOut" }}
+        >
+          <div className={styles.vehicleAura} />
         <svg
           className={styles.suv}
           viewBox="0 0 520 290"
@@ -173,28 +173,33 @@ export function CarfactDriveLoading({
           <path d="M66 197h52l-13 44H75M454 197h-52l13 44h30" fill="#090a0c" stroke="#454a50" strokeWidth="3" />
           <path d="M121 220h52M347 220h52" stroke="#b9bdc2" strokeWidth="4" opacity=".62" />
           <path d="M82 128c23-14 49-23 77-28M438 128c-23-14-49-23-77-28" fill="none" stroke="#9ca2a9" strokeWidth="3" opacity=".55" />
-        </svg>
-      </motion.div>
+          </svg>
+        </motion.div>
+      </div>
 
-      <motion.div
-        key={statusIndex}
-        className={styles.status}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24 }}
-      >
-        <span>{statusMessages[statusIndex]}</span>
-        <i />
-      </motion.div>
+      <div className={styles.statusAnchor}>
+        <motion.div
+          key={statusIndex}
+          className={styles.status}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24 }}
+        >
+          <span>{statusMessages[statusIndex]}</span>
+          <i />
+        </motion.div>
+      </div>
 
-      <motion.div
-        className={styles.finish}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: [0, 0, 0, 1], scale: [0.9, 0.9, 1.08, 1] }}
-        transition={{ duration: 2.7, times: [0, 0.82, 0.94, 1] }}
-      >
-        CARFACT <em>CHECK</em>
-      </motion.div>
+      <div className={styles.finishAnchor}>
+        <motion.div
+          className={styles.finish}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: [0, 0, 0, 1], scale: [0.9, 0.9, 1.08, 1] }}
+          transition={{ duration: 2.7, times: [0, 0.82, 0.94, 1] }}
+        >
+          CARFACT <em>CHECK</em>
+        </motion.div>
+      </div>
     </div>
   );
 }
