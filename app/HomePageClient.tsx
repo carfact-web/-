@@ -1110,6 +1110,7 @@ export default function Home() {
     <main className={pageClassName}>
       <CarfactDriveLoading
         active={pendingReportHref !== null}
+        plateNumber={formatVehiclePlateNumberForDisplay(carNumber)}
         onComplete={completeDriveLoading}
       />
       <div className={shellClassName}>
