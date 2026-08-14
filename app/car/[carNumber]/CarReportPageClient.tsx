@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
-import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
@@ -111,7 +110,6 @@ export default function CarReportPage() {
   const {
     isAllowed: isGuestReportAllowed,
     isAuthenticated,
-    isBlocked: isGuestReportBlocked,
     isChecking: isGuestReportChecking,
     signInWithGoogle,
     signInWithKakao,
@@ -462,13 +460,136 @@ export default function CarReportPage() {
     );
   }
 
-  if (isGuestReportBlocked) {
+  if (!isAuthenticated) {
+    const vehicleTitle = [brand, model, generation].filter(Boolean).join(" ");
+    const teaserFields = [
+      { label: "현재 주행거리", hint: "로그인 후 공개" },
+      { label: "주요 제원", hint: "로그인 후 공개" },
+      { label: "정비 이력", hint: "로그인 후 공개" },
+      { label: "성능 점검", hint: "로그인 후 공개" },
+      { label: "실제 후기", hint: "로그인 후 공개" },
+    ];
+
     return (
-      <main className="min-h-screen bg-black pb-24">
-        <LoginRequiredPanel
-          onGoogleLogin={googleLoginFromCurrentPage}
-          onKakaoLogin={kakaoLoginFromCurrentPage}
+      <main className="min-h-screen overflow-hidden bg-black text-white">
+        <div
+          className="pointer-events-none fixed inset-0 opacity-80"
+          aria-hidden="true"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 18%, rgba(239,68,68,0.18), transparent 32%), radial-gradient(circle at 15% 70%, rgba(255,255,255,0.05), transparent 28%)",
+          }}
         />
+
+        <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 pb-16 pt-6 sm:px-10 sm:pt-10">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="mb-10 inline-flex w-fit items-center gap-2 text-sm font-semibold text-zinc-400 transition hover:text-white"
+          >
+            <span aria-hidden="true">←</span>
+            다시 조회하기
+          </button>
+
+          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950/90 p-6 shadow-2xl shadow-red-950/20 sm:p-10">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-500 to-transparent"
+              aria-hidden="true"
+            />
+
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-bold tracking-[0.18em] text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)]" />
+                CARFACT CHECK · 조회 완료
+              </div>
+              <span className="text-xs font-semibold tracking-[0.2em] text-zinc-600">
+                VERIFIED VEHICLE
+              </span>
+            </div>
+
+            <div className="max-w-3xl">
+              <p className="mb-3 text-sm font-semibold text-red-400">
+                실제 차량정보가 확인되었습니다
+              </p>
+              <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">
+                {hasVehicleInfo ? vehicleTitle : "차량 기본정보 확인 완료"}
+              </h1>
+              {year && (
+                <p className="mt-4 text-xl font-bold text-zinc-300 sm:text-2xl">
+                  {year}년식
+                </p>
+              )}
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
+                모델과 연식까지 조회되었습니다. 상세 이력은 본인 확인 후 안전하게
+                공개됩니다.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {teaserFields.map((field) => (
+                <div
+                  key={field.label}
+                  className="group relative min-h-28 overflow-hidden rounded-2xl border border-white/8 bg-white/[0.035] p-5"
+                >
+                  <div
+                    className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent backdrop-blur-md"
+                    aria-hidden="true"
+                  />
+                  <div className="relative">
+                    <div className="mb-5 flex items-center justify-between">
+                      <span className="text-sm font-bold text-zinc-300">
+                        {field.label}
+                      </span>
+                      <span
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-xs text-zinc-500"
+                        aria-hidden="true"
+                      >
+                        🔒
+                      </span>
+                    </div>
+                    <div className="h-3 w-3/4 rounded-full bg-zinc-800 blur-[2px]" />
+                    <p className="mt-3 text-xs font-medium text-zinc-600">
+                      {field.hint}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/10 to-transparent p-5 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-7">
+              <div>
+                <h2 className="text-xl font-black sm:text-2xl">
+                  로그인하면 전체 차량정보가 열립니다
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  로그인 후 이 화면으로 돌아와 주행거리, 제원, 정비·성능점검
+                  정보와 실제 후기를 확인할 수 있어요.
+                </p>
+              </div>
+
+              <div className="mt-5 grid shrink-0 gap-2 sm:mt-0 sm:min-w-56">
+                <button
+                  type="button"
+                  onClick={kakaoLoginFromCurrentPage}
+                  className="rounded-xl bg-[#FEE500] px-5 py-3 text-sm font-black text-black transition hover:brightness-95 active:scale-[0.98]"
+                >
+                  카카오로 계속하기
+                </button>
+                <button
+                  type="button"
+                  onClick={googleLoginFromCurrentPage}
+                  className="rounded-xl border border-white/15 bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-zinc-100 active:scale-[0.98]"
+                >
+                  Google로 계속하기
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <p className="mt-6 text-center text-xs leading-5 text-zinc-700">
+            상세 정보는 로그인한 사용자에게만 제공됩니다.
+          </p>
+        </div>
       </main>
     );
   }
