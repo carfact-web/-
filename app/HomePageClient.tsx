@@ -14,6 +14,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { CarfactDriveLoading } from "@/components/CarfactDriveLoading";
 import { renderCommunityTextColorSegments } from "@/components/CommunityPostBody";
 import { VerifiedNickname } from "@/components/VerifiedNickname";
 import { useAuth } from "@/hooks/useAuth";
@@ -545,6 +546,7 @@ export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isAuthReady, signOut } = useAuth();
   const [carNumber, setCarNumber] = useState("");
+  const [pendingReportHref, setPendingReportHref] = useState<string | null>(null);
   const [heroCopyIndex, setHeroCopyIndex] = useState(0);
   const [recentSlideIndex, setRecentSlideIndex] = useState(0);
   const [topRankingSlideIndex, setTopRankingSlideIndex] = useState(0);
@@ -1079,6 +1081,14 @@ export default function Home() {
     };
   }, []);
 
+  const completeDriveLoading = useCallback(() => {
+    if (!pendingReportHref) {
+      return;
+    }
+
+    router.push(pendingReportHref);
+  }, [pendingReportHref, router]);
+
   const goToReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -1093,11 +1103,15 @@ export default function Home() {
     }
 
     setCarNumber(value);
-    router.push(`/car/${encodeURIComponent(value)}`);
+    setPendingReportHref(`/car/${encodeURIComponent(value)}`);
   };
 
   return (
     <main className={pageClassName}>
+      <CarfactDriveLoading
+        active={pendingReportHref !== null}
+        onComplete={completeDriveLoading}
+      />
       <div className={shellClassName}>
         <header className={headerClassName}>
           <div className={headerTopClassName}>
@@ -1217,9 +1231,9 @@ export default function Home() {
           <button
             type="submit"
             className={primaryButtonClassName}
-            disabled={!isCarNumberValid}
+            disabled={!isCarNumberValid || pendingReportHref !== null}
           >
-            차량 이야기 보기
+            {pendingReportHref ? "차량 기록 확인 중" : "차량 이야기 보기"}
           </button>
           <p className="mt-3 text-xs leading-5 text-zinc-500">
             영업용 번호판 확인은 별도 탭에서 이용할 수 있습니다.
