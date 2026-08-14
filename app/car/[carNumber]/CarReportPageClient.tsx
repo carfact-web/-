@@ -565,6 +565,9 @@ export default function CarReportPage() {
                   로그인 후 이 화면으로 돌아와 주행거리, 제원, 정비·성능점검
                   정보와 실제 후기를 확인할 수 있어요.
                 </p>
+                <p className="mt-3 text-sm font-bold text-white">
+                  카팩트(CARFACT)의 모든 서비스는 무료로 제공됩니다.
+                </p>
               </div>
 
               <div className="mt-5 grid shrink-0 gap-2 sm:mt-0 sm:min-w-56">
