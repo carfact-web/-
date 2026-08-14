@@ -1,0 +1,400 @@
+.page {
+  min-height: 100vh;
+  background: #e7e9ee;
+  color: #111827;
+  padding: 28px 16px 44px;
+}
+
+:global(body:has([data-report-preview="true"]) nav[aria-label="하단 탐색"]) {
+  display: none;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 auto 18px;
+  max-width: 210mm;
+}
+
+.toolbarText {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.printButton {
+  background: #111827;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 10px 14px;
+}
+
+.sheet {
+  background: #ffffff;
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.18);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 297mm;
+  margin: 0 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8mm 10mm;
+  width: 210mm;
+}
+
+.header {
+  border-bottom: 2px solid #111827;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto;
+  padding-bottom: 6px;
+}
+
+.wordmark {
+  color: #d71920;
+  font-size: 16px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.title {
+  color: #111827;
+  font-size: 23px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.subtitle {
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+.metaBox {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  min-width: 140px;
+  padding: 6px 9px;
+}
+
+.metaLabel {
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.metaValue {
+  color: #111827;
+  font-size: 11px;
+  font-weight: 900;
+  margin-top: 3px;
+}
+
+.summary {
+  border: 1px solid #c9ced6;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1.25fr;
+  padding: 8px 10px;
+}
+
+.vehicleName {
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.vehicleYear {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.mileageBox {
+  border-left: 4px solid #d71920;
+  margin-top: 9px;
+  padding-left: 8px;
+}
+
+.mileageLabel {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.mileageValue {
+  color: #111827;
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
+  margin-top: 3px;
+}
+
+.summaryGrid {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.infoCell {
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  padding: 5px 7px;
+}
+
+.cellLabel {
+  color: #6b7280;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.cellValue {
+  color: #111827;
+  font-size: 10.5px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.section {
+  border: 1px solid #d9dde4;
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.sectionHeader {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.sectionTitle {
+  color: #111827;
+  font-size: 12.5px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.sectionHint {
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.checks {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checkCell {
+  align-items: center;
+  border: 1px solid #d8dce3;
+  border-radius: 7px;
+  display: flex;
+  justify-content: space-between;
+  min-height: 25px;
+  padding: 4px 7px;
+}
+
+.checkLabel {
+  color: #4b5563;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.checkValue {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  color: #111827;
+  font-size: 9px;
+  font-weight: 950;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.notice {
+  color: #4b5563;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.specGrid {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.historyCounts {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.countCard {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.countLabel {
+  color: #4b5563;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.countValue {
+  color: #111827;
+  font-size: 21px;
+  font-weight: 950;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.timeline {
+  align-items: stretch;
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.timelineItem {
+  border: 1px solid #d8dce3;
+  border-radius: 8px;
+  padding: 6px 6px;
+  position: relative;
+}
+
+.timelineItem::after {
+  background: #9ca3af;
+  content: "";
+  height: 1px;
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  width: 8px;
+}
+
+.timelineItem:last-child::after {
+  display: none;
+}
+
+.timelineDate {
+  color: #4b5563;
+  font-size: 8.5px;
+  font-weight: 900;
+}
+
+.timelineMileage {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 950;
+  margin-top: 3px;
+}
+
+.timelineKind {
+  color: #d71920;
+  font-size: 8.5px;
+  font-weight: 950;
+  margin-top: 3px;
+}
+
+.maintenanceTable {
+  border-collapse: collapse;
+  font-size: 10px;
+  width: 100%;
+}
+
+.maintenanceTable th {
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 9px;
+  font-weight: 950;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.maintenanceTable td {
+  border-top: 1px solid #e5e7eb;
+  color: #111827;
+  font-weight: 800;
+  padding: 5px 6px;
+  vertical-align: top;
+}
+
+.aiBox {
+  background: #f8fafc;
+  border: 1px solid #d8dce3;
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.aiText {
+  color: #1f2937;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.42;
+}
+
+.footer {
+  border-top: 1px solid #d1d5db;
+  color: #4b5563;
+  font-size: 7.8px;
+  font-weight: 800;
+  line-height: 1.4;
+  margin-top: 2px;
+  padding-top: 5px;
+}
+
+@page {
+  margin: 0;
+  size: A4 portrait;
+}
+
+@media print {
+  .page {
+    background: #ffffff;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .toolbar {
+    display: none;
+  }
+
+  .sheet {
+    box-shadow: none;
+    height: 297mm;
+    margin: 0;
+    min-height: 0;
+    width: 210mm;
+  }
+}
+
+@media (max-width: 860px) {
+  .page {
+    overflow-x: auto;
+  }
+
+  .toolbar {
+    min-width: 210mm;
+  }
+}
