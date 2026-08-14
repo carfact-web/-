@@ -479,7 +479,7 @@
   opacity: 0;
   transform: translate3d(var(--card-x), -70px, -260px) rotateX(13deg) scale(0.58);
   transform-origin: center bottom;
-  animation: documentApproach 2.7s cubic-bezier(0.22, 0.7, 0.18, 1) infinite;
+  animation: documentApproach 2.15s cubic-bezier(0.22, 0.7, 0.18, 1) both;
   animation-delay: var(--card-delay);
   backdrop-filter: blur(10px);
 }
