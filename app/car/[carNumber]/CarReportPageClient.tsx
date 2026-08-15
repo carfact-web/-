@@ -35,6 +35,7 @@ import {
   subscribeToHelpfulChanges,
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
+import type { Vehicle } from "@/types/vehicle";
 import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -79,6 +80,15 @@ type ReviewSortOption = "latest" | "helpful" | "photo";
 type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
 
 interface CommercialPlateCheckResponse {
+  display?: {
+    carName?: string | null;
+    firstRegistrationDate?: string | null;
+    fuelType?: string | null;
+    latestPerformanceMileage?: string | null;
+    usage?: string | null;
+    vehicleType?: string | null;
+    year?: string | null;
+  } | null;
   error?: string;
   ok?: boolean;
 }
@@ -105,6 +115,7 @@ export default function CarReportPage() {
     useState<CommercialPlateCheckState>("checking");
   const [commercialPlateCheckError, setCommercialPlateCheckError] = useState("");
   const [commercialPlateRetryCount, setCommercialPlateRetryCount] = useState(0);
+  const [apiVehicle, setApiVehicle] = useState<Vehicle | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -128,8 +139,9 @@ export default function CarReportPage() {
 
   const { isAdmin, session, user } = useAuth();
   const { deleteReview, reviews } = useReviews(carNumber);
-  const { vehicle } = useVehicle(carNumber);
+  const { vehicle: registeredVehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
+  const vehicle = registeredVehicle ?? apiVehicle;
   const aiAnalysisEventKeyRef = useRef<string | null>(null);
   const brand = vehicle?.brand ?? "";
   const model = vehicle?.model ?? "";
@@ -137,7 +149,7 @@ export default function CarReportPage() {
   const year = vehicle?.year ?? "";
   const mileage = vehicle?.mileage ?? "";
   const fuelType = vehicle?.fuelType ?? "";
-  const hasVehicleInfo = Boolean(brand && model && generation && year);
+  const hasVehicleInfo = Boolean(vehicle && (model || year));
   const currentVehicleModelKey = useMemo(
     () => (vehicle ? getVehicleModelKey(vehicle) : ""),
     [vehicle],
@@ -488,8 +500,23 @@ export default function CarReportPage() {
         }
         if (!isActive) return;
 
-        // The approved attachment API is itself scoped to used-car sale
-        // product vehicles. Usage classification is not an eligibility flag.
+        const display = payload.display;
+        const registrationYear = display?.firstRegistrationDate
+          ?.replace(/\D/g, "")
+          .slice(0, 4);
+
+        setApiVehicle({
+          brand: "",
+          fuelType: display?.fuelType ?? "",
+          generation: display?.vehicleType ?? "",
+          mileage: display?.latestPerformanceMileage ?? "",
+          model: display?.carName ?? display?.vehicleType ?? "조회 차량",
+          plateNumber: carNumber,
+          year: display?.year ?? registrationYear ?? "",
+        });
+
+        // A successful response from the approved attachment API is the
+        // eligibility signal. Usage classification must not block the report.
         setCommercialPlateCheckState("eligible");
       })
       .catch((error: unknown) => {
