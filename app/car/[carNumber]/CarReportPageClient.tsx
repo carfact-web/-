@@ -79,7 +79,6 @@ type ReviewSortOption = "latest" | "helpful" | "photo";
 type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
 
 interface CommercialPlateCheckResponse {
-  businessVehicle?: boolean;
   error?: string;
   ok?: boolean;
 }
@@ -472,13 +471,26 @@ export default function CarReportPage() {
           | null;
 
         if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error ?? "상품용 차량 여부를 확인하지 못했습니다.");
+          const message =
+            payload?.error ?? "상품용 차량 여부를 확인하지 못했습니다.";
+
+          if (
+            isActive &&
+            /(매매 상품용|상품용 차량|제공 대상|조회 대상|대상 차량).*(아니|없|불가)|확인되지 않/.test(
+              message,
+            )
+          ) {
+            setCommercialPlateCheckState("ineligible");
+            return;
+          }
+
+          throw new Error(message);
         }
         if (!isActive) return;
 
-        setCommercialPlateCheckState(
-          payload.businessVehicle ? "eligible" : "ineligible",
-        );
+        // The approved attachment API is itself scoped to used-car sale
+        // product vehicles. Usage classification is not an eligibility flag.
+        setCommercialPlateCheckState("eligible");
       })
       .catch((error: unknown) => {
         if (!isActive || controller.signal.aborted) return;
