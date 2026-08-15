@@ -637,7 +637,7 @@ export default function CarReportPage() {
                 <VehicleReportSheet
                   carNumber={carNumber}
                   reviewCount={reviews.length}
-                  vehicle={vehicle}
+                  vehicle={vehicle!}
                 />
 
                 <Link
