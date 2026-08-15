@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
+import { VehicleReportSheet } from "@/components/VehicleReportSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
@@ -37,7 +38,7 @@ import type { Review } from "@/types/review";
 import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
-const shellClassName = cn("mx-auto w-full max-w-3xl");
+const shellClassName = cn("mx-auto w-full max-w-5xl");
 const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
@@ -632,26 +633,12 @@ export default function CarReportPage() {
             </>
           ) : (
             <>
-              <section className="mb-6">
-                <h2 className="mb-4 text-2xl font-bold">차량정보</h2>
-                <div className="rounded-xl bg-zinc-800 p-4">
-                  <p className="text-gray-300">
-                    {[brand, model, generation, year && `${year}년`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {(fuelType || mileage) && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      {[
-                        fuelType,
-                        mileage &&
-                          `주행거리: ${Number(mileage).toLocaleString()}km`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  )}
-                </div>
+              <section className="mb-8">
+                <VehicleReportSheet
+                  carNumber={carNumber}
+                  reviewCount={reviews.length}
+                  vehicle={vehicle}
+                />
 
                 <Link
                   href={`/car/${encodeURIComponent(carNumber)}/edit`}
