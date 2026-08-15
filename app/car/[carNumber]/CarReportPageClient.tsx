@@ -76,6 +76,13 @@ const sortButtonClassName = cn(
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
+type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
+
+interface CommercialPlateCheckResponse {
+  businessVehicle?: boolean;
+  error?: string;
+  ok?: boolean;
+}
 
 const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   const parsedTime = Date.parse(dateLabel);
@@ -95,6 +102,10 @@ export default function CarReportPage() {
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [commercialPlateCheckState, setCommercialPlateCheckState] =
+    useState<CommercialPlateCheckState>("checking");
+  const [commercialPlateCheckError, setCommercialPlateCheckError] = useState("");
+  const [commercialPlateRetryCount, setCommercialPlateRetryCount] = useState(0);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -116,7 +127,7 @@ export default function CarReportPage() {
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, session, user } = useAuth();
   const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -429,6 +440,63 @@ export default function CarReportPage() {
     };
   }, [aiKeywordRules, currentVehicleModelKey, fuelType, generation, model, vehicle]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const accessToken = session?.access_token;
+    if (!accessToken || !carNumber) return;
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    void Promise.resolve().then(() => {
+      if (isActive) {
+        setCommercialPlateCheckState("checking");
+        setCommercialPlateCheckError("");
+      }
+    });
+
+    fetch("/api/kotsa/commercial-plate", {
+      body: JSON.stringify({ vehicleNumber: carNumber }),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | CommercialPlateCheckResponse
+          | null;
+
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error ?? "상품용 차량 여부를 확인하지 못했습니다.");
+        }
+        if (!isActive) return;
+
+        setCommercialPlateCheckState(
+          payload.businessVehicle ? "eligible" : "ineligible",
+        );
+      })
+      .catch((error: unknown) => {
+        if (!isActive || controller.signal.aborted) return;
+
+        setCommercialPlateCheckState("error");
+        setCommercialPlateCheckError(
+          error instanceof Error
+            ? error.message
+            : "상품용 차량 여부를 확인하지 못했습니다.",
+        );
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [carNumber, commercialPlateRetryCount, isAuthenticated, session?.access_token]);
+
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
   };
@@ -593,6 +661,85 @@ export default function CarReportPage() {
           <p className="mt-6 text-center text-xs leading-5 text-zinc-700">
             상세 정보는 로그인한 사용자에게만 제공됩니다.
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "checking") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button type="button" onClick={() => router.push("/")} className={homeButtonClassName}>
+            ← 처음으로
+          </button>
+          <h1 className="mb-6 text-4xl font-bold sm:text-5xl">카팩트 리포트</h1>
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400">
+              중고차 매매 상품용 차량 여부를 확인하고 있습니다.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "ineligible") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
+            <div className="mb-6 inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold tracking-[0.16em] text-red-400">
+              CARFACT CHECK
+            </div>
+            <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
+              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
+            </h1>
+            <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
+              차량번호를 다시 확인하거나 다른 차량을 조회해주세요.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="mt-9 inline-flex rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+            >
+              처음으로 이동
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "error") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 sm:p-10">
+            <p className="text-sm font-bold text-red-400">
+              상품용 차량 확인 중 오류가 발생했습니다.
+            </p>
+            <h1 className="mt-3 text-3xl font-black">잠시 후 다시 시도해주세요.</h1>
+            <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-500">
+              {commercialPlateCheckError}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setCommercialPlateRetryCount((count) => count + 1)}
+                className="rounded-xl bg-red-500 px-6 py-4 text-sm font-black transition hover:bg-red-600 active:scale-[0.98]"
+              >
+                다시 확인
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="rounded-xl border border-white/10 bg-zinc-900 px-6 py-4 text-sm font-black transition hover:bg-zinc-800 active:scale-[0.98]"
+              >
+                처음으로
+              </button>
+            </div>
+          </section>
         </div>
       </main>
     );
