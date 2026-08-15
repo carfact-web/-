@@ -128,7 +128,29 @@ export const getKotsaVehicleDisplayInfo = (
     return null;
   }
 
+  const rawCarName = findDeepStringByKeys(data.raw, [
+    "atmbNm",
+    "carName",
+    "vhclNm",
+    "modelNm",
+  ]);
+  const rawFirstRegistrationDate = findDeepStringByKeys(data.raw, [
+    "frstRegYmd",
+    "firstRegistrationDate",
+  ]);
+  const rawVehicleType = findDeepStringByKeys(data.raw, [
+    "carmdlAsortNm",
+    "vehicleType",
+    "vhclTypeNm",
+  ]);
+  const rawUsage = findDeepStringByKeys(data.raw, [
+    "usgSeNm",
+    "usgDtlSeNm",
+    "usage",
+  ]);
   const rawYear = findDeepStringByKeys(data.raw, [
+    "yridnw",
+    "mdlYr",
     "yr",
     "year",
     "modelYear",
@@ -137,37 +159,43 @@ export const getKotsaVehicleDisplayInfo = (
     "vhclYy",
   ]);
   const fuelType = findDeepStringByKeys(data.raw, [
+    "useFuelNm",
     "fuel",
     "fuelType",
     "fuelNm",
     "fuelKndNm",
-    "useFuelNm",
     "ffuelCdNm",
   ]);
   const latestPerformanceMileage = normalizeMileage(
     findDeepStringByKeys(data.raw, [
+      "drvngDstnc",
+      "prfomncCheckDrvngDstnc",
+      "imprmnHstryDrvngDstnc",
       "mileage",
       "odometer",
       "trvlDstnc",
       "drvnDstnc",
-      "drvngDstnc",
       "prfomncChckMlg",
       "acmlMlg",
     ]),
   );
+  const firstRegistrationDate =
+    data.firstRegistrationDate ?? rawFirstRegistrationDate;
 
   return {
-    carName: data.carName,
-    firstRegistrationDate: data.firstRegistrationDate,
+    carName: data.carName ?? rawCarName,
+    firstRegistrationDate,
     fuelType,
     inspectionHistoryCount: data.inspectionRecords.length,
     latestPerformanceMileage,
     maintenanceHistoryCount: data.maintenanceHistoryCount,
     performanceCheckCount: data.performanceCheckCount,
     scrapped: data.scrapped,
-    usage: data.usage,
-    vehicleType: data.vehicleType,
-    year: onlyDigits(rawYear).slice(0, 4) || getYearFromDate(data.firstRegistrationDate),
+    usage: data.usage ?? rawUsage,
+    vehicleType: data.vehicleType ?? rawVehicleType,
+    year:
+      onlyDigits(rawYear).slice(0, 4) ||
+      getYearFromDate(firstRegistrationDate),
   };
 };
 
