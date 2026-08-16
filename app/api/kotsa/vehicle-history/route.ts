@@ -5,6 +5,10 @@ import { evaluateKotsaFailureAlerts } from "@/lib/server/kotsa/alerts";
 import { fetchKotsaVehicleHistory, KotsaApiError } from "@/lib/server/kotsa/client";
 import { KotsaCircuitOpenError } from "@/lib/server/kotsa/circuitBreaker";
 import {
+  fetchKotsaComprehensiveInfo,
+  KotsaComprehensiveApiError,
+} from "@/lib/server/kotsa-comprehensive/client";
+import {
   getCachedVehicleHistory,
   getCachedVehicleHistoryFromDb,
   hashVehicleNumber,
@@ -32,8 +36,10 @@ import {
 import {
   getKotsaVehicleDisplayInfo,
   isKotsaBusinessVehicle,
+  type KotsaVehicleDisplayInfo,
   type KotsaVehicleHistory,
 } from "@/types/kotsa";
+import { normalizeKotsaVehicleHistory } from "@/lib/server/kotsa/normalize";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,16 +47,35 @@ export const runtime = "nodejs";
 const jsonError = (message: string, status: number) =>
   NextResponse.json({ ok: false, error: message }, { status });
 
+interface VehicleMasterMatch {
+  candidates: Array<{
+    brand: string;
+    model: string;
+    generation: string;
+  }>;
+  status: "matched" | "multiple_candidates" | "unmatched";
+  vehicle: {
+    brand: string;
+    fuelType: string;
+    generation: string;
+    mileage: string;
+    model: string;
+    year: string;
+  } | null;
+}
+
 const createSuccessPayload = (
   result: KotsaVehicleHistory,
   cached: boolean,
   requestId: string,
+  match: VehicleMasterMatch | null,
 ) => ({
   ok: true,
   businessVehicle: isKotsaBusinessVehicle(result),
   cached,
   data: result,
   display: getKotsaVehicleDisplayInfo(result),
+  match,
   requestId,
 });
 
@@ -62,6 +87,149 @@ const commercialPlateQuotaLimit = 5;
 const commercialPlateQuotaWindowMs = 24 * 60 * 60 * 1000;
 const commercialPlateQuotaExceededMessage =
   "24시간 조회 가능 횟수를 초과했습니다.\n동일 번호 재조회는 가능하며, 신규 번호 조회는 24시간 후 다시 이용해주세요.";
+
+const normalizeMatchText = (value: string | null | undefined) =>
+  (value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/mercedesbenz|mercedes|benz/g, "벤츠")
+    .replace(/bmw/g, "비엠더블유")
+    .replace(/[^0-9a-z가-힣]/g, "");
+
+const getYearFromDetail = (detail: string) =>
+  [...detail.matchAll(/\d{2,4}/g)]
+    .map((match) => {
+      const value = Number(match[0]);
+
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      return value >= 1000 ? value : value <= 29 ? 2000 + value : 1900 + value;
+    })
+    .filter((value): value is number => Boolean(value));
+
+const buildMatchTokens = (display: KotsaVehicleDisplayInfo | null) =>
+  [
+    display?.manufacturer,
+    display?.brand,
+    display?.carName,
+    display?.vehicleType,
+    display?.generation,
+  ]
+    .flatMap((value) => (value ?? "").split(/[\s/()·,]+/))
+    .map(normalizeMatchText)
+    .filter((value) => value.length >= 2);
+
+const getVehicleMasterMatch = async (
+  clients: ReturnType<typeof getSupabaseAdminClients>,
+  display: KotsaVehicleDisplayInfo | null,
+): Promise<VehicleMasterMatch | null> => {
+  if (!clients || !display) {
+    return null;
+  }
+
+  const tokens = [...new Set(buildMatchTokens(display))].slice(0, 6);
+  const fullQuery = normalizeMatchText(
+    [display.manufacturer, display.carName, display.vehicleType]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  if (!fullQuery || tokens.length === 0) {
+    return {
+      candidates: [],
+      status: "unmatched",
+      vehicle: null,
+    };
+  }
+
+  const selectFields =
+    "id, manufacturer, model, model_detail, aliases, search_text, search_text_normalized, active_car_count";
+  const runTokenQuery = () =>
+    clients.admin
+      .from("vehicle_master")
+      .select(selectFields)
+      .or(tokens.map((token) => `search_text_normalized.ilike.%${token}%`).join(","))
+      .limit(80);
+  const { data, error } =
+    fullQuery.length >= 4
+      ? await clients.admin
+          .from("vehicle_master")
+          .select(selectFields)
+          .ilike("search_text_normalized", `%${fullQuery}%`)
+          .limit(80)
+      : await runTokenQuery();
+
+  if (error) {
+    return null;
+  }
+
+  let rows = data ?? [];
+
+  if (rows.length === 0 && tokens.length > 0 && fullQuery.length >= 4) {
+    const fallback = await runTokenQuery();
+
+    if (!fallback.error) {
+      rows = fallback.data ?? [];
+    }
+  }
+  const rawYear = display.year ? Number(display.year) : null;
+  const scored = rows
+    .map((row) => {
+      const aliases = Array.isArray(row.aliases) ? row.aliases.join(" ") : "";
+      const haystack = normalizeMatchText(
+        [
+          row.manufacturer,
+          row.model,
+          row.model_detail,
+          row.search_text,
+          row.search_text_normalized,
+          aliases,
+        ].join(" "),
+      );
+      const score =
+        (fullQuery && haystack.includes(fullQuery) ? 80 : 0) +
+        tokens.reduce((total, token) => total + (haystack.includes(token) ? 12 : 0), 0) +
+        (rawYear && getYearFromDetail(row.model_detail).includes(rawYear) ? 10 : 0) +
+        Math.min(Number(row.active_car_count ?? 0), 20) / 10;
+
+      return { row, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score);
+
+  const candidates = scored.slice(0, 5).map(({ row }) => ({
+    brand: row.manufacturer,
+    model: row.model,
+    generation: row.model_detail,
+  }));
+  const [best, second] = scored;
+  const isConfident =
+    Boolean(best) &&
+    (best.score >= 55 || (best.score >= 30 && (!second || best.score - second.score >= 8)));
+
+  if (!best || !isConfident) {
+    return {
+      candidates,
+      status: candidates.length > 1 ? "multiple_candidates" : "unmatched",
+      vehicle: null,
+    };
+  }
+
+  return {
+    candidates,
+    status: "matched",
+    vehicle: {
+      brand: best.row.manufacturer,
+      fuelType: display.fuelType ?? "",
+      generation: best.row.model_detail,
+      mileage: display.latestPerformanceMileage ?? "",
+      model: best.row.model,
+      year: display.year ?? "",
+    },
+  };
+};
 
 const checkCommercialPlateRollingQuota = async ({
   endpoint,
@@ -335,8 +503,20 @@ export async function handleKotsaVehicleHistoryRequest(
       (await getCachedVehicleHistoryFromDb(vehicleNumber)) ??
       getCachedVehicleHistory(vehicleNumber);
 
-    if (cachedResult) {
+    const cachedDisplay = getKotsaVehicleDisplayInfo(cachedResult);
+    const hasUsefulCachedDisplay = Boolean(
+      cachedDisplay?.carName ||
+        cachedDisplay?.year ||
+        cachedDisplay?.fuelType ||
+        cachedDisplay?.latestPerformanceMileage,
+    );
+
+    if (cachedResult && hasUsefulCachedDisplay) {
       setCachedVehicleHistory(vehicleNumber, cachedResult);
+      const cachedMatch = await getVehicleMasterMatch(
+        authResult.clients,
+        cachedDisplay,
+      );
 
       await writeKotsaAuditLog({
         endpoint,
@@ -361,7 +541,7 @@ export async function handleKotsaVehicleHistoryRequest(
       });
 
       const response = NextResponse.json(
-        createSuccessPayload(cachedResult, true, requestId),
+        createSuccessPayload(cachedResult, true, requestId, cachedMatch),
       );
       response.headers.set("x-request-id", requestId);
       return response;
@@ -524,9 +704,23 @@ export async function handleKotsaVehicleHistoryRequest(
       }
     }
 
-    const result = await fetchKotsaVehicleHistory({ vehicleNumber });
+    let result: KotsaVehicleHistory;
+
+    try {
+      const comprehensive = await fetchKotsaComprehensiveInfo({ vehicleNumber });
+      result = normalizeKotsaVehicleHistory(comprehensive.payload);
+    } catch (error) {
+      if (error instanceof KotsaComprehensiveApiError && error.status < 500) {
+        throw new KotsaApiError(error.message, error.status, error.responseCode);
+      }
+
+      result = await fetchKotsaVehicleHistory({ vehicleNumber });
+    }
+
     setCachedVehicleHistory(vehicleNumber, result);
     await setCachedVehicleHistoryInDb(vehicleNumber, result);
+    const display = getKotsaVehicleDisplayInfo(result);
+    const match = await getVehicleMasterMatch(authResult.clients, display);
 
     await writeKotsaAuditLog({
       endpoint,
@@ -552,7 +746,7 @@ export async function handleKotsaVehicleHistoryRequest(
     });
 
     const response = NextResponse.json(
-      createSuccessPayload(result, false, requestId),
+      createSuccessPayload(result, false, requestId, match),
     );
     response.headers.set("x-request-id", requestId);
     return response;

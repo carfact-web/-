@@ -27,8 +27,11 @@ export interface KotsaVehicleHistory {
 }
 
 export interface KotsaVehicleDisplayInfo {
+  brand: string | null;
   carName: string | null;
   vehicleType: string | null;
+  generation: string | null;
+  manufacturer: string | null;
   usage: string | null;
   firstRegistrationDate: string | null;
   year: string | null;
@@ -155,6 +158,58 @@ const normalizeMileage = (value: string | null) => {
   return String(Number(digits));
 };
 
+const findDeepArrayLengthByKeys = (
+  value: unknown,
+  targetKeys: string[],
+  depth = 0,
+): number | null => {
+  if (depth > 12) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findDeepArrayLengthByKeys(item, targetKeys, depth + 1);
+
+      if (found !== null) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseJsonString(value);
+
+    return parsed === null
+      ? null
+      : findDeepArrayLengthByKeys(parsed, targetKeys, depth + 1);
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const normalizedTargets = targetKeys.map(normalizeKey);
+
+  for (const [key, item] of Object.entries(value)) {
+    if (normalizedTargets.includes(normalizeKey(key)) && Array.isArray(item)) {
+      return item.length;
+    }
+  }
+
+  for (const item of Object.values(value)) {
+    const found = findDeepArrayLengthByKeys(item, targetKeys, depth + 1);
+
+    if (found !== null) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
 export const getKotsaVehicleDisplayInfo = (
   data: KotsaVehicleHistory | null | undefined,
 ): KotsaVehicleDisplayInfo | null => {
@@ -167,6 +222,16 @@ export const getKotsaVehicleDisplayInfo = (
     "carName",
     "vhclNm",
     "modelNm",
+  ]);
+  const rawManufacturer = findDeepStringByKeys(data.raw, [
+    "manufacturer",
+    "brand",
+    "maker",
+    "makerNm",
+    "makrNm",
+    "mkrNm",
+    "mkngCmpyNm",
+    "fbctnBzentyNm",
   ]);
   const rawFirstRegistrationDate = findDeepStringByKeys(data.raw, [
     "frstRegYmd",
@@ -215,18 +280,32 @@ export const getKotsaVehicleDisplayInfo = (
   );
   const firstRegistrationDate =
     data.firstRegistrationDate ?? rawFirstRegistrationDate;
+  const vehicleType = data.vehicleType ?? rawVehicleType;
+  const maintenanceHistoryCount =
+    data.maintenanceHistoryCount ??
+    findDeepArrayLengthByKeys(data.raw, ["imprmnList", "maintenanceList"]);
+  const performanceCheckCount =
+    data.performanceCheckCount ??
+    findDeepArrayLengthByKeys(data.raw, ["sttusList1", "sttusList2"]);
+  const inspectionHistoryCount =
+    data.inspectionRecords.length ||
+    findDeepArrayLengthByKeys(data.raw, ["record", "inspList", "inspectionList"]) ||
+    (findDeepStringByKeys(data.raw, ["inspVldPdBgngYmd", "inspVldPdEndYmd"]) ? 1 : 0);
 
   return {
+    brand: rawManufacturer,
     carName: data.carName ?? rawCarName,
     firstRegistrationDate,
     fuelType,
-    inspectionHistoryCount: data.inspectionRecords.length,
+    generation: vehicleType,
+    inspectionHistoryCount,
     latestPerformanceMileage,
-    maintenanceHistoryCount: data.maintenanceHistoryCount,
-    performanceCheckCount: data.performanceCheckCount,
+    maintenanceHistoryCount,
+    manufacturer: rawManufacturer,
+    performanceCheckCount,
     scrapped: data.scrapped,
     usage: data.usage ?? rawUsage,
-    vehicleType: data.vehicleType ?? rawVehicleType,
+    vehicleType,
     year:
       onlyDigits(rawYear).slice(0, 4) ||
       getYearFromDate(firstRegistrationDate),

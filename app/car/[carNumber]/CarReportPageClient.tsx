@@ -94,8 +94,24 @@ interface CommercialPlateCheckResponse {
     vehicleType?: string | null;
     year?: string | null;
   } | null;
+  match?: {
+    candidates?: Array<{
+      brand: string;
+      generation: string;
+      model: string;
+    }>;
+    status?: "matched" | "multiple_candidates" | "unmatched";
+    vehicle?: Omit<Vehicle, "plateNumber"> | null;
+  } | null;
   error?: string;
   ok?: boolean;
+}
+
+interface AutoMatchingState {
+  candidates: NonNullable<CommercialPlateCheckResponse["match"]>["candidates"];
+  display: CommercialPlateCheckResponse["display"];
+  status: NonNullable<CommercialPlateCheckResponse["match"]>["status"];
+  vehicle: Vehicle;
 }
 
 const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
@@ -110,6 +126,150 @@ const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
 };
 
+const buildSlotOptions = (value: string, candidates: string[]) => {
+  const uniqueCandidates = [...new Set(candidates.filter(Boolean))].slice(0, 5);
+
+  if (!value) {
+    return uniqueCandidates.length ? uniqueCandidates : ["정보 없음"];
+  }
+
+  return [...uniqueCandidates.filter((item) => item !== value), value].slice(-5);
+};
+
+function AutoMatchingPanel({ state }: { state: AutoMatchingState }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isReducedMotion, setIsReducedMotion] = useState(false);
+  const candidates = state.candidates ?? [];
+  const fields = [
+    {
+      label: "제조사",
+      value: state.vehicle.brand,
+      options: buildSlotOptions(
+        state.vehicle.brand,
+        candidates.map((item) => item.brand),
+      ),
+    },
+    {
+      label: "모델",
+      value: state.vehicle.model,
+      options: buildSlotOptions(
+        state.vehicle.model,
+        candidates.map((item) => item.model),
+      ),
+    },
+    {
+      label: "세부모델",
+      value: state.vehicle.generation,
+      options: buildSlotOptions(
+        state.vehicle.generation,
+        candidates.map((item) => item.generation),
+      ),
+    },
+    {
+      label: "연식",
+      value: state.vehicle.year,
+      options: buildSlotOptions(state.vehicle.year, [state.display?.year ?? ""]),
+    },
+    {
+      label: "연료",
+      value: state.vehicle.fuelType,
+      options: buildSlotOptions(state.vehicle.fuelType, [
+        state.display?.fuelType ?? "",
+      ]),
+    },
+    {
+      label: "주행거리",
+      value: state.vehicle.mileage ? `${Number(state.vehicle.mileage).toLocaleString()} km` : "정보 없음",
+      options: buildSlotOptions(state.vehicle.mileage, [
+        state.display?.latestPerformanceMileage ?? "",
+      ]).map((item) =>
+        /^\d+$/.test(item) ? `${Number(item).toLocaleString()} km` : item,
+      ),
+    },
+  ];
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setIsReducedMotion(media.matches);
+
+    if (media.matches) {
+      setActiveIndex(fields.length);
+      return;
+    }
+
+    const timers = fields.map((_, index) =>
+      window.setTimeout(() => setActiveIndex(index + 1), 520 * (index + 1)),
+    );
+
+    return () => {
+      timers.forEach(window.clearTimeout);
+    };
+  }, [fields.length]);
+
+  return (
+    <main className={pageClassName}>
+      <div className={shellClassName}>
+        <section className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-red-950/20 sm:p-8">
+          <div className="mb-6">
+            <p className="text-xs font-black tracking-[0.18em] text-red-400">
+              CARFACT AUTO MATCHING
+            </p>
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+              차량정보 자동 선택 중
+            </h1>
+          </div>
+
+          <div className="grid gap-3">
+            {fields.map((field, index) => {
+              const isActive = activeIndex === index;
+              const isLocked = activeIndex > index;
+              const currentValue = isLocked || isReducedMotion
+                ? field.value
+                : field.options[index % Math.max(field.options.length, 1)] ?? "확인 중";
+
+              return (
+                <div
+                  key={field.label}
+                  className={cn(
+                    "grid min-h-20 grid-cols-[7rem_1fr_2.5rem] items-center gap-3 rounded-2xl border bg-zinc-900/80 px-4 py-3 transition sm:grid-cols-[10rem_1fr_3rem]",
+                    isActive
+                      ? "border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.24)]"
+                      : "border-white/10",
+                    isLocked && "border-red-500/40 bg-red-500/5",
+                  )}
+                >
+                  <p className="text-sm font-black text-zinc-400">{field.label}</p>
+                  <div className="relative h-11 overflow-hidden rounded-xl border border-white/10 bg-black px-4">
+                    <div
+                      className={cn(
+                        "flex h-full items-center text-lg font-black text-white transition-transform duration-300",
+                        isActive && "motion-safe:animate-pulse",
+                      )}
+                    >
+                      {currentValue || "정보 없음"}
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-full border text-sm font-black",
+                      isLocked
+                        ? "border-red-500 bg-red-500 text-white"
+                        : "border-white/10 text-zinc-600",
+                    )}
+                    aria-label={isLocked ? `${field.label} 확정` : `${field.label} 대기`}
+                  >
+                    {isLocked ? "✓" : ""}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
@@ -123,6 +283,9 @@ export default function CarReportPage() {
   const [apiVehicle, setApiVehicle] = useState<Vehicle | null>(null);
   const [apiDisplay, setApiDisplay] =
     useState<NonNullable<CommercialPlateCheckResponse["display"]> | null>(null);
+  const [autoMatchingState, setAutoMatchingState] =
+    useState<AutoMatchingState | null>(null);
+  const [showAutoMatching, setShowAutoMatching] = useState(false);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -511,17 +674,34 @@ export default function CarReportPage() {
         const registrationYear = display?.firstRegistrationDate
           ?.replace(/\D/g, "")
           .slice(0, 4);
+        const matchedVehicle = payload.match?.vehicle;
+        const nextVehicle: Vehicle = matchedVehicle
+          ? { ...matchedVehicle, plateNumber: carNumber }
+          : {
+              brand: display?.manufacturer ?? display?.brand ?? "",
+              fuelType: display?.fuelType ?? "",
+              generation: display?.generation ?? display?.vehicleType ?? "",
+              mileage: display?.latestPerformanceMileage ?? "",
+              model: display?.carName ?? display?.vehicleType ?? "",
+              plateNumber: carNumber,
+              year: display?.year ?? registrationYear ?? "",
+            };
 
         setApiDisplay(display ?? null);
-        setApiVehicle({
-          brand: display?.manufacturer ?? display?.brand ?? "",
-          fuelType: display?.fuelType ?? "",
-          generation: display?.generation ?? display?.vehicleType ?? "",
-          mileage: display?.latestPerformanceMileage ?? "",
-          model: display?.carName ?? display?.vehicleType ?? "",
-          plateNumber: carNumber,
-          year: display?.year ?? registrationYear ?? "",
+        setApiVehicle(nextVehicle);
+        setAutoMatchingState({
+          candidates: payload.match?.candidates ?? [],
+          display: display ?? null,
+          status: payload.match?.status,
+          vehicle: nextVehicle,
         });
+        setShowAutoMatching(true);
+
+        window.setTimeout(() => {
+          if (isActive) {
+            setShowAutoMatching(false);
+          }
+        }, 4200);
 
         // A successful response from the approved attachment API is the
         // eligibility signal. Usage classification must not block the report.
@@ -790,6 +970,10 @@ export default function CarReportPage() {
         </div>
       </main>
     );
+  }
+
+  if (showAutoMatching && autoMatchingState) {
+    return <AutoMatchingPanel state={autoMatchingState} />;
   }
 
   return (

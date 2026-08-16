@@ -6,7 +6,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     : {};
 
 const asString = (value: unknown) =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
+  typeof value === "string" && value.trim()
+    ? value.trim()
+    : typeof value === "number" && Number.isFinite(value)
+      ? String(value)
+      : null;
 
 const asNumber = (value: unknown) => {
   const stringValue = asString(value);
@@ -54,13 +58,23 @@ export const normalizeKotsaVehicleHistory = (payload: unknown): KotsaVehicleHist
   const root = asRecord(payload);
   const data = Array.isArray(root.data) ? root.data : [];
   const first = asRecord(data[0]);
+  const carBscInfo = Array.isArray(first.carBscInfo)
+    ? asRecord(first.carBscInfo[0])
+    : asRecord(first.carBscInfo);
   const records = Array.isArray(first.record) ? first.record : [];
   const insuranceYn = asString(first.insrncYn);
   const scrappedYn = asString(first.scrcarYn);
+  const maintenanceList = Array.isArray(first.imprmnList) ? first.imprmnList : [];
+  const performanceList = Array.isArray(first.sttusList1)
+    ? first.sttusList1
+    : Array.isArray(first.sttusList2)
+      ? first.sttusList2
+      : [];
 
   return {
-    carName: asString(first.atmbNm),
-    firstRegistrationDate: asDate(first.frstRegYmd),
+    carName: asString(first.atmbNm) ?? asString(carBscInfo.atmbNm),
+    firstRegistrationDate:
+      asDate(first.frstRegYmd) ?? asDate(carBscInfo.frstRegYmd),
     inspectionRecords: records.map((record) => {
       const inspection = asRecord(record);
 
@@ -72,19 +86,21 @@ export const normalizeKotsaVehicleHistory = (payload: unknown): KotsaVehicleHist
     }),
     insuranceActive: asYnBoolean(insuranceYn),
     insuranceYn,
-    maintenanceHistoryCount: asNumber(first.imprmnHstryCnt),
+    maintenanceHistoryCount:
+      asNumber(first.imprmnHstryCnt) ?? maintenanceList.length,
     mortgageCount: asNumber(first.mrtgCnt),
     overdueTaxCount: asNumber(first.npmntCnt),
-    performanceCheckCount: asNumber(first.prfomncChckCnt),
+    performanceCheckCount: asNumber(first.prfomncChckCnt) ?? performanceList.length,
     responseCode: asString(first.linkRsltCd),
     responseMessage: asString(first.linkRsltDtl),
     scrapped: asYnBoolean(scrappedYn),
     scrappedYn,
     seizureCount: asNumber(first.szrCnt),
     transferDate: asDate(first.trnsfrYmd),
-    usage: asString(first.usgSeNm),
+    usage: asString(first.usgSeNm) ?? asString(carBscInfo.usgSeNm),
     vehicleNumber: asString(first.vhrno),
-    vehicleType: asString(first.carmdlAsortNm),
+    vehicleType:
+      asString(first.carmdlAsortNm) ?? asString(carBscInfo.carmdlAsortNm),
     raw: payload,
   };
 };
