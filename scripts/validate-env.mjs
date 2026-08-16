@@ -11,9 +11,10 @@ const requiredPublicEnv = [
 const forbiddenPublicSecretPrefixes = ["NEXT_PUBLIC_KOTSA_"];
 
 const expectedProductionOrigin = "https://carfact.kr";
+const isVercelPreview = process.env.VERCEL_ENV === "preview";
 const missing = requiredPublicEnv.filter((key) => !process.env[key]?.trim());
 
-if (missing.length > 0) {
+if (!isVercelPreview && missing.length > 0) {
   console.error(
     [
       "Missing required environment variables for the client bundle:",
@@ -24,6 +25,17 @@ if (missing.length > 0) {
     ].join("\n")
   );
   process.exit(1);
+}
+
+if (isVercelPreview && missing.length > 0) {
+  console.warn(
+    [
+      "Preview build is missing optional browser authentication variables:",
+      ...missing.map((key) => "- " + key),
+      "",
+      "The preview will build, but Supabase login controls remain disabled.",
+    ].join("\n")
+  );
 }
 
 const exposedSecretKeys = Object.keys(process.env).filter((key) =>
@@ -43,7 +55,10 @@ if (exposedSecretKeys.length > 0) {
 }
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-if (!/^https:\/\/[^\s/]+\.supabase\.co\/?$/.test(supabaseUrl)) {
+if (
+  supabaseUrl &&
+  !/^https:\/\/[^\s/]+\.supabase\.co\/?$/.test(supabaseUrl)
+) {
   console.error(
     "NEXT_PUBLIC_SUPABASE_URL must be a Supabase project URL, for example https://project-ref.supabase.co"
   );
@@ -51,7 +66,7 @@ if (!/^https:\/\/[^\s/]+\.supabase\.co\/?$/.test(supabaseUrl)) {
 }
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.APP_URL;
-if (siteUrl) {
+if (siteUrl && !isVercelPreview) {
   let origin;
 
   try {

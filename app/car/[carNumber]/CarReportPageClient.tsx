@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
-import { LoginRequiredPanel } from "@/components/LoginRequiredPanel";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
@@ -35,10 +34,11 @@ import {
   subscribeToHelpfulChanges,
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
+import type { Vehicle } from "@/types/vehicle";
 import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
-const shellClassName = cn("mx-auto w-full max-w-3xl");
+const shellClassName = cn("mx-auto w-full max-w-5xl");
 const panelClassName = cn("w-full rounded-2xl bg-zinc-900 p-6");
 const homeButtonClassName = cn(
   "mb-8 inline-flex items-center rounded-lg bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-gray-200 transition",
@@ -76,6 +76,27 @@ const sortButtonClassName = cn(
 const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
+type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
+
+interface CommercialPlateCheckResponse {
+  display?: {
+    brand?: string | null;
+    carName?: string | null;
+    firstRegistrationDate?: string | null;
+    fuelType?: string | null;
+    generation?: string | null;
+    inspectionHistoryCount?: number | null;
+    latestPerformanceMileage?: string | null;
+    maintenanceHistoryCount?: number | null;
+    manufacturer?: string | null;
+    performanceCheckCount?: number | null;
+    usage?: string | null;
+    vehicleType?: string | null;
+    year?: string | null;
+  } | null;
+  error?: string;
+  ok?: boolean;
+}
 
 const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   const parsedTime = Date.parse(dateLabel);
@@ -95,6 +116,13 @@ export default function CarReportPage() {
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewSort, setReviewSort] = useState<ReviewSortOption>("latest");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [commercialPlateCheckState, setCommercialPlateCheckState] =
+    useState<CommercialPlateCheckState>("checking");
+  const [commercialPlateCheckError, setCommercialPlateCheckError] = useState("");
+  const [commercialPlateRetryCount, setCommercialPlateRetryCount] = useState(0);
+  const [apiVehicle, setApiVehicle] = useState<Vehicle | null>(null);
+  const [apiDisplay, setApiDisplay] =
+    useState<NonNullable<CommercialPlateCheckResponse["display"]> | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -111,16 +139,16 @@ export default function CarReportPage() {
   const {
     isAllowed: isGuestReportAllowed,
     isAuthenticated,
-    isBlocked: isGuestReportBlocked,
     isChecking: isGuestReportChecking,
     signInWithGoogle,
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, session, user } = useAuth();
   const { deleteReview, reviews } = useReviews(carNumber);
-  const { vehicle } = useVehicle(carNumber);
+  const { vehicle: registeredVehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
+  const vehicle = registeredVehicle ?? apiVehicle;
   const aiAnalysisEventKeyRef = useRef<string | null>(null);
   const brand = vehicle?.brand ?? "";
   const model = vehicle?.model ?? "";
@@ -128,7 +156,7 @@ export default function CarReportPage() {
   const year = vehicle?.year ?? "";
   const mileage = vehicle?.mileage ?? "";
   const fuelType = vehicle?.fuelType ?? "";
-  const hasVehicleInfo = Boolean(brand && model && generation && year);
+  const hasVehicleInfo = Boolean(vehicle && (model || year));
   const currentVehicleModelKey = useMemo(
     () => (vehicle ? getVehicleModelKey(vehicle) : ""),
     [vehicle],
@@ -430,6 +458,92 @@ export default function CarReportPage() {
     };
   }, [aiKeywordRules, currentVehicleModelKey, fuelType, generation, model, vehicle]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const accessToken = session?.access_token;
+    if (!accessToken || !carNumber) return;
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    void Promise.resolve().then(() => {
+      if (isActive) {
+        setCommercialPlateCheckState("checking");
+        setCommercialPlateCheckError("");
+      }
+    });
+
+    fetch("/api/kotsa/commercial-plate", {
+      body: JSON.stringify({ vehicleNumber: carNumber }),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | CommercialPlateCheckResponse
+          | null;
+
+        if (!response.ok || !payload?.ok) {
+          const message =
+            payload?.error ?? "상품용 차량 여부를 확인하지 못했습니다.";
+
+          if (
+            isActive &&
+            /(매매 상품용|상품용 차량|제공 대상|조회 대상|대상 차량).*(아니|없|불가)|확인되지 않/.test(
+              message,
+            )
+          ) {
+            setCommercialPlateCheckState("ineligible");
+            return;
+          }
+
+          throw new Error(message);
+        }
+        if (!isActive) return;
+
+        const display = payload.display;
+        const registrationYear = display?.firstRegistrationDate
+          ?.replace(/\D/g, "")
+          .slice(0, 4);
+
+        setApiDisplay(display ?? null);
+        setApiVehicle({
+          brand: display?.manufacturer ?? display?.brand ?? "",
+          fuelType: display?.fuelType ?? "",
+          generation: display?.generation ?? display?.vehicleType ?? "",
+          mileage: display?.latestPerformanceMileage ?? "",
+          model: display?.carName ?? display?.vehicleType ?? "",
+          plateNumber: carNumber,
+          year: display?.year ?? registrationYear ?? "",
+        });
+
+        // A successful response from the approved attachment API is the
+        // eligibility signal. Usage classification must not block the report.
+        setCommercialPlateCheckState("eligible");
+      })
+      .catch((error: unknown) => {
+        if (!isActive || controller.signal.aborted) return;
+
+        setCommercialPlateCheckState("error");
+        setCommercialPlateCheckError(
+          error instanceof Error
+            ? error.message
+            : "상품용 차량 여부를 확인하지 못했습니다.",
+        );
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [carNumber, commercialPlateRetryCount, isAuthenticated, session?.access_token]);
+
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
   };
@@ -462,13 +576,218 @@ export default function CarReportPage() {
     );
   }
 
-  if (isGuestReportBlocked) {
+  if (!isAuthenticated) {
+    const vehicleTitle = [brand, model, generation].filter(Boolean).join(" ");
+    const teaserFields = [
+      { label: "현재 주행거리", hint: "로그인 후 공개" },
+      { label: "주요 제원", hint: "로그인 후 공개" },
+      { label: "정비 이력", hint: "로그인 후 공개" },
+      { label: "성능 점검", hint: "로그인 후 공개" },
+      { label: "실제 후기", hint: "로그인 후 공개" },
+    ];
+
     return (
-      <main className="min-h-screen bg-black pb-24">
-        <LoginRequiredPanel
-          onGoogleLogin={googleLoginFromCurrentPage}
-          onKakaoLogin={kakaoLoginFromCurrentPage}
+      <main className="min-h-screen overflow-hidden bg-black text-white">
+        <div
+          className="pointer-events-none fixed inset-0 opacity-80"
+          aria-hidden="true"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 18%, rgba(239,68,68,0.18), transparent 32%), radial-gradient(circle at 15% 70%, rgba(255,255,255,0.05), transparent 28%)",
+          }}
         />
+
+        <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 pb-16 pt-6 sm:px-10 sm:pt-10">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="mb-10 inline-flex w-fit items-center gap-2 text-sm font-semibold text-zinc-400 transition hover:text-white"
+          >
+            <span aria-hidden="true">←</span>
+            다시 조회하기
+          </button>
+
+          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950/90 p-6 shadow-2xl shadow-red-950/20 sm:p-10">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-500 to-transparent"
+              aria-hidden="true"
+            />
+
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-bold tracking-[0.18em] text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)]" />
+                CARFACT CHECK · 조회 완료
+              </div>
+              <span className="text-xs font-semibold tracking-[0.2em] text-zinc-600">
+                VERIFIED VEHICLE
+              </span>
+            </div>
+
+            <div className="max-w-3xl">
+              <p className="mb-3 text-sm font-semibold text-red-400">
+                실제 차량정보가 확인되었습니다
+              </p>
+              <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">
+                {hasVehicleInfo ? vehicleTitle : "차량 기본정보 확인 완료"}
+              </h1>
+              {year && (
+                <p className="mt-4 text-xl font-bold text-zinc-300 sm:text-2xl">
+                  {year}년식
+                </p>
+              )}
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
+                모델과 연식까지 조회되었습니다. 상세 이력은 본인 확인 후 안전하게
+                공개됩니다.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {teaserFields.map((field) => (
+                <div
+                  key={field.label}
+                  className="group relative min-h-28 overflow-hidden rounded-2xl border border-white/8 bg-white/[0.035] p-5"
+                >
+                  <div
+                    className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent backdrop-blur-md"
+                    aria-hidden="true"
+                  />
+                  <div className="relative">
+                    <div className="mb-5 flex items-center justify-between">
+                      <span className="text-sm font-bold text-zinc-300">
+                        {field.label}
+                      </span>
+                      <span
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-xs text-zinc-500"
+                        aria-hidden="true"
+                      >
+                        🔒
+                      </span>
+                    </div>
+                    <div className="h-3 w-3/4 rounded-full bg-zinc-800 blur-[2px]" />
+                    <p className="mt-3 text-xs font-medium text-zinc-600">
+                      {field.hint}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/10 to-transparent p-5 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-7">
+              <div>
+                <h2 className="text-xl font-black sm:text-2xl">
+                  로그인하면 전체 차량정보가 열립니다
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  로그인 후 이 화면으로 돌아와 주행거리, 제원, 정비·성능점검
+                  정보와 실제 후기를 확인할 수 있어요.
+                </p>
+                <p className="mt-3 text-sm font-bold text-white">
+                  카팩트(CARFACT)의 모든 서비스는 무료로 제공됩니다.
+                </p>
+              </div>
+
+              <div className="mt-5 grid shrink-0 gap-2 sm:mt-0 sm:min-w-56">
+                <button
+                  type="button"
+                  onClick={kakaoLoginFromCurrentPage}
+                  className="rounded-xl bg-[#FEE500] px-5 py-3 text-sm font-black text-black transition hover:brightness-95 active:scale-[0.98]"
+                >
+                  카카오로 계속하기
+                </button>
+                <button
+                  type="button"
+                  onClick={googleLoginFromCurrentPage}
+                  className="rounded-xl border border-white/15 bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-zinc-100 active:scale-[0.98]"
+                >
+                  Google로 계속하기
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <p className="mt-6 text-center text-xs leading-5 text-zinc-700">
+            상세 정보는 로그인한 사용자에게만 제공됩니다.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "checking") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button type="button" onClick={() => router.push("/")} className={homeButtonClassName}>
+            ← 처음으로
+          </button>
+          <h1 className="mb-6 text-4xl font-bold sm:text-5xl">카팩트 리포트</h1>
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400">
+              중고차 매매 상품용 차량 여부를 확인하고 있습니다.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "ineligible") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
+            <div className="mb-6 inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold tracking-[0.16em] text-red-400">
+              CARFACT CHECK
+            </div>
+            <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
+              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
+            </h1>
+            <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
+              차량번호를 다시 확인하거나 다른 차량을 조회해주세요.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="mt-9 inline-flex rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+            >
+              처음으로 이동
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (commercialPlateCheckState === "error") {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 sm:p-10">
+            <p className="text-sm font-bold text-red-400">
+              상품용 차량 확인 중 오류가 발생했습니다.
+            </p>
+            <h1 className="mt-3 text-3xl font-black">잠시 후 다시 시도해주세요.</h1>
+            <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-500">
+              {commercialPlateCheckError}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setCommercialPlateRetryCount((count) => count + 1)}
+                className="rounded-xl bg-red-500 px-6 py-4 text-sm font-black transition hover:bg-red-600 active:scale-[0.98]"
+              >
+                다시 확인
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="rounded-xl border border-white/10 bg-zinc-900 px-6 py-4 text-sm font-black transition hover:bg-zinc-800 active:scale-[0.98]"
+              >
+                처음으로
+              </button>
+            </div>
+          </section>
+        </div>
       </main>
     );
   }
@@ -508,33 +827,92 @@ export default function CarReportPage() {
             </>
           ) : (
             <>
-              <section className="mb-6">
-                <h2 className="mb-4 text-2xl font-bold">차량정보</h2>
-                <div className="rounded-xl bg-zinc-800 p-4">
-                  <p className="text-gray-300">
-                    {[brand, model, generation, year && `${year}년`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {(fuelType || mileage) && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      {[
-                        fuelType,
-                        mileage &&
-                          `주행거리: ${Number(mileage).toLocaleString()}km`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  )}
+              <section className="mb-10 overflow-hidden rounded-3xl border border-white/10 bg-black/45">
+                <div className="border-b border-white/10 px-5 py-6 sm:px-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black tracking-[0.18em] text-red-400">
+                        CARFACT VEHICLE DATA
+                      </p>
+                      <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                        {[brand, model].filter(Boolean).join(" ") || "조회 차량"}
+                      </h2>
+                      <p className="mt-2 text-sm font-semibold text-zinc-500">
+                        공공데이터에서 확인된 항목만 표시합니다.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                      조회 완료
+                    </span>
+                  </div>
                 </div>
 
-                <Link
-                  href={`/car/${encodeURIComponent(carNumber)}/edit`}
-                  className={editLinkClassName}
-                >
-                  차량정보가 바뀌었나요?
-                </Link>
+                <div className="grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    ["제조사", brand],
+                    ["모델", model],
+                    ["세대·차종", generation],
+                    ["연료", fuelType],
+                    ["연식", year ? `${year}년식` : ""],
+                    [
+                      "현재 주행거리",
+                      mileage
+                        ? `${Number(mileage.replace(/[^0-9.]/g, "")).toLocaleString()} km`
+                        : "",
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-h-28 bg-zinc-950 px-5 py-5 sm:px-6">
+                      <p className="text-xs font-bold text-zinc-600">{label}</p>
+                      <p className="mt-3 text-lg font-black text-white">
+                        {value || "제공 정보 없음"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-white/10 px-5 py-6 sm:px-8">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black tracking-[0.16em] text-red-400">
+                        HISTORY &amp; INSPECTION
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black">정비·성능정보</h3>
+                    </div>
+                    <p className="text-xs font-semibold text-zinc-600">
+                      관계기관 제공 기준
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      ["정비 이력", apiDisplay?.maintenanceHistoryCount],
+                      ["성능점검 이력", apiDisplay?.performanceCheckCount],
+                      ["검사 이력", apiDisplay?.inspectionHistoryCount],
+                    ].map(([label, count]) => (
+                      <div
+                        key={label}
+                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
+                      >
+                        <p className="text-sm font-bold text-zinc-400">{label}</p>
+                        <p className="mt-3 text-3xl font-black">
+                          {typeof count === "number" ? `${count}건` : "제공 정보 없음"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-5 text-xs leading-5 text-zinc-600">
+                    세부 이력은 제공 범위와 조회 시점에 따라 달라질 수 있습니다.
+                    A4 리포트 양식은 추후 내려받기 기능에서 사용됩니다.
+                  </p>
+                </div>
+
+                {registeredVehicle && (
+                  <Link
+                    href={`/car/${encodeURIComponent(carNumber)}/edit`}
+                    className={editLinkClassName}
+                  >
+                    차량정보가 바뀌었나요?
+                  </Link>
+                )}
               </section>
 
               <AiSummaryCard
