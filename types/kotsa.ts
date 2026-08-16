@@ -46,8 +46,34 @@ const businessUsagePattern =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const asString = (value: unknown) =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
+const asString = (value: unknown) => {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+};
+
+const parseJsonString = (value: string) => {
+  const trimmed = value.trim();
+
+  if (
+    !trimmed ||
+    (!trimmed.startsWith("{") && !trimmed.startsWith("["))
+  ) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+};
 
 const normalizeKey = (key: string) => key.replace(/[_\-\s]/g, "").toLowerCase();
 
@@ -56,7 +82,7 @@ const findDeepStringByKeys = (
   targetKeys: string[],
   depth = 0,
 ): string | null => {
-  if (depth > 5) {
+  if (depth > 12) {
     return null;
   }
 
@@ -70,6 +96,14 @@ const findDeepStringByKeys = (
     }
 
     return null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseJsonString(value);
+
+    return parsed === null
+      ? null
+      : findDeepStringByKeys(parsed, targetKeys, depth + 1);
   }
 
   if (!isRecord(value)) {
