@@ -6,7 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { ReviewCard } from "@/components/ReviewCard";
-import { VehicleReportSheet } from "@/components/VehicleReportSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuestReportAccess } from "@/hooks/useGuestReportAccess";
 import { useRecentViews } from "@/hooks/useRecentViews";
@@ -82,9 +81,16 @@ type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error
 interface CommercialPlateCheckResponse {
   display?: {
     carName?: string | null;
+    brand?: string | null;
+    carName?: string | null;
     firstRegistrationDate?: string | null;
     fuelType?: string | null;
+    generation?: string | null;
+    inspectionHistoryCount?: number | null;
     latestPerformanceMileage?: string | null;
+    maintenanceHistoryCount?: number | null;
+    manufacturer?: string | null;
+    performanceCheckCount?: number | null;
     usage?: string | null;
     vehicleType?: string | null;
     year?: string | null;
@@ -116,6 +122,8 @@ export default function CarReportPage() {
   const [commercialPlateCheckError, setCommercialPlateCheckError] = useState("");
   const [commercialPlateRetryCount, setCommercialPlateRetryCount] = useState(0);
   const [apiVehicle, setApiVehicle] = useState<Vehicle | null>(null);
+  const [apiDisplay, setApiDisplay] =
+    useState<NonNullable<CommercialPlateCheckResponse["display"]> | null>(null);
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -505,12 +513,13 @@ export default function CarReportPage() {
           ?.replace(/\D/g, "")
           .slice(0, 4);
 
+        setApiDisplay(display ?? null);
         setApiVehicle({
-          brand: "",
+          brand: display?.manufacturer ?? display?.brand ?? "",
           fuelType: display?.fuelType ?? "",
-          generation: display?.vehicleType ?? "",
+          generation: display?.generation ?? display?.vehicleType ?? "",
           mileage: display?.latestPerformanceMileage ?? "",
-          model: display?.carName ?? display?.vehicleType ?? "조회 차량",
+          model: display?.carName ?? display?.vehicleType ?? "",
           plateNumber: carNumber,
           year: display?.year ?? registrationYear ?? "",
         });
@@ -819,19 +828,92 @@ export default function CarReportPage() {
             </>
           ) : (
             <>
-              <section className="mb-8">
-                <VehicleReportSheet
-                  carNumber={carNumber}
-                  reviewCount={reviews.length}
-                  vehicle={vehicle!}
-                />
+              <section className="mb-10 overflow-hidden rounded-3xl border border-white/10 bg-black/45">
+                <div className="border-b border-white/10 px-5 py-6 sm:px-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black tracking-[0.18em] text-red-400">
+                        CARFACT VEHICLE DATA
+                      </p>
+                      <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                        {[brand, model].filter(Boolean).join(" ") || "조회 차량"}
+                      </h2>
+                      <p className="mt-2 text-sm font-semibold text-zinc-500">
+                        공공데이터에서 확인된 항목만 표시합니다.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                      조회 완료
+                    </span>
+                  </div>
+                </div>
 
-                <Link
-                  href={`/car/${encodeURIComponent(carNumber)}/edit`}
-                  className={editLinkClassName}
-                >
-                  차량정보가 바뀌었나요?
-                </Link>
+                <div className="grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    ["제조사", brand],
+                    ["모델", model],
+                    ["세대·차종", generation],
+                    ["연료", fuelType],
+                    ["연식", year ? `${year}년식` : ""],
+                    [
+                      "현재 주행거리",
+                      mileage
+                        ? `${Number(mileage.replace(/[^0-9.]/g, "")).toLocaleString()} km`
+                        : "",
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-h-28 bg-zinc-950 px-5 py-5 sm:px-6">
+                      <p className="text-xs font-bold text-zinc-600">{label}</p>
+                      <p className="mt-3 text-lg font-black text-white">
+                        {value || "제공 정보 없음"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-white/10 px-5 py-6 sm:px-8">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black tracking-[0.16em] text-red-400">
+                        HISTORY &amp; INSPECTION
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black">정비·성능정보</h3>
+                    </div>
+                    <p className="text-xs font-semibold text-zinc-600">
+                      관계기관 제공 기준
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      ["정비 이력", apiDisplay?.maintenanceHistoryCount],
+                      ["성능점검 이력", apiDisplay?.performanceCheckCount],
+                      ["검사 이력", apiDisplay?.inspectionHistoryCount],
+                    ].map(([label, count]) => (
+                      <div
+                        key={label}
+                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
+                      >
+                        <p className="text-sm font-bold text-zinc-400">{label}</p>
+                        <p className="mt-3 text-3xl font-black">
+                          {typeof count === "number" ? `${count}건` : "제공 정보 없음"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-5 text-xs leading-5 text-zinc-600">
+                    세부 이력은 제공 범위와 조회 시점에 따라 달라질 수 있습니다.
+                    A4 리포트 양식은 추후 내려받기 기능에서 사용됩니다.
+                  </p>
+                </div>
+
+                {registeredVehicle && (
+                  <Link
+                    href={`/car/${encodeURIComponent(carNumber)}/edit`}
+                    className={editLinkClassName}
+                  >
+                    차량정보가 바뀌었나요?
+                  </Link>
+                )}
               </section>
 
               <AiSummaryCard
