@@ -80,7 +80,6 @@ type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error
 
 interface CommercialPlateCheckResponse {
   display?: {
-    carName?: string | null;
     brand?: string | null;
     carName?: string | null;
     firstRegistrationDate?: string | null;
