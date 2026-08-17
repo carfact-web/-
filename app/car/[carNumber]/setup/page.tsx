@@ -227,8 +227,9 @@ export default function VehicleSetupPage() {
             <p className="text-xs font-black tracking-[0.16em] text-red-400">
               CARFACT DEALER ONLY
             </p>
-            <h1 className="mt-3 text-[24px] font-black leading-tight sm:text-3xl">
-              차량정보 직접 등록 권한이 없습니다
+            <h1 className="mt-3 text-[22px] font-black leading-tight sm:text-3xl">
+              <span className="block">차량정보 직접 등록</span>
+              <span className="block">권한이 없습니다</span>
             </h1>
             <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
               인증 완료된 딜러만 차량정보를 직접 등록할 수 있습니다.
