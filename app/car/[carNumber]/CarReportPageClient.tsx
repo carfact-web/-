@@ -149,16 +149,6 @@ const formatMileageLabel = (mileage: string | null | undefined) => {
   return numericMileage ? `${Number(numericMileage).toLocaleString()} km` : "";
 };
 
-const getShortBrandName = (brandName: string) => {
-  const normalizedBrand = brandName.toLowerCase();
-
-  if (brandName.includes("메르세데스") || normalizedBrand.includes("benz")) {
-    return "벤츠";
-  }
-
-  return brandName;
-};
-
 function AutoMatchCheckBadge() {
   return (
     <span className="auto-match-check-badge" aria-hidden="true">
@@ -1097,8 +1087,6 @@ export default function CarReportPage() {
     );
   }
 
-  const screenBrand = getShortBrandName(brand);
-  const vehicleDisplayName = [screenBrand, model].filter(Boolean).join(" ");
   const mileageLabel = formatMileageLabel(mileage);
   const hasMileage = Boolean(mileageLabel);
   const mileageNotice =
@@ -1106,26 +1094,21 @@ export default function CarReportPage() {
   const vehicleInfoCells = [
     {
       className: "order-1",
-      label: "제조사·모델",
-      value: vehicleDisplayName,
-    },
-    {
-      className: "order-2 sm:order-3",
-      label: "연식",
-      value: year ? `${year}년식` : "",
-    },
-    {
-      className: "order-3 sm:order-2",
       label: "세대·차종",
       value: generation,
     },
     {
-      className: "order-4",
+      className: "order-2",
+      label: "연식",
+      value: year ? `${year}년식` : "",
+    },
+    {
+      className: "order-3",
       label: "연료",
       value: fuelType,
     },
     {
-      className: "order-5 col-span-2 sm:col-span-1",
+      className: "order-4 col-span-3 sm:col-span-1",
       label: "현재 주행거리",
       notice: hasMileage ? mileageNotice : "",
       value: mileageLabel,
@@ -1190,12 +1173,14 @@ export default function CarReportPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[minmax(0,68%)_minmax(0,32%)] gap-px bg-white/10 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-px bg-white/10 sm:grid-cols-[1fr_1fr_1fr_1.35fr]">
                   {vehicleInfoCells.map((cell) => (
                     <div
                       key={cell.label}
                       className={cn(
-                        "min-h-[86px] bg-zinc-950 px-4 py-3 sm:min-h-[96px] sm:px-5 sm:py-4",
+                        "min-h-[74px] bg-zinc-950 px-3 py-3 sm:min-h-[82px] sm:px-5 sm:py-4",
+                        cell.label === "현재 주행거리" &&
+                          "min-h-[112px] px-4 py-4 sm:min-h-[82px] sm:px-5 sm:py-4",
                         cell.className,
                       )}
                     >
@@ -1212,13 +1197,18 @@ export default function CarReportPage() {
                         {cell.value || "제공 정보 없음"}
                       </p>
                       {"notice" in cell && cell.notice ? (
-                        <p className="mt-2 text-[11px] font-medium leading-[1.5] text-zinc-300 sm:text-[12px]">
+                        <p className="mt-2 text-[11px] font-medium leading-[1.45] text-white/60 sm:hidden">
                           {cell.notice}
                         </p>
                       ) : null}
                     </div>
                   ))}
                 </div>
+                {hasMileage ? (
+                  <p className="hidden border-t border-white/10 bg-zinc-950 px-5 py-3 text-[12px] font-medium leading-[1.45] text-white/55 sm:block">
+                    ⓘ {mileageNotice}
+                  </p>
+                ) : null}
 
                 <div className="border-t border-white/10 px-4 py-5 sm:px-7 sm:py-6">
                   <div className="mb-4">
