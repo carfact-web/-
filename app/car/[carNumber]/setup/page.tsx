@@ -67,8 +67,12 @@ export default function VehicleSetupPage() {
     let isActive = true;
 
     if (!isAuthReady || !isProfileReady) {
-      setCanRegister(false);
-      setIsCheckingPermission(true);
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setCanRegister(false);
+          setIsCheckingPermission(true);
+        }
+      });
       return () => {
         isActive = false;
       };
@@ -77,15 +81,23 @@ export default function VehicleSetupPage() {
     const accessToken = session?.access_token;
 
     if (!accessToken) {
-      setCanRegister(false);
-      setIsCheckingPermission(false);
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setCanRegister(false);
+          setIsCheckingPermission(false);
+        }
+      });
       return () => {
         isActive = false;
       };
     }
 
-    setCanRegister(false);
-    setIsCheckingPermission(true);
+    void Promise.resolve().then(() => {
+      if (isActive) {
+        setCanRegister(false);
+        setIsCheckingPermission(true);
+      }
+    });
 
     fetch("/api/dealer/vehicle-registration", {
       headers: {

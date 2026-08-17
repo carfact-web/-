@@ -297,15 +297,21 @@ function AutoMatchingPanel({
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setIsReducedMotion(media.matches);
+    void Promise.resolve().then(() => {
+      setIsReducedMotion(media.matches);
+    });
 
     if (!isReady) {
-      setActiveIndex(0);
+      void Promise.resolve().then(() => {
+        setActiveIndex(0);
+      });
       return;
     }
 
     if (media.matches) {
-      setActiveIndex(fields.length);
+      void Promise.resolve().then(() => {
+        setActiveIndex(fields.length);
+      });
       if (!needsUserSelection) {
         const completeTimer = window.setTimeout(onComplete, 700);
         return () => window.clearTimeout(completeTimer);
@@ -313,7 +319,9 @@ function AutoMatchingPanel({
       return;
     }
 
-    setActiveIndex(0);
+    void Promise.resolve().then(() => {
+      setActiveIndex(0);
+    });
 
     const timers = fields.map((_, index) =>
       window.setTimeout(() => setActiveIndex(index + 1), 430 * (index + 1)),
@@ -978,11 +986,15 @@ export default function CarReportPage() {
     let isActive = true;
 
     if (commercialPlateCheckState !== "ineligible") {
-      setDealerRegistrationPermission({
-        canRegister: false,
-        isLoading: true,
-        isVerifiedDealer: false,
-        role: "user",
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setDealerRegistrationPermission({
+            canRegister: false,
+            isLoading: true,
+            isVerifiedDealer: false,
+            role: "user",
+          });
+        }
       });
       return () => {
         isActive = false;
@@ -990,11 +1002,15 @@ export default function CarReportPage() {
     }
 
     if (!isAuthReady || !isProfileReady) {
-      setDealerRegistrationPermission({
-        canRegister: false,
-        isLoading: true,
-        isVerifiedDealer: false,
-        role: "user",
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setDealerRegistrationPermission({
+            canRegister: false,
+            isLoading: true,
+            isVerifiedDealer: false,
+            role: "user",
+          });
+        }
       });
       return () => {
         isActive = false;
@@ -1004,22 +1020,30 @@ export default function CarReportPage() {
     const accessToken = session?.access_token;
 
     if (!accessToken) {
-      setDealerRegistrationPermission({
-        canRegister: false,
-        isLoading: false,
-        isVerifiedDealer: false,
-        role: "anonymous",
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setDealerRegistrationPermission({
+            canRegister: false,
+            isLoading: false,
+            isVerifiedDealer: false,
+            role: "anonymous",
+          });
+        }
       });
       return () => {
         isActive = false;
       };
     }
 
-    setDealerRegistrationPermission({
-      canRegister: false,
-      isLoading: true,
-      isVerifiedDealer: false,
-      role: "user",
+    void Promise.resolve().then(() => {
+      if (isActive) {
+        setDealerRegistrationPermission({
+          canRegister: false,
+          isLoading: true,
+          isVerifiedDealer: false,
+          role: "user",
+        });
+      }
     });
 
     fetch("/api/dealer/vehicle-registration", {

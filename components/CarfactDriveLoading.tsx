@@ -33,7 +33,9 @@ export function CarfactDriveLoading({
 
   useEffect(() => {
     if (!active) {
-      setStatusIndex(0);
+      void Promise.resolve().then(() => {
+        setStatusIndex(0);
+      });
       return;
     }
 
