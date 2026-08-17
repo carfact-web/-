@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
@@ -136,75 +143,111 @@ const buildSlotOptions = (value: string, candidates: string[]) => {
   return [...uniqueCandidates.filter((item) => item !== value), value].slice(-5);
 };
 
-function AutoMatchingPanel({ state }: { state: AutoMatchingState }) {
+function AutoMatchingPanel({
+  onComplete,
+  onSelectCandidate,
+  state,
+}: {
+  onComplete: () => void;
+  onSelectCandidate: (
+    candidate: NonNullable<AutoMatchingState["candidates"]>[number],
+  ) => void;
+  state: AutoMatchingState | null;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isReducedMotion, setIsReducedMotion] = useState(false);
-  const candidates = state.candidates ?? [];
+  const candidates = state?.candidates ?? [];
+  const isReady = Boolean(state);
   const fields = [
     {
       label: "제조사",
-      value: state.vehicle.brand,
+      value: state?.vehicle.brand ?? "",
       options: buildSlotOptions(
-        state.vehicle.brand,
+        state?.vehicle.brand ?? "",
         candidates.map((item) => item.brand),
       ),
     },
     {
       label: "모델",
-      value: state.vehicle.model,
+      value: state?.vehicle.model ?? "",
       options: buildSlotOptions(
-        state.vehicle.model,
+        state?.vehicle.model ?? "",
         candidates.map((item) => item.model),
       ),
     },
     {
       label: "세부모델",
-      value: state.vehicle.generation,
+      value: state?.vehicle.generation ?? "",
       options: buildSlotOptions(
-        state.vehicle.generation,
+        state?.vehicle.generation ?? "",
         candidates.map((item) => item.generation),
       ),
     },
     {
       label: "연식",
-      value: state.vehicle.year,
-      options: buildSlotOptions(state.vehicle.year, [state.display?.year ?? ""]),
+      value: state?.vehicle.year ?? "",
+      options: buildSlotOptions(state?.vehicle.year ?? "", [
+        state?.display?.year ?? "",
+      ]),
     },
     {
       label: "연료",
-      value: state.vehicle.fuelType,
-      options: buildSlotOptions(state.vehicle.fuelType, [
-        state.display?.fuelType ?? "",
+      value: state?.vehicle.fuelType ?? "",
+      options: buildSlotOptions(state?.vehicle.fuelType ?? "", [
+        state?.display?.fuelType ?? "",
       ]),
     },
     {
       label: "주행거리",
-      value: state.vehicle.mileage ? `${Number(state.vehicle.mileage).toLocaleString()} km` : "정보 없음",
-      options: buildSlotOptions(state.vehicle.mileage, [
-        state.display?.latestPerformanceMileage ?? "",
+      value: state?.vehicle.mileage
+        ? `${Number(state.vehicle.mileage).toLocaleString()} km`
+        : state
+          ? "정보 없음"
+          : "",
+      options: buildSlotOptions(state?.vehicle.mileage ?? "", [
+        state?.display?.latestPerformanceMileage ?? "",
       ]).map((item) =>
         /^\d+$/.test(item) ? `${Number(item).toLocaleString()} km` : item,
       ),
     },
   ];
+  const needsUserSelection =
+    state?.status === "multiple_candidates" && candidates.length > 1;
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     setIsReducedMotion(media.matches);
 
-    if (media.matches) {
-      setActiveIndex(fields.length);
+    if (!isReady) {
+      setActiveIndex(0);
       return;
     }
 
+    if (media.matches) {
+      setActiveIndex(fields.length);
+      if (!needsUserSelection) {
+        const completeTimer = window.setTimeout(onComplete, 700);
+        return () => window.clearTimeout(completeTimer);
+      }
+      return;
+    }
+
+    setActiveIndex(0);
+
     const timers = fields.map((_, index) =>
-      window.setTimeout(() => setActiveIndex(index + 1), 520 * (index + 1)),
+      window.setTimeout(() => setActiveIndex(index + 1), 430 * (index + 1)),
     );
+    const completeTimer = needsUserSelection
+      ? null
+      : window.setTimeout(onComplete, 430 * fields.length + 700);
 
     return () => {
       timers.forEach(window.clearTimeout);
+      if (completeTimer !== null) {
+        window.clearTimeout(completeTimer);
+      }
     };
-  }, [fields.length]);
+  }, [fields.length, isReady, needsUserSelection, onComplete]);
 
   return (
     <main className={pageClassName}>
@@ -223,9 +266,14 @@ function AutoMatchingPanel({ state }: { state: AutoMatchingState }) {
             {fields.map((field, index) => {
               const isActive = activeIndex === index;
               const isLocked = activeIndex > index;
-              const currentValue = isLocked || isReducedMotion
-                ? field.value
-                : field.options[index % Math.max(field.options.length, 1)] ?? "확인 중";
+              const currentValue = !isReady
+                ? index === 0
+                  ? "확인 중"
+                  : "대기"
+                : isLocked || isReducedMotion
+                  ? field.value
+                  : (field.options[index % Math.max(field.options.length, 1)] ??
+                    "확인 중");
 
               return (
                 <div
@@ -264,6 +312,27 @@ function AutoMatchingPanel({ state }: { state: AutoMatchingState }) {
               );
             })}
           </div>
+          {needsUserSelection ? (
+            <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+              <p className="text-sm font-bold text-amber-200">
+                세부모델 후보를 확인해주세요.
+              </p>
+              <div className="mt-3 grid gap-2">
+                {candidates.map((candidate) => (
+                  <button
+                    key={`${candidate.brand}-${candidate.model}-${candidate.generation}`}
+                    type="button"
+                    onClick={() => onSelectCandidate(candidate)}
+                    className="rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-left text-sm font-bold text-white transition hover:border-red-500 active:scale-[0.98]"
+                  >
+                    {[candidate.brand, candidate.model, candidate.generation]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>
@@ -632,8 +701,10 @@ export default function CarReportPage() {
 
     void Promise.resolve().then(() => {
       if (isActive) {
+        setAutoMatchingState(null);
         setCommercialPlateCheckState("checking");
         setCommercialPlateCheckError("");
+        setShowAutoMatching(false);
       }
     });
 
@@ -697,12 +768,6 @@ export default function CarReportPage() {
         });
         setShowAutoMatching(true);
 
-        window.setTimeout(() => {
-          if (isActive) {
-            setShowAutoMatching(false);
-          }
-        }, 4200);
-
         // A successful response from the approved attachment API is the
         // eligibility signal. Usage classification must not block the report.
         setCommercialPlateCheckState("eligible");
@@ -732,27 +797,44 @@ export default function CarReportPage() {
     void signInWithGoogle(window.location.href);
   };
 
+  const completeAutoMatching = useCallback(() => {
+    setShowAutoMatching(false);
+  }, []);
+
+  const selectAutoMatchingCandidate = useCallback(
+    (candidate: NonNullable<AutoMatchingState["candidates"]>[number]) => {
+      const nextVehicle: Vehicle = {
+        brand: candidate.brand,
+        fuelType: apiVehicle?.fuelType ?? "",
+        generation: candidate.generation,
+        mileage: apiVehicle?.mileage ?? "",
+        model: candidate.model,
+        plateNumber: carNumber,
+        year: apiVehicle?.year ?? "",
+      };
+
+      setApiVehicle(nextVehicle);
+      setAutoMatchingState((current) =>
+        current
+          ? {
+              ...current,
+              status: "matched",
+              vehicle: nextVehicle,
+            }
+          : null,
+      );
+      setShowAutoMatching(true);
+    },
+    [apiVehicle?.fuelType, apiVehicle?.mileage, apiVehicle?.year, carNumber],
+  );
+
   if (isGuestReportChecking) {
     return (
-      <main className={pageClassName}>
-        <div className={shellClassName}>
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className={homeButtonClassName}
-          >
-            ← 홈으로
-          </button>
-
-          <h1 className="text-5xl font-bold mb-6">카팩트 리포트</h1>
-
-          <div className={panelClassName}>
-            <p className="text-sm text-zinc-400">
-              로그인 상태를 확인하고 있습니다.
-            </p>
-          </div>
-        </div>
-      </main>
+      <AutoMatchingPanel
+        onComplete={completeAutoMatching}
+        onSelectCandidate={selectAutoMatchingCandidate}
+        state={null}
+      />
     );
   }
 
@@ -893,24 +975,6 @@ export default function CarReportPage() {
     );
   }
 
-  if (commercialPlateCheckState === "checking") {
-    return (
-      <main className={pageClassName}>
-        <div className={shellClassName}>
-          <button type="button" onClick={() => router.push("/")} className={homeButtonClassName}>
-            ← 처음으로
-          </button>
-          <h1 className="mb-6 text-4xl font-bold sm:text-5xl">카팩트 리포트</h1>
-          <div className={panelClassName}>
-            <p className="text-sm text-zinc-400">
-              중고차 매매 상품용 차량 여부를 확인하고 있습니다.
-            </p>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
   if (commercialPlateCheckState === "ineligible") {
     return (
       <main className={pageClassName}>
@@ -944,7 +1008,7 @@ export default function CarReportPage() {
         <div className={shellClassName}>
           <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 sm:p-10">
             <p className="text-sm font-bold text-red-400">
-              상품용 차량 확인 중 오류가 발생했습니다.
+              차량정보를 불러오지 못했습니다.
             </p>
             <h1 className="mt-3 text-3xl font-black">잠시 후 다시 시도해주세요.</h1>
             <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-500">
@@ -956,7 +1020,7 @@ export default function CarReportPage() {
                 onClick={() => setCommercialPlateRetryCount((count) => count + 1)}
                 className="rounded-xl bg-red-500 px-6 py-4 text-sm font-black transition hover:bg-red-600 active:scale-[0.98]"
               >
-                다시 확인
+                다시 시도
               </button>
               <button
                 type="button"
@@ -972,8 +1036,14 @@ export default function CarReportPage() {
     );
   }
 
-  if (showAutoMatching && autoMatchingState) {
-    return <AutoMatchingPanel state={autoMatchingState} />;
+  if (commercialPlateCheckState === "checking" || showAutoMatching) {
+    return (
+      <AutoMatchingPanel
+        onComplete={completeAutoMatching}
+        onSelectCandidate={selectAutoMatchingCandidate}
+        state={autoMatchingState}
+      />
+    );
   }
 
   return (
