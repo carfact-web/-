@@ -517,6 +517,85 @@ function CommercialIneligibleModal({
   );
 }
 
+function VehicleUnavailableGuide({
+  onHome,
+  onLookup,
+}: {
+  onHome: () => void;
+  onLookup: () => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
+      <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
+        CARFACT CHECK
+      </p>
+      <h1 className="text-[24px] font-black leading-tight text-white sm:text-3xl">
+        차량정보를 확인할 수 없습니다
+      </h1>
+      <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
+        입력하신 차량번호가 정확한지 다시 확인해 주세요.
+      </p>
+      <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
+        카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 제공하고 있습니다.
+      </p>
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={onLookup}
+          className="h-[52px] rounded-xl bg-red-500 px-5 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+        >
+          다른 차량 조회하기
+        </button>
+        <button
+          type="button"
+          onClick={onHome}
+          className="h-[52px] rounded-xl border border-white/10 bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+        >
+          홈으로 이동
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DealerVehicleRegistrationGuide({
+  onHome,
+  onRegister,
+}: {
+  onHome: () => void;
+  onRegister: () => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
+      <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
+        CARFACT DEALER
+      </p>
+      <h1 className="text-[24px] font-black leading-tight text-white sm:text-3xl">
+        차량 정보를 찾지 못했습니다
+      </h1>
+      <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
+        인증 딜러는 실제 매매 상품용 차량인 경우 차량정보를 직접 등록할 수 있습니다.
+      </p>
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={onRegister}
+          className="h-[52px] rounded-xl bg-red-500 px-5 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+        >
+          차량정보 직접 등록
+        </button>
+        <button
+          type="button"
+          onClick={onHome}
+          className="h-[52px] rounded-xl border border-white/10 bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+        >
+          홈으로 이동
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
@@ -984,8 +1063,11 @@ export default function CarReportPage() {
 
   useEffect(() => {
     let isActive = true;
+    const shouldCheckDealerPermission =
+      commercialPlateCheckState === "ineligible" ||
+      (isAuthenticated && !hasVehicleInfo);
 
-    if (commercialPlateCheckState !== "ineligible") {
+    if (!shouldCheckDealerPermission) {
       void Promise.resolve().then(() => {
         if (isActive) {
           setDealerRegistrationPermission({
@@ -1094,7 +1176,9 @@ export default function CarReportPage() {
     };
   }, [
     commercialPlateCheckState,
+    hasVehicleInfo,
     isAuthReady,
+    isAuthenticated,
     isProfileReady,
     session?.access_token,
   ]);
@@ -1223,36 +1307,10 @@ export default function CarReportPage() {
       return (
         <main className={pageClassName}>
           <div className={shellClassName}>
-            <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
-              <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
-                CARFACT CHECK
-              </p>
-              <h1 className="text-[24px] font-black leading-tight text-white sm:text-3xl">
-                차량정보를 확인할 수 없습니다
-              </h1>
-              <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
-                입력하신 차량번호가 정확한지 다시 확인해 주세요.
-              </p>
-              <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
-                카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 제공하고 있습니다.
-              </p>
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => router.replace("/")}
-                  className="h-[52px] rounded-xl bg-red-500 px-5 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
-                >
-                  다른 차량 조회하기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.replace("/")}
-                  className="h-[52px] rounded-xl border border-white/10 bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]"
-                >
-                  홈으로 이동
-                </button>
-              </div>
-            </section>
+            <VehicleUnavailableGuide
+              onHome={() => router.replace("/")}
+              onLookup={() => router.replace("/")}
+            />
           </div>
         </main>
       );
@@ -1517,19 +1575,22 @@ export default function CarReportPage() {
 
         <div className={panelClassName}>
           {!hasVehicleInfo ? (
-            <>
-              <p className="text-gray-300 mb-6">
-                차량정보를 표시하지 못했습니다. 처음 화면에서 다시 조회해 주세요.
+            dealerRegistrationPermission.isLoading ? (
+              <p className="text-sm text-zinc-400" aria-live="polite">
+                차량정보 등록 권한을 확인하고 있습니다.
               </p>
-
-              <button
-                type="button"
-                onClick={resetReportToHome}
-                className={actionLinkClassName}
-              >
-                처음 화면으로 이동
-              </button>
-            </>
+            ) : dealerRegistrationPermission.isVerifiedDealer === true &&
+              dealerRegistrationPermission.canRegister === true ? (
+              <DealerVehicleRegistrationGuide
+                onHome={resetReportToHome}
+                onRegister={goToDealerRegistration}
+              />
+            ) : (
+              <VehicleUnavailableGuide
+                onHome={resetReportToHome}
+                onLookup={resetReportToHome}
+              />
+            )
           ) : (
             <>
               <section className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-black/45 sm:mb-10">
