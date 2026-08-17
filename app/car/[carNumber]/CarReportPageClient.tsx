@@ -1219,6 +1219,45 @@ export default function CarReportPage() {
   }
 
   if (!isAuthenticated) {
+    if (!hasVehicleInfo) {
+      return (
+        <main className={pageClassName}>
+          <div className={shellClassName}>
+            <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
+              <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
+                CARFACT CHECK
+              </p>
+              <h1 className="text-[24px] font-black leading-tight text-white sm:text-3xl">
+                차량정보를 확인할 수 없습니다
+              </h1>
+              <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
+                입력하신 차량번호가 정확한지 다시 확인해 주세요.
+              </p>
+              <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
+                카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 제공하고 있습니다.
+              </p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => router.replace("/")}
+                  className="h-[52px] rounded-xl bg-red-500 px-5 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+                >
+                  다른 차량 조회하기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.replace("/")}
+                  className="h-[52px] rounded-xl border border-white/10 bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+                >
+                  홈으로 이동
+                </button>
+              </div>
+            </section>
+          </div>
+        </main>
+      );
+    }
+
     const vehicleTitle = [brand, model, generation].filter(Boolean).join(" ");
     const teaserFields = [
       { label: "현재 주행거리", hint: "로그인 후 공개" },
