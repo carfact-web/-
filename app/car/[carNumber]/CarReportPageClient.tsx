@@ -143,6 +143,12 @@ const buildSlotOptions = (value: string, candidates: string[]) => {
   return [...uniqueCandidates.filter((item) => item !== value), value].slice(-5);
 };
 
+const formatMileageLabel = (mileage: string | null | undefined) => {
+  const numericMileage = String(mileage ?? "").replace(/[^0-9]/g, "");
+
+  return numericMileage ? `${Number(numericMileage).toLocaleString()} km` : "";
+};
+
 function AutoMatchingPanel({
   onComplete,
   onSelectCandidate,
@@ -160,6 +166,7 @@ function AutoMatchingPanel({
   const isReady = Boolean(state);
   const fields = [
     {
+      checkingLabel: "제조사 확인 중…",
       label: "제조사",
       value: state?.vehicle.brand ?? "",
       options: buildSlotOptions(
@@ -168,6 +175,7 @@ function AutoMatchingPanel({
       ),
     },
     {
+      checkingLabel: "모델명 확인 중…",
       label: "모델",
       value: state?.vehicle.model ?? "",
       options: buildSlotOptions(
@@ -176,6 +184,7 @@ function AutoMatchingPanel({
       ),
     },
     {
+      checkingLabel: "세부모델 확인 중…",
       label: "세부모델",
       value: state?.vehicle.generation ?? "",
       options: buildSlotOptions(
@@ -184,6 +193,7 @@ function AutoMatchingPanel({
       ),
     },
     {
+      checkingLabel: "연식 확인 중…",
       label: "연식",
       value: state?.vehicle.year ?? "",
       options: buildSlotOptions(state?.vehicle.year ?? "", [
@@ -191,6 +201,7 @@ function AutoMatchingPanel({
       ]),
     },
     {
+      checkingLabel: "연료 확인 중…",
       label: "연료",
       value: state?.vehicle.fuelType ?? "",
       options: buildSlotOptions(state?.vehicle.fuelType ?? "", [
@@ -198,12 +209,9 @@ function AutoMatchingPanel({
       ]),
     },
     {
+      checkingLabel: "주행거리 확인 중…",
       label: "주행거리",
-      value: state?.vehicle.mileage
-        ? `${Number(state.vehicle.mileage).toLocaleString()} km`
-        : state
-          ? "정보 없음"
-          : "",
+      value: formatMileageLabel(state?.vehicle.mileage),
       options: buildSlotOptions(state?.vehicle.mileage ?? "", [
         state?.display?.latestPerformanceMileage ?? "",
       ]).map((item) =>
@@ -260,20 +268,22 @@ function AutoMatchingPanel({
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">
               차량정보 자동 선택 중
             </h1>
+            <p className="mt-3 text-sm font-semibold text-zinc-400">
+              차량정보를 순서대로 확인하고 있습니다
+            </p>
           </div>
 
           <div className="grid gap-3">
             {fields.map((field, index) => {
               const isActive = activeIndex === index;
               const isLocked = activeIndex > index;
-              const currentValue = !isReady
-                ? index === 0
-                  ? "확인 중"
-                  : "대기"
-                : isLocked || isReducedMotion
-                  ? field.value
-                  : (field.options[index % Math.max(field.options.length, 1)] ??
-                    "확인 중");
+              const finalValue = field.value || "제공 정보 없음";
+              const currentValue =
+                isLocked || isReducedMotion
+                  ? finalValue
+                  : isActive
+                    ? field.checkingLabel
+                    : "대기 중";
 
               return (
                 <div
@@ -283,7 +293,7 @@ function AutoMatchingPanel({
                     isActive
                       ? "border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.24)]"
                       : "border-white/10",
-                    isLocked && "border-red-500/40 bg-red-500/5",
+                    isLocked && "bg-red-500/5",
                   )}
                 >
                   <p className="text-sm font-black text-zinc-400">{field.label}</p>
