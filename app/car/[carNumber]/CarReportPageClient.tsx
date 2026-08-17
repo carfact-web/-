@@ -311,20 +311,20 @@ function AutoMatchingPanel({
                 <div
                   key={field.label}
                   className={cn(
-                    "grid min-h-[74px] grid-cols-[25%_minmax(0,60%)_15%] items-center gap-0 rounded-xl border bg-zinc-900/80 px-3 py-2.5 transition sm:min-h-20 sm:grid-cols-[8rem_minmax(0,1fr)_3rem] sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3",
+                    "grid min-h-[74px] grid-cols-[106px_minmax(0,1fr)_40px] items-center gap-3 rounded-xl border bg-zinc-900/80 px-3 py-2.5 transition sm:min-h-20 sm:grid-cols-[120px_minmax(0,1fr)_48px] sm:rounded-2xl sm:px-4 sm:py-3",
                     isActive
                       ? "border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.24)]"
                       : "border-white/10",
                     isLocked && "bg-red-500/5",
                   )}
                 >
-                  <p className="auto-match-label">
-                    <span className="auto-match-label-pin" aria-hidden="true">
+                  <span className="vehicle-field-label">
+                    <span className="vehicle-field-pin" aria-hidden="true">
                       📌
                     </span>
                     <span className="truncate">{field.label}</span>
-                  </p>
-                  <div className="relative mx-2 h-10 min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black px-3 sm:mx-0 sm:h-11 sm:px-4">
+                  </span>
+                  <div className="relative h-10 min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black px-3 sm:h-11 sm:px-4">
                     <div
                       className={cn(
                         "flex h-full min-w-0 items-center truncate whitespace-nowrap text-[16px] font-black text-white transition-transform duration-300 min-[380px]:text-[17px] sm:text-lg",
