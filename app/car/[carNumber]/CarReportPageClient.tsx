@@ -121,6 +121,13 @@ interface AutoMatchingState {
   vehicle: Vehicle;
 }
 
+interface DealerRegistrationPermission {
+  canRegister: boolean;
+  isLoading: boolean;
+  isVerifiedDealer: boolean;
+  role: string;
+}
+
 const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   const parsedTime = Date.parse(dateLabel);
 
@@ -148,6 +155,21 @@ const formatMileageLabel = (mileage: string | null | undefined) => {
 
   return numericMileage ? `${Number(numericMileage).toLocaleString()} km` : "";
 };
+
+const createMissingAutoMatchingState = (plateNumber: string): AutoMatchingState => ({
+  candidates: [],
+  display: null,
+  status: "unmatched",
+  vehicle: {
+    brand: "",
+    fuelType: "",
+    generation: "",
+    mileage: "",
+    model: "",
+    plateNumber,
+    year: "",
+  },
+});
 
 function AutoMatchCheckBadge() {
   return (
@@ -414,6 +436,79 @@ function AutoMatchingPanel({
   );
 }
 
+function CommercialIneligibleModal({
+  canRegister,
+  isOpen,
+  onGoHome,
+  onRegister,
+}: {
+  canRegister: boolean;
+  isOpen: boolean;
+  onGoHome: () => void;
+  onRegister: () => void;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="commercial-ineligible-title"
+    >
+      <section className="modal-enter w-[calc(100%-40px)] max-w-[500px] rounded-3xl border border-white/10 bg-zinc-950 p-6 text-center shadow-2xl shadow-red-950/30 sm:p-8">
+        <div className="mb-5 flex justify-center">
+          <AutoMatchMissingBadge />
+        </div>
+        <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
+          CARFACT CHECK
+        </p>
+        <h1
+          id="commercial-ineligible-title"
+          className="text-[21px] font-black leading-tight text-white sm:text-[24px]"
+        >
+          {canRegister
+            ? "등록된 차량정보를 찾지 못했습니다"
+            : "매매 상품용 차량으로 확인되지 않았습니다"}
+        </h1>
+        <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
+          {canRegister
+            ? "해당 차량은 현재 중고차 매매 상품용 차량으로 확인되지 않습니다."
+            : "해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다."}
+        </p>
+        <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
+          {canRegister
+            ? "인증 딜러는 실제 매매 상품용 차량인 경우 차량정보를 직접 등록할 수 있습니다."
+            : "카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 공유하고 있습니다."}
+        </p>
+        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onGoHome}
+            className={cn(
+              "h-[52px] rounded-xl border border-white/10 bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]",
+              !canRegister && "sm:col-span-2",
+            )}
+          >
+            처음 화면으로 이동
+          </button>
+          {canRegister ? (
+            <button
+              type="button"
+              onClick={onRegister}
+              className="h-[52px] rounded-xl bg-red-500 px-5 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+            >
+              차량정보 직접 등록
+            </button>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
@@ -430,6 +525,15 @@ export default function CarReportPage() {
   const [autoMatchingState, setAutoMatchingState] =
     useState<AutoMatchingState | null>(null);
   const [showAutoMatching, setShowAutoMatching] = useState(false);
+  const [showCommercialIneligibleModal, setShowCommercialIneligibleModal] =
+    useState(false);
+  const [dealerRegistrationPermission, setDealerRegistrationPermission] =
+    useState<DealerRegistrationPermission>({
+      canRegister: false,
+      isLoading: true,
+      isVerifiedDealer: false,
+      role: "user",
+    });
   const [inspectionProfile, setInspectionProfile] =
     useState<VehicleInspectionProfile | null>(null);
   const [aiKeywordRules, setAiKeywordRules] = useState<
@@ -451,7 +555,7 @@ export default function CarReportPage() {
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { isAdmin, session, user } = useAuth();
+  const { isAdmin, isAuthReady, isProfileReady, session, user } = useAuth();
   const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle: registeredVehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -780,6 +884,7 @@ export default function CarReportPage() {
         setCommercialPlateCheckState("checking");
         setCommercialPlateCheckError("");
         setShowAutoMatching(false);
+        setShowCommercialIneligibleModal(false);
       }
     });
 
@@ -808,6 +913,11 @@ export default function CarReportPage() {
               message,
             )
           ) {
+            setApiDisplay(null);
+            setApiVehicle(null);
+            setAutoMatchingState(createMissingAutoMatchingState(carNumber));
+            setShowAutoMatching(true);
+            setShowCommercialIneligibleModal(false);
             setCommercialPlateCheckState("ineligible");
             return;
           }
@@ -864,6 +974,107 @@ export default function CarReportPage() {
     };
   }, [carNumber, commercialPlateRetryCount, isAuthenticated, session?.access_token]);
 
+  useEffect(() => {
+    let isActive = true;
+
+    if (commercialPlateCheckState !== "ineligible") {
+      setDealerRegistrationPermission({
+        canRegister: false,
+        isLoading: true,
+        isVerifiedDealer: false,
+        role: "user",
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    if (!isAuthReady || !isProfileReady) {
+      setDealerRegistrationPermission({
+        canRegister: false,
+        isLoading: true,
+        isVerifiedDealer: false,
+        role: "user",
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      setDealerRegistrationPermission({
+        canRegister: false,
+        isLoading: false,
+        isVerifiedDealer: false,
+        role: "anonymous",
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setDealerRegistrationPermission({
+      canRegister: false,
+      isLoading: true,
+      isVerifiedDealer: false,
+      role: "user",
+    });
+
+    fetch("/api/dealer/vehicle-registration", {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      method: "GET",
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | {
+              canRegister?: boolean;
+              isVerifiedDealer?: boolean;
+              ok?: boolean;
+              role?: string;
+            }
+          | null;
+
+        if (!isActive) return;
+
+        const isVerifiedDealer =
+          Boolean(response.ok && payload?.ok && payload.isVerifiedDealer === true);
+        const canRegister =
+          Boolean(response.ok && payload?.ok && payload.canRegister === true) &&
+          isVerifiedDealer;
+
+        setDealerRegistrationPermission({
+          canRegister,
+          isLoading: false,
+          isVerifiedDealer,
+          role: typeof payload?.role === "string" ? payload.role : "user",
+        });
+      })
+      .catch(() => {
+        if (isActive) {
+          setDealerRegistrationPermission({
+            canRegister: false,
+            isLoading: false,
+            isVerifiedDealer: false,
+            role: "user",
+          });
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    commercialPlateCheckState,
+    isAuthReady,
+    isProfileReady,
+    session?.access_token,
+  ]);
+
   const kakaoLoginFromCurrentPage = () => {
     void signInWithKakao(window.location.href);
   };
@@ -876,14 +1087,61 @@ export default function CarReportPage() {
     setShowAutoMatching(false);
   }, []);
 
+  const completeIneligibleAutoMatching = useCallback(() => {
+    setShowAutoMatching(false);
+    setShowCommercialIneligibleModal(true);
+  }, []);
+
   const resetReportToHome = useCallback(() => {
     setApiVehicle(null);
     setAutoMatchingState(null);
     setCommercialPlateCheckError("");
     setCommercialPlateCheckState("checking");
+    setShowCommercialIneligibleModal(false);
     setShowAutoMatching(false);
     router.replace("/");
   }, [router]);
+
+  const goToDealerRegistration = useCallback(() => {
+    if (!dealerRegistrationPermission.canRegister) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      "carfact_dealer_registration_intent",
+      String(Date.now()),
+    );
+    router.push(`/car/${encodeURIComponent(carNumber)}/setup`);
+  }, [carNumber, dealerRegistrationPermission.canRegister, router]);
+
+  useEffect(() => {
+    if (!showCommercialIneligibleModal) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        resetReportToHome();
+      }
+    };
+
+    const handlePopState = () => {
+      resetReportToHome();
+    };
+
+    window.history.pushState({ carfactCommercialModal: true }, "", window.location.href);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [resetReportToHome, showCommercialIneligibleModal]);
 
   const retryCommercialPlateCheck = useCallback(() => {
     if (commercialPlateCheckState !== "error") {
@@ -894,6 +1152,7 @@ export default function CarReportPage() {
     setAutoMatchingState(null);
     setCommercialPlateCheckError("");
     setCommercialPlateCheckState("checking");
+    setShowCommercialIneligibleModal(false);
     setShowAutoMatching(false);
     setCommercialPlateRetryCount((count) => count + 1);
   }, [commercialPlateCheckState]);
@@ -1073,36 +1332,26 @@ export default function CarReportPage() {
   }
 
   if (commercialPlateCheckState === "ineligible") {
+    const modalReady =
+      showCommercialIneligibleModal && !dealerRegistrationPermission.isLoading;
+
     return (
-      <main className={pageClassName}>
-        <div className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center">
-          <section className="w-full rounded-3xl border border-white/10 bg-zinc-950 p-6 text-center shadow-2xl shadow-red-950/20 sm:p-10">
-            <div className="mb-6 flex justify-center">
-              <AutoMatchMissingBadge />
-            </div>
-            <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
-              CARFACT CHECK
-            </p>
-            <h1 className="text-[23px] font-black leading-tight text-white sm:text-3xl">
-              매매 상품용 차량으로 확인되지 않았습니다
-            </h1>
-            <p className="mt-5 text-[15px] font-semibold leading-6 text-zinc-300 sm:text-base">
-              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
-            </p>
-            <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
-              카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를
-              제공하고 있습니다.
-            </p>
-            <button
-              type="button"
-              onClick={resetReportToHome}
-              className="mt-8 w-full rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
-            >
-              홈으로 돌아가기
-            </button>
-          </section>
-        </div>
-      </main>
+      <>
+        <AutoMatchingPanel
+          onComplete={completeIneligibleAutoMatching}
+          onSelectCandidate={selectAutoMatchingCandidate}
+          state={autoMatchingState ?? createMissingAutoMatchingState(carNumber)}
+        />
+        <CommercialIneligibleModal
+          canRegister={
+            dealerRegistrationPermission.isVerifiedDealer === true &&
+            dealerRegistrationPermission.canRegister === true
+          }
+          isOpen={modalReady}
+          onGoHome={resetReportToHome}
+          onRegister={goToDealerRegistration}
+        />
+      </>
     );
   }
 
@@ -1207,15 +1456,16 @@ export default function CarReportPage() {
           {!hasVehicleInfo ? (
             <>
               <p className="text-gray-300 mb-6">
-                차량 정보를 찾지 못했어요. 직접 차량 정보를 등록해주세요.
+                차량정보를 표시하지 못했습니다. 처음 화면에서 다시 조회해 주세요.
               </p>
 
-              <Link
-                href={`/car/${encodeURIComponent(carNumber)}/setup`}
+              <button
+                type="button"
+                onClick={resetReportToHome}
                 className={actionLinkClassName}
               >
-                차량 정보 등록하기
-              </Link>
+                처음 화면으로 이동
+              </button>
             </>
           ) : (
             <>

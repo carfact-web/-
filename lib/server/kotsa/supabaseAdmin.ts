@@ -116,7 +116,7 @@ export const resolveKotsaAuthenticatedUser = async (request: Request) => {
 
   const { data: profile, error: profileError } = await clients.admin
     .from("user_profiles")
-    .select("role,is_verified_dealer")
+    .select("role,is_verified_dealer,is_suspended")
     .eq("id", userData.user.id)
     .maybeSingle();
 
@@ -124,10 +124,15 @@ export const resolveKotsaAuthenticatedUser = async (request: Request) => {
     return { error: "회원 정보를 확인하지 못했습니다.", status: 403 };
   }
 
+  if (profile.is_suspended) {
+    return { error: "정지된 계정입니다.", status: 403 };
+  }
+
   return {
     clients,
     isAdmin: profile.role === "admin" || profile.role === "super_admin",
-    isVerifiedDealer: Boolean(profile.is_verified_dealer),
+    isVerifiedDealer: profile.is_verified_dealer === true,
+    isSuspended: Boolean(profile.is_suspended),
     role: String(profile.role ?? "user"),
     userId: userData.user.id,
   };

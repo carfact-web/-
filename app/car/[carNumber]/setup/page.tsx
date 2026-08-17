@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { VehicleMasterFields } from "@/components/VehicleMasterFields";
+import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
@@ -41,11 +42,13 @@ export default function VehicleSetupPage() {
   );
   const {
     vehicle,
-    saveVehicle,
     isLoadedFromExistingRegistration,
   } = useVehicle(carNumber);
+  const { isAuthReady, isProfileReady, session } = useAuth();
   const { saveRecentView } = useRecentViews();
 
+  const [canRegister, setCanRegister] = useState(false);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(true);
   const [brand, setBrand] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
   const [generation, setGeneration] = useState<string | null>(null);
@@ -59,6 +62,64 @@ export default function VehicleSetupPage() {
   const yearValue = year ?? vehicle?.year ?? "";
   const mileageValue = mileage ?? vehicle?.mileage ?? "";
   const fuelTypeValue = fuelType ?? vehicle?.fuelType ?? "";
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isAuthReady || !isProfileReady) {
+      setCanRegister(false);
+      setIsCheckingPermission(true);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      setCanRegister(false);
+      setIsCheckingPermission(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setCanRegister(false);
+    setIsCheckingPermission(true);
+
+    fetch("/api/dealer/vehicle-registration", {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      method: "GET",
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | { canRegister?: boolean; isVerifiedDealer?: boolean; ok?: boolean }
+          | null;
+
+        if (!isActive) return;
+
+        setCanRegister(
+          Boolean(response.ok && payload?.ok && payload.canRegister === true),
+        );
+      })
+      .catch(() => {
+        if (isActive) {
+          setCanRegister(false);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsCheckingPermission(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthReady, isProfileReady, session?.access_token]);
 
   useEffect(() => {
     const recentTitle = [brandValue, modelValue, generationValue]
@@ -84,9 +145,94 @@ export default function VehicleSetupPage() {
       fuelType: fuelTypeValue,
     };
 
-    await saveVehicle(nextVehicle);
+    const accessToken = session?.access_token;
+
+    if (!canRegister || !accessToken) {
+      setValidationMessage("인증 딜러만 차량정보를 직접 등록할 수 있습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/dealer/vehicle-registration", {
+      body: JSON.stringify(nextVehicle),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; ok?: boolean }
+      | null;
+
+    if (!response.ok || !payload?.ok) {
+      setValidationMessage(
+        payload?.error ?? "차량정보 저장 권한을 확인하지 못했습니다.",
+      );
+      return;
+    }
+
     window.location.href = `/car/${encodeURIComponent(carNumber)}`;
   };
+
+  if (isCheckingPermission) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.replace("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+          <section className="rounded-2xl border border-white/10 bg-zinc-950 p-6 text-center sm:p-10">
+            <p className="text-xs font-black tracking-[0.16em] text-red-400">
+              CARFACT DEALER CHECK
+            </p>
+            <h1 className="mt-3 text-2xl font-black">등록 권한 확인 중</h1>
+            <p className="mt-3 text-sm font-semibold text-zinc-400">
+              인증 딜러 여부를 서버에서 확인하고 있습니다.
+            </p>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canRegister) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.replace("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+          <section className="rounded-2xl border border-red-500/20 bg-zinc-950 p-6 text-center shadow-2xl shadow-red-950/20 sm:p-10">
+            <p className="text-xs font-black tracking-[0.16em] text-red-400">
+              CARFACT DEALER ONLY
+            </p>
+            <h1 className="mt-3 text-[24px] font-black leading-tight sm:text-3xl">
+              차량정보 직접 등록 권한이 없습니다
+            </h1>
+            <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300">
+              인증 완료된 딜러만 차량정보를 직접 등록할 수 있습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.replace("/")}
+              className="mt-8 w-full rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+            >
+              처음 화면으로 이동
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={pageClassName}>

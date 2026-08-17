@@ -249,6 +249,22 @@ body {
   }
 }
 
+.modal-enter {
+  animation: carfactModalEnter 250ms ease-out both;
+}
+
+@keyframes carfactModalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auto-match-status-indicator-active,
   .auto-match-check-badge,
@@ -256,7 +272,8 @@ body {
   .auto-match-check-badge::after,
   .auto-match-missing-badge::after,
   .auto-match-check-path,
-  .auto-match-x-path {
+  .auto-match-x-path,
+  .modal-enter {
     animation: none;
   }
 
