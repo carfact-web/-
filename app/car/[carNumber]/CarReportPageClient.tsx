@@ -149,6 +149,16 @@ const formatMileageLabel = (mileage: string | null | undefined) => {
   return numericMileage ? `${Number(numericMileage).toLocaleString()} km` : "";
 };
 
+const getShortBrandName = (brandName: string) => {
+  const normalizedBrand = brandName.toLowerCase();
+
+  if (brandName.includes("메르세데스") || normalizedBrand.includes("benz")) {
+    return "벤츠";
+  }
+
+  return brandName;
+};
+
 function AutoMatchCheckBadge() {
   return (
     <span className="auto-match-check-badge" aria-hidden="true">
@@ -1087,6 +1097,41 @@ export default function CarReportPage() {
     );
   }
 
+  const screenBrand = getShortBrandName(brand);
+  const vehicleDisplayName = [screenBrand, model].filter(Boolean).join(" ");
+  const mileageLabel = formatMileageLabel(mileage);
+  const hasMileage = Boolean(mileageLabel);
+  const mileageNotice =
+    "현재 주행거리는 국토교통부 자동차정보 데이터를 기반으로 제공되며, 최종 수집 시점 이후 실제 주행거리와 차이가 있을 수 있습니다.";
+  const vehicleInfoCells = [
+    {
+      className: "order-1",
+      label: "제조사·모델",
+      value: vehicleDisplayName,
+    },
+    {
+      className: "order-2 sm:order-3",
+      label: "연식",
+      value: year ? `${year}년식` : "",
+    },
+    {
+      className: "order-3 sm:order-2",
+      label: "세대·차종",
+      value: generation,
+    },
+    {
+      className: "order-4",
+      label: "연료",
+      value: fuelType,
+    },
+    {
+      className: "order-5 col-span-2 sm:col-span-1",
+      label: "현재 주행거리",
+      notice: hasMileage ? mileageNotice : "",
+      value: mileageLabel,
+    },
+  ];
+
   return (
     <main className={pageClassName}>
       <div className={shellClassName}>
@@ -1122,73 +1167,87 @@ export default function CarReportPage() {
             </>
           ) : (
             <>
-              <section className="mb-10 overflow-hidden rounded-3xl border border-white/10 bg-black/45">
-                <div className="border-b border-white/10 px-5 py-6 sm:px-8">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-black tracking-[0.18em] text-red-400">
+              <section className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-black/45 sm:mb-10">
+                <div className="border-b border-white/10 px-4 py-4 sm:px-7 sm:py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black tracking-[0.18em] text-red-400 sm:text-xs">
                         CARFACT VEHICLE DATA
                       </p>
-                      <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                        {[brand, model].filter(Boolean).join(" ") || "조회 차량"}
+                      <p className="mt-2 max-w-full truncate text-[14px] font-semibold leading-[1.2] text-zinc-400 sm:text-[15px]">
+                        {brand || "제조사 정보 없음"}
+                      </p>
+                      <h2 className="mt-1 max-w-full text-[22px] font-[750] leading-[1.2] tracking-tight text-white sm:text-[26px]">
+                        {model || "조회 차량"}
                       </h2>
-                      <p className="mt-2 text-sm font-semibold text-zinc-500">
+                      <p className="mt-1.5 text-xs font-semibold text-zinc-500 sm:text-sm">
                         공공데이터에서 확인된 항목만 표시합니다.
                       </p>
                     </div>
-                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-xs font-black text-emerald-300">
                       조회 완료
                     </span>
                   </div>
                 </div>
 
-                <div className="grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    ["제조사", brand],
-                    ["모델", model],
-                    ["세대·차종", generation],
-                    ["연료", fuelType],
-                    ["연식", year ? `${year}년식` : ""],
-                    [
-                      "현재 주행거리",
-                      mileage
-                        ? `${Number(mileage.replace(/[^0-9.]/g, "")).toLocaleString()} km`
-                        : "",
-                    ],
-                  ].map(([label, value]) => (
-                    <div key={label} className="min-h-28 bg-zinc-950 px-5 py-5 sm:px-6">
-                      <p className="text-xs font-bold text-zinc-600">{label}</p>
-                      <p className="mt-3 text-lg font-black text-white">
-                        {value || "제공 정보 없음"}
+                <div className="grid grid-cols-[minmax(0,68%)_minmax(0,32%)] gap-px bg-white/10 sm:grid-cols-3">
+                  {vehicleInfoCells.map((cell) => (
+                    <div
+                      key={cell.label}
+                      className={cn(
+                        "min-h-[86px] bg-zinc-950 px-4 py-3 sm:min-h-[96px] sm:px-5 sm:py-4",
+                        cell.className,
+                      )}
+                    >
+                      <p className="text-[12px] font-semibold text-zinc-500 sm:text-xs">
+                        {cell.label}
                       </p>
+                      <p
+                        className={cn(
+                          "mt-2 truncate text-[17px] font-bold leading-tight text-white sm:text-[18px]",
+                          cell.label === "현재 주행거리" &&
+                            "text-[22px] font-[750] sm:text-[22px]",
+                        )}
+                      >
+                        {cell.value || "제공 정보 없음"}
+                      </p>
+                      {"notice" in cell && cell.notice ? (
+                        <p className="mt-2 text-[11px] font-medium leading-[1.5] text-zinc-300 sm:text-[12px]">
+                          {cell.notice}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
 
-                <div className="border-t border-white/10 px-5 py-6 sm:px-8">
-                  <div className="mb-5 flex items-end justify-between gap-4">
+                <div className="border-t border-white/10 px-4 py-5 sm:px-7 sm:py-6">
+                  <div className="mb-4">
                     <div>
-                      <p className="text-xs font-black tracking-[0.16em] text-red-400">
+                      <p className="text-[11px] font-black tracking-[0.16em] text-red-400 sm:text-xs">
                         HISTORY &amp; INSPECTION
                       </p>
-                      <h3 className="mt-2 text-2xl font-black">정비·성능정보</h3>
+                      <h3 className="mt-1.5 text-[22px] font-black leading-tight sm:text-[24px]">
+                        정비·성능정보
+                      </h3>
                     </div>
-                    <p className="text-xs font-semibold text-zinc-600">
+                    <p className="mt-1.5 text-xs font-semibold text-zinc-500">
                       관계기관 제공 기준
                     </p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                     {[
-                      ["정비 이력", apiDisplay?.maintenanceHistoryCount],
+                      ["정비이력", apiDisplay?.maintenanceHistoryCount],
                       ["성능점검 이력", apiDisplay?.performanceCheckCount],
-                      ["검사 이력", apiDisplay?.inspectionHistoryCount],
+                      ["검사이력", apiDisplay?.inspectionHistoryCount],
                     ].map(([label, count]) => (
                       <div
                         key={label}
-                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
+                        className="min-h-[82px] rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:min-h-[92px] sm:rounded-2xl sm:p-4"
                       >
-                        <p className="text-sm font-bold text-zinc-400">{label}</p>
-                        <p className="mt-3 text-3xl font-black">
+                        <p className="text-[11px] font-semibold leading-tight text-zinc-400 sm:text-[13px]">
+                          {label}
+                        </p>
+                        <p className="mt-2 text-[22px] font-[750] leading-tight sm:text-[26px]">
                           {typeof count === "number" ? `${count}건` : "제공 정보 없음"}
                         </p>
                       </div>
