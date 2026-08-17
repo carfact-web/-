@@ -227,6 +227,34 @@ export const saveSupabaseVehicle = async (vehicle: Vehicle) => {
     return null;
   }
 
+  if (typeof window !== "undefined") {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error("로그인이 필요합니다.");
+    }
+
+    const response = await fetch("/api/vehicles", {
+      body: JSON.stringify({ vehicle }),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; vehicle?: Vehicle }
+      | null;
+
+    if (!response.ok || !payload?.vehicle) {
+      throw new Error(payload?.error ?? "차량정보 저장 권한을 확인하지 못했습니다.");
+    }
+
+    return payload.vehicle;
+  }
+
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("vehicles")

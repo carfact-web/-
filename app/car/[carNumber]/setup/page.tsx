@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CarViewEventToast } from "@/components/CarViewEventToast";
 import { VehicleMasterFields } from "@/components/VehicleMasterFields";
+import { useAuth } from "@/hooks/useAuth";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { useVehicle } from "@/hooks/useVehicle";
 import { cn } from "@/utils/cn";
@@ -30,6 +31,9 @@ const validationMessageClassName = cn(
 const historyToastClassName = cn(
   "mb-4 rounded-xl border border-zinc-700 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-100 shadow-lg shadow-black/25"
 );
+const secondaryButtonClassName = cn(
+  "mt-6 inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-zinc-800 p-4 text-sm font-black text-white transition hover:bg-zinc-700"
+);
 
 const fuelTypes = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "수소"];
 
@@ -44,6 +48,7 @@ export default function VehicleSetupPage() {
     saveVehicle,
     isLoadedFromExistingRegistration,
   } = useVehicle(carNumber);
+  const { isProfileReady, profile, session } = useAuth();
   const { saveRecentView } = useRecentViews();
 
   const [brand, setBrand] = useState<string | null>(null);
@@ -59,6 +64,10 @@ export default function VehicleSetupPage() {
   const yearValue = year ?? vehicle?.year ?? "";
   const mileageValue = mileage ?? vehicle?.mileage ?? "";
   const fuelTypeValue = fuelType ?? vehicle?.fuelType ?? "";
+  const isVerifiedDealer =
+    Boolean(session?.user) &&
+    profile?.id === session?.user.id &&
+    profile?.is_verified_dealer === true;
 
   useEffect(() => {
     const recentTitle = [brandValue, modelValue, generationValue]
@@ -68,6 +77,11 @@ export default function VehicleSetupPage() {
   }, [carNumber, brandValue, generationValue, modelValue, saveRecentView, vehicle]);
 
   const saveAndGoToReport = async () => {
+    if (isVerifiedDealer !== true) {
+      setValidationMessage("인증 완료 딜러만 차량정보를 직접 등록할 수 있습니다.");
+      return;
+    }
+
     if (!brandValue || !modelValue || !generationValue || !yearValue) {
       setValidationMessage("제조사, 모델, 세부모델, 연식을 선택해주세요.");
       return;
@@ -87,6 +101,62 @@ export default function VehicleSetupPage() {
     await saveVehicle(nextVehicle);
     window.location.href = `/car/${encodeURIComponent(carNumber)}`;
   };
+
+  if (!isProfileReady) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.replace("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+          <div className={panelClassName}>
+            <p className="text-sm text-zinc-400" aria-live="polite">
+              차량정보 등록 권한을 확인하고 있습니다.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (isVerifiedDealer !== true) {
+    return (
+      <main className={pageClassName}>
+        <div className={shellClassName}>
+          <button
+            type="button"
+            onClick={() => router.replace("/")}
+            className={homeButtonClassName}
+          >
+            ← 홈으로
+          </button>
+
+          <section className={panelClassName}>
+            <p className="mb-3 text-sm font-bold text-red-400">
+              차량정보 등록 권한이 없습니다.
+            </p>
+            <h1 className="text-3xl font-black leading-tight">
+              인증 완료 딜러만 차량정보를 직접 등록할 수 있습니다.
+            </h1>
+            <p className="mt-4 text-sm leading-6 text-zinc-400">
+              카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 제공하고 있습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.replace("/")}
+              className={secondaryButtonClassName}
+            >
+              홈으로 이동
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={pageClassName}>

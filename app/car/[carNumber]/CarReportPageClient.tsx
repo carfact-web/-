@@ -78,6 +78,7 @@ const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
+type DealerPermissionState = "loading" | "verified-dealer" | "non-dealer";
 
 interface CommercialPlateCheckResponse {
   display?: {
@@ -104,6 +105,68 @@ const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
 
   return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
 };
+
+const missingVehicleNoticeClassName = cn(
+  "rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10",
+);
+const secondaryButtonClassName = cn(
+  "inline-flex items-center justify-center rounded-xl border border-white/10 bg-zinc-900 px-5 py-4 text-sm font-black text-white transition hover:bg-zinc-800 active:scale-[0.98]",
+);
+
+interface MissingVehicleGuideProps {
+  kind: "not-found" | "commercial-ineligible";
+  onHome: () => void;
+  onLookup?: () => void;
+}
+
+function MissingVehicleGuide({ kind, onHome, onLookup }: MissingVehicleGuideProps) {
+  const isCommercialIneligible = kind === "commercial-ineligible";
+
+  return (
+    <section className={missingVehicleNoticeClassName}>
+      <div className="mb-6 inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold tracking-[0.16em] text-red-400">
+        CARFACT CHECK
+      </div>
+      <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
+        {isCommercialIneligible
+          ? "매매 상품용 차량으로 확인되지 않았습니다"
+          : "차량정보를 확인할 수 없습니다"}
+      </h1>
+      <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-300 sm:text-base">
+        {isCommercialIneligible
+          ? "해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다."
+          : "입력하신 차량번호가 정확한지 다시 확인해 주세요."}
+      </p>
+      <p className="mt-3 max-w-2xl text-xs leading-5 text-zinc-500 sm:text-sm">
+        카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를 제공하고 있습니다.
+      </p>
+      <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+        {isCommercialIneligible ? (
+          <button
+            type="button"
+            onClick={onHome}
+            className="inline-flex items-center justify-center rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+          >
+            처음 화면으로 이동
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onLookup ?? onHome}
+              className="inline-flex items-center justify-center rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+            >
+              다른 차량 조회하기
+            </button>
+            <button type="button" onClick={onHome} className={secondaryButtonClassName}>
+              홈으로 이동
+            </button>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export default function CarReportPage() {
   const params = useParams();
@@ -137,7 +200,7 @@ export default function CarReportPage() {
     signInWithKakao,
   } = useGuestReportAccess(carNumber);
 
-  const { isAdmin, session, user } = useAuth();
+  const { isAdmin, isProfileReady, profile, session, user } = useAuth();
   const { deleteReview, reviews } = useReviews(carNumber);
   const { vehicle: registeredVehicle } = useVehicle(carNumber);
   const { saveRecentView } = useRecentViews();
@@ -150,6 +213,15 @@ export default function CarReportPage() {
   const mileage = vehicle?.mileage ?? "";
   const fuelType = vehicle?.fuelType ?? "";
   const hasVehicleInfo = Boolean(vehicle && (model || year));
+  const isVerifiedDealer =
+    Boolean(session?.user) &&
+    profile?.id === session?.user.id &&
+    profile?.is_verified_dealer === true;
+  const dealerPermissionState: DealerPermissionState = !isProfileReady
+    ? "loading"
+    : isVerifiedDealer === true
+      ? "verified-dealer"
+      : "non-dealer";
   const currentVehicleModelKey = useMemo(
     () => (vehicle ? getVehicleModelKey(vehicle) : ""),
     [vehicle],
@@ -543,6 +615,9 @@ export default function CarReportPage() {
   const googleLoginFromCurrentPage = () => {
     void signInWithGoogle(window.location.href);
   };
+  const goHome = () => {
+    router.replace("/");
+  };
 
   if (isGuestReportChecking) {
     return (
@@ -569,6 +644,19 @@ export default function CarReportPage() {
   }
 
   if (!isAuthenticated) {
+    if (!hasVehicleInfo) {
+      return (
+        <main className={pageClassName}>
+          <div className={shellClassName}>
+            <button type="button" onClick={goHome} className={homeButtonClassName}>
+              ← 처음으로
+            </button>
+            <MissingVehicleGuide kind="not-found" onHome={goHome} onLookup={goHome} />
+          </div>
+        </main>
+      );
+    }
+
     const vehicleTitle = [brand, model, generation].filter(Boolean).join(" ");
     const teaserFields = [
       { label: "현재 주행거리", hint: "로그인 후 공개" },
@@ -727,24 +815,7 @@ export default function CarReportPage() {
     return (
       <main className={pageClassName}>
         <div className={shellClassName}>
-          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
-            <div className="mb-6 inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold tracking-[0.16em] text-red-400">
-              CARFACT CHECK
-            </div>
-            <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
-              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
-            </h1>
-            <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
-              차량번호를 다시 확인하거나 다른 차량을 조회해주세요.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="mt-9 inline-flex rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
-            >
-              처음으로 이동
-            </button>
-          </section>
+          <MissingVehicleGuide kind="commercial-ineligible" onHome={goHome} />
         </div>
       </main>
     );
@@ -805,18 +876,26 @@ export default function CarReportPage() {
 
         <div className={panelClassName}>
           {!hasVehicleInfo ? (
-            <>
-              <p className="text-gray-300 mb-6">
-                차량 정보를 찾지 못했어요. 직접 차량 정보를 등록해주세요.
+            dealerPermissionState === "loading" ? (
+              <p className="text-sm text-zinc-400" aria-live="polite">
+                차량정보 등록 권한을 확인하고 있습니다.
               </p>
+            ) : dealerPermissionState === "verified-dealer" ? (
+              <>
+                <p className="text-gray-300 mb-6">
+                  차량 정보를 찾지 못했습니다.
+                </p>
 
-              <Link
-                href={`/car/${encodeURIComponent(carNumber)}/setup`}
-                className={actionLinkClassName}
-              >
-                차량 정보 등록하기
-              </Link>
-            </>
+                <Link
+                  href={`/car/${encodeURIComponent(carNumber)}/setup`}
+                  className={actionLinkClassName}
+                >
+                  차량 정보 직접 등록
+                </Link>
+              </>
+            ) : (
+              <MissingVehicleGuide kind="not-found" onHome={goHome} onLookup={goHome} />
+            )
           ) : (
             <>
               <section className="mb-8">
