@@ -149,6 +149,28 @@ const formatMileageLabel = (mileage: string | null | undefined) => {
   return numericMileage ? `${Number(numericMileage).toLocaleString()} km` : "";
 };
 
+function AutoMatchCheckBadge() {
+  return (
+    <span className="auto-match-check-badge" aria-hidden="true">
+      <svg
+        className="auto-match-check-svg"
+        viewBox="0 0 38 38"
+        focusable="false"
+      >
+        <path
+          className="auto-match-check-path"
+          d="M10.5 19.5 16.2 25 28 13.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="4.2"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function AutoMatchingPanel({
   onComplete,
   onSelectCandidate,
@@ -261,19 +283,19 @@ function AutoMatchingPanel({
     <main className={pageClassName}>
       <div className={shellClassName}>
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-red-950/20 sm:p-8">
-          <div className="mb-6">
-            <p className="text-xs font-black tracking-[0.18em] text-red-400">
+          <div className="mb-4 sm:mb-5">
+            <p className="text-[11px] font-black tracking-[0.16em] text-red-400 sm:text-xs">
               CARFACT AUTO MATCHING
             </p>
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+            <h1 className="mt-1.5 whitespace-nowrap text-[22px] font-bold leading-tight text-white sm:text-[26px]">
               차량정보 자동 선택 중
             </h1>
-            <p className="mt-3 text-sm font-semibold text-zinc-400">
+            <p className="mt-1.5 text-[13px] font-semibold text-zinc-400 sm:text-sm">
               차량정보를 순서대로 확인하고 있습니다
             </p>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2.5 sm:gap-3">
             {fields.map((field, index) => {
               const isActive = activeIndex === index;
               const isLocked = activeIndex > index;
@@ -289,34 +311,43 @@ function AutoMatchingPanel({
                 <div
                   key={field.label}
                   className={cn(
-                    "grid min-h-20 grid-cols-[7rem_1fr_2.5rem] items-center gap-3 rounded-2xl border bg-zinc-900/80 px-4 py-3 transition sm:grid-cols-[10rem_1fr_3rem]",
+                    "grid min-h-[74px] grid-cols-[25%_minmax(0,60%)_15%] items-center gap-0 rounded-xl border bg-zinc-900/80 px-3 py-2.5 transition sm:min-h-20 sm:grid-cols-[8rem_minmax(0,1fr)_3rem] sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3",
                     isActive
                       ? "border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.24)]"
                       : "border-white/10",
                     isLocked && "bg-red-500/5",
                   )}
                 >
-                  <p className="text-sm font-black text-zinc-400">{field.label}</p>
-                  <div className="relative h-11 overflow-hidden rounded-xl border border-white/10 bg-black px-4">
+                  <p className="auto-match-label">
+                    <span className="auto-match-label-pin" aria-hidden="true">
+                      📌
+                    </span>
+                    <span className="truncate">{field.label}</span>
+                  </p>
+                  <div className="relative mx-2 h-10 min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black px-3 sm:mx-0 sm:h-11 sm:px-4">
                     <div
                       className={cn(
-                        "flex h-full items-center text-lg font-black text-white transition-transform duration-300",
+                        "flex h-full min-w-0 items-center truncate whitespace-nowrap text-[16px] font-black text-white transition-transform duration-300 min-[380px]:text-[17px] sm:text-lg",
                         isActive && "motion-safe:animate-pulse",
                       )}
                     >
                       {currentValue || "정보 없음"}
                     </div>
                   </div>
-                  <div
-                    className={cn(
-                      "grid h-9 w-9 place-items-center rounded-full border text-sm font-black",
-                      isLocked
-                        ? "border-red-500 bg-red-500 text-white"
-                        : "border-white/10 text-zinc-600",
+                  <div className="grid justify-items-end">
+                    {isLocked ? (
+                      <AutoMatchCheckBadge />
+                    ) : (
+                      <span
+                        className={cn(
+                          "auto-match-status-indicator",
+                          isActive
+                            ? "auto-match-status-indicator-active"
+                            : "auto-match-status-indicator-waiting",
+                        )}
+                        aria-label={`${field.label} ${isActive ? "확인 중" : "대기"}`}
+                      />
                     )}
-                    aria-label={isLocked ? `${field.label} 확정` : `${field.label} 대기`}
-                  >
-                    {isLocked ? "✓" : ""}
                   </div>
                 </div>
               );

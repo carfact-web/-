@@ -34,6 +34,184 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.auto-match-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.82);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    "Apple SD Gothic Neo",
+    "Pretendard",
+    sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.auto-match-label-pin {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.auto-match-status-indicator {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+}
+
+.auto-match-status-indicator-active {
+  background: #ff3b30;
+  box-shadow: 0 0 16px rgba(255, 59, 48, 0.58);
+  animation: autoMatchActivePulse 900ms ease-in-out infinite;
+}
+
+.auto-match-status-indicator-waiting {
+  width: 9px;
+  height: 9px;
+  margin: 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.auto-match-check-badge {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(190, 255, 207, 0.72);
+  border-radius: 999px;
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(180deg, #62e889 0%, #22c55e 52%, #109447 100%);
+  box-shadow:
+    0 0 18px rgba(34, 197, 94, 0.46),
+    0 8px 16px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -4px 8px rgba(5, 85, 39, 0.4);
+  animation: autoMatchBadgePop 330ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.auto-match-check-badge::before {
+  content: "";
+  position: absolute;
+  inset: 4px 7px auto;
+  z-index: 0;
+  height: 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0));
+  opacity: 0.82;
+}
+
+.auto-match-check-badge::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -80%;
+  z-index: 1;
+  width: 44%;
+  transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.58), transparent);
+  animation: autoMatchHighlightSweep 260ms ease-out 360ms both;
+}
+
+.auto-match-check-svg {
+  position: relative;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 1px rgba(7, 83, 36, 0.42));
+}
+
+.auto-match-check-path {
+  stroke-dasharray: 25;
+  stroke-dashoffset: 25;
+  animation: autoMatchCheckDraw 300ms ease-out 230ms forwards;
+}
+
+@keyframes autoMatchActivePulse {
+  0%,
+  100% {
+    opacity: 0.68;
+    transform: scale(0.82);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes autoMatchBadgePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  72% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes autoMatchCheckDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes autoMatchHighlightSweep {
+  from {
+    transform: translateX(0) skewX(-18deg);
+    opacity: 0;
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(360%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-match-status-indicator-active,
+  .auto-match-check-badge,
+  .auto-match-check-badge::after,
+  .auto-match-check-path {
+    animation: none;
+  }
+
+  .auto-match-check-badge {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .auto-match-check-path {
+    stroke-dashoffset: 0;
+  }
+}
+
 @media (max-width: 767px) {
   html,
   body {
