@@ -114,6 +114,28 @@ body {
   animation: autoMatchBadgePop 330ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+.auto-match-missing-badge {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 202, 202, 0.72);
+  border-radius: 999px;
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(180deg, #ff7a7a 0%, #ef4444 52%, #b91c1c 100%);
+  box-shadow:
+    0 0 18px rgba(239, 68, 68, 0.48),
+    0 8px 16px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -4px 8px rgba(104, 18, 18, 0.44);
+  animation: autoMatchBadgePop 330ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 .auto-match-check-badge::before {
   content: "";
   position: absolute;
@@ -125,7 +147,19 @@ body {
   opacity: 0.82;
 }
 
-.auto-match-check-badge::after {
+.auto-match-missing-badge::before {
+  content: "";
+  position: absolute;
+  inset: 4px 7px auto;
+  z-index: 0;
+  height: 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0));
+  opacity: 0.82;
+}
+
+.auto-match-check-badge::after,
+.auto-match-missing-badge::after {
   content: "";
   position: absolute;
   inset: -20% auto -20% -80%;
@@ -148,6 +182,19 @@ body {
   stroke-dasharray: 25;
   stroke-dashoffset: 25;
   animation: autoMatchCheckDraw 300ms ease-out 230ms forwards;
+}
+
+.auto-match-x-path {
+  stroke-dasharray: 19;
+  stroke-dashoffset: 19;
+}
+
+.auto-match-x-path-first {
+  animation: autoMatchCheckDraw 230ms ease-out 230ms forwards;
+}
+
+.auto-match-x-path-second {
+  animation: autoMatchCheckDraw 230ms ease-out 430ms forwards;
 }
 
 @keyframes autoMatchActivePulse {
@@ -205,17 +252,22 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .auto-match-status-indicator-active,
   .auto-match-check-badge,
+  .auto-match-missing-badge,
   .auto-match-check-badge::after,
-  .auto-match-check-path {
+  .auto-match-missing-badge::after,
+  .auto-match-check-path,
+  .auto-match-x-path {
     animation: none;
   }
 
-  .auto-match-check-badge {
+  .auto-match-check-badge,
+  .auto-match-missing-badge {
     opacity: 1;
     transform: scale(1);
   }
 
-  .auto-match-check-path {
+  .auto-match-check-path,
+  .auto-match-x-path {
     stroke-dashoffset: 0;
   }
 }

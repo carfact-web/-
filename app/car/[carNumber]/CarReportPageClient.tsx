@@ -171,6 +171,35 @@ function AutoMatchCheckBadge() {
   );
 }
 
+function AutoMatchMissingBadge() {
+  return (
+    <span className="auto-match-missing-badge" aria-hidden="true">
+      <svg
+        className="auto-match-check-svg"
+        viewBox="0 0 38 38"
+        focusable="false"
+      >
+        <path
+          className="auto-match-x-path auto-match-x-path-first"
+          d="M12.5 12.5 25.5 25.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="4.2"
+        />
+        <path
+          className="auto-match-x-path auto-match-x-path-second"
+          d="M25.5 12.5 12.5 25.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="4.2"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function AutoMatchingPanel({
   onComplete,
   onSelectCandidate,
@@ -299,6 +328,7 @@ function AutoMatchingPanel({
             {fields.map((field, index) => {
               const isActive = activeIndex === index;
               const isLocked = activeIndex > index;
+              const hasFinalValue = Boolean(field.value);
               const finalValue = field.value || "제공 정보 없음";
               const currentValue =
                 isLocked || isReducedMotion
@@ -336,7 +366,11 @@ function AutoMatchingPanel({
                   </div>
                   <div className="grid justify-items-end">
                     {isLocked ? (
-                      <AutoMatchCheckBadge />
+                      hasFinalValue ? (
+                        <AutoMatchCheckBadge />
+                      ) : (
+                        <AutoMatchMissingBadge />
+                      )
                     ) : (
                       <span
                         className={cn(
@@ -842,6 +876,28 @@ export default function CarReportPage() {
     setShowAutoMatching(false);
   }, []);
 
+  const resetReportToHome = useCallback(() => {
+    setApiVehicle(null);
+    setAutoMatchingState(null);
+    setCommercialPlateCheckError("");
+    setCommercialPlateCheckState("checking");
+    setShowAutoMatching(false);
+    router.replace("/");
+  }, [router]);
+
+  const retryCommercialPlateCheck = useCallback(() => {
+    if (commercialPlateCheckState !== "error") {
+      return;
+    }
+
+    setApiVehicle(null);
+    setAutoMatchingState(null);
+    setCommercialPlateCheckError("");
+    setCommercialPlateCheckState("checking");
+    setShowAutoMatching(false);
+    setCommercialPlateRetryCount((count) => count + 1);
+  }, [commercialPlateCheckState]);
+
   const selectAutoMatchingCandidate = useCallback(
     (candidate: NonNullable<AutoMatchingState["candidates"]>[number]) => {
       const nextVehicle: Vehicle = {
@@ -1019,23 +1075,30 @@ export default function CarReportPage() {
   if (commercialPlateCheckState === "ineligible") {
     return (
       <main className={pageClassName}>
-        <div className={shellClassName}>
-          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 shadow-2xl shadow-red-950/20 sm:p-10">
-            <div className="mb-6 inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold tracking-[0.16em] text-red-400">
-              CARFACT CHECK
+        <div className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center">
+          <section className="w-full rounded-3xl border border-white/10 bg-zinc-950 p-6 text-center shadow-2xl shadow-red-950/20 sm:p-10">
+            <div className="mb-6 flex justify-center">
+              <AutoMatchMissingBadge />
             </div>
-            <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
-              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
+            <p className="mb-3 text-xs font-black tracking-[0.16em] text-red-400">
+              CARFACT CHECK
+            </p>
+            <h1 className="text-[23px] font-black leading-tight text-white sm:text-3xl">
+              매매 상품용 차량으로 확인되지 않았습니다
             </h1>
-            <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
-              차량번호를 다시 확인하거나 다른 차량을 조회해주세요.
+            <p className="mt-5 text-[15px] font-semibold leading-6 text-zinc-300 sm:text-base">
+              해당 차량은 중고차 매매 상품용 차량으로 확인되지 않습니다.
+            </p>
+            <p className="mt-3 text-[13px] leading-6 text-zinc-500 sm:text-sm">
+              카팩트는 중고차 매매 상품용 차량에 한해 차량정보와 실제 후기를
+              제공하고 있습니다.
             </p>
             <button
               type="button"
-              onClick={() => router.push("/")}
-              className="mt-9 inline-flex rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
+              onClick={resetReportToHome}
+              className="mt-8 w-full rounded-xl bg-red-500 px-6 py-4 text-sm font-black text-white transition hover:bg-red-600 active:scale-[0.98]"
             >
-              처음으로 이동
+              홈으로 돌아가기
             </button>
           </section>
         </div>
@@ -1046,29 +1109,35 @@ export default function CarReportPage() {
   if (commercialPlateCheckState === "error") {
     return (
       <main className={pageClassName}>
-        <div className={shellClassName}>
-          <section className="rounded-3xl border border-white/10 bg-zinc-950 p-7 sm:p-10">
-            <p className="text-sm font-bold text-red-400">
-              차량정보를 불러오지 못했습니다.
+        <div className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center">
+          <section className="w-full rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl shadow-red-950/20 sm:p-10">
+            <p className="text-xs font-black tracking-[0.16em] text-red-400">
+              CARFACT CHECK
             </p>
-            <h1 className="mt-3 text-3xl font-black">잠시 후 다시 시도해주세요.</h1>
-            <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-500">
+            <h1 className="mt-3 text-[23px] font-black leading-tight sm:text-3xl">
+              차량 확인 중 오류가 발생했습니다
+            </h1>
+            <p className="mt-4 text-[15px] font-semibold leading-6 text-zinc-300 sm:text-base">
+              일시적으로 차량정보를 확인하지 못했습니다. 잠시 후 다시 시도해
+              주세요.
+            </p>
+            <p className="mt-3 whitespace-pre-line text-xs leading-5 text-zinc-600">
               {commercialPlateCheckError}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => setCommercialPlateRetryCount((count) => count + 1)}
-                className="rounded-xl bg-red-500 px-6 py-4 text-sm font-black transition hover:bg-red-600 active:scale-[0.98]"
+                onClick={retryCommercialPlateCheck}
+                className="min-w-36 flex-1 rounded-xl bg-red-500 px-6 py-4 text-sm font-black transition hover:bg-red-600 active:scale-[0.98]"
               >
                 다시 시도
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/")}
-                className="rounded-xl border border-white/10 bg-zinc-900 px-6 py-4 text-sm font-black transition hover:bg-zinc-800 active:scale-[0.98]"
+                onClick={resetReportToHome}
+                className="min-w-36 flex-1 rounded-xl border border-white/10 bg-zinc-900 px-6 py-4 text-sm font-black transition hover:bg-zinc-800 active:scale-[0.98]"
               >
-                처음으로
+                홈으로 돌아가기
               </button>
             </div>
           </section>
