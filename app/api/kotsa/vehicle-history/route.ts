@@ -36,6 +36,7 @@ import {
 import {
   getKotsaVehicleDisplayInfo,
   isKotsaBusinessVehicle,
+  toPublicKotsaVehicleHistory,
   type KotsaVehicleDisplayInfo,
   type KotsaVehicleHistory,
 } from "@/types/kotsa";
@@ -73,7 +74,7 @@ const createSuccessPayload = (
   ok: true,
   businessVehicle: isKotsaBusinessVehicle(result),
   cached,
-  data: result,
+  data: toPublicKotsaVehicleHistory(result),
   display: getKotsaVehicleDisplayInfo(result),
   match,
   requestId,

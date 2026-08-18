@@ -26,6 +26,49 @@ export interface KotsaVehicleHistory {
   raw: unknown;
 }
 
+export interface KotsaMaintenanceHistoryItem {
+  businessName: string | null;
+  componentName: string | null;
+  date: string | null;
+  id: string;
+  jobType: string | null;
+  mileage: string | null;
+}
+
+export interface KotsaPerformanceHistoryItem {
+  accidentStatus: string | null;
+  inspectionBusinessName: string | null;
+  inspectionDate: string | null;
+  informationBusinessName: string | null;
+  id: string;
+  mileage: string | null;
+  repairStatus: string | null;
+  statusCategory: string | null;
+  validFrom: string | null;
+  validTo: string | null;
+}
+
+export interface KotsaInspectionHistoryItem {
+  date: string | null;
+  id: string;
+  sequence: string | null;
+  type: string | null;
+}
+
+export interface KotsaDetailedHistory {
+  inspection: KotsaInspectionHistoryItem[];
+  maintenance: KotsaMaintenanceHistoryItem[];
+  performance: KotsaPerformanceHistoryItem[];
+}
+
+export type KotsaPublicVehicleHistory = Omit<
+  KotsaVehicleHistory,
+  "raw" | "vehicleNumber"
+> & {
+  businessStatus: string | null;
+  detailedHistory: KotsaDetailedHistory;
+};
+
 export interface KotsaVehicleDisplayInfo {
   brand: string | null;
   carName: string | null;
@@ -40,6 +83,7 @@ export interface KotsaVehicleDisplayInfo {
   maintenanceHistoryCount: number | null;
   performanceCheckCount: number | null;
   inspectionHistoryCount: number;
+  detailedHistory: KotsaDetailedHistory;
   scrapped: boolean | null;
 }
 
@@ -158,56 +202,208 @@ const normalizeMileage = (value: string | null) => {
   return String(Number(digits));
 };
 
-const findDeepArrayLengthByKeys = (
-  value: unknown,
-  targetKeys: string[],
-  depth = 0,
-): number | null => {
-  if (depth > 12) {
-    return null;
-  }
+const getFirstRawRow = (value: unknown) => {
+  const root = isRecord(value) ? value : {};
+  const data = Array.isArray(root.data) ? root.data : [];
 
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findDeepArrayLengthByKeys(item, targetKeys, depth + 1);
+  return isRecord(data[0]) ? data[0] : {};
+};
 
-      if (found !== null) {
-        return found;
+const getRawArray = (data: KotsaVehicleHistory, key: string) => {
+  const first = getFirstRawRow(data.raw);
+  const value = first[key];
+
+  return Array.isArray(value) ? value : [];
+};
+
+const hasAnyValue = (record: Record<string, unknown>, keys: string[]) =>
+  keys.some((key) => Boolean(asString(record[key])));
+
+const getDateSortValue = (value: string | null) => {
+  const digits = onlyDigits(value);
+
+  return digits ? Number(digits.padEnd(8, "0")) : 0;
+};
+
+const normalizeMaintenanceHistory = (
+  data: KotsaVehicleHistory,
+): KotsaMaintenanceHistoryItem[] => {
+  const groups = new Map<
+    string,
+    {
+      businessName: string | null;
+      componentNames: string[];
+      date: string | null;
+      firstIndex: number;
+      jobType: string | null;
+      mileage: string | null;
+    }
+  >();
+
+  getRawArray(data, "imprmnList").forEach((item, index) => {
+    const record = isRecord(item) ? item : {};
+
+    if (
+      !hasAnyValue(record, [
+        "imprmnCmptnYmd",
+        "imprmnHstryDrvngDstnc",
+        "cmpntSeNm",
+        "jobCnCdNm",
+      ])
+    ) {
+      return;
+    }
+
+    const date = asString(record.imprmnCmptnYmd);
+    const mileage = normalizeMileage(asString(record.imprmnHstryDrvngDstnc));
+    const componentName = asString(record.cmpntSeNm);
+    const jobType = asString(record.jobCnCdNm);
+    const businessName = asString(record.bzentNm);
+    const groupKey = [date, mileage, businessName, jobType].join("|");
+    const group = groups.get(groupKey);
+
+    if (group) {
+      if (componentName && !group.componentNames.includes(componentName)) {
+        group.componentNames.push(componentName);
       }
+      return;
     }
 
-    return null;
+    groups.set(groupKey, {
+      businessName,
+      componentNames: componentName ? [componentName] : [],
+      date,
+      firstIndex: index,
+      jobType,
+      mileage,
+    });
+  });
+
+  return [...groups.values()]
+    .sort(
+      (left, right) =>
+        getDateSortValue(right.date) - getDateSortValue(left.date) ||
+        left.firstIndex - right.firstIndex,
+    )
+    .map((item, index) => ({
+      businessName: item.businessName,
+      componentName: item.componentNames.join(", ") || null,
+      date: asDateLabel(item.date),
+      id: `maintenance-${index + 1}`,
+      jobType: item.jobType,
+      mileage: item.mileage,
+    }));
+};
+
+const normalizePerformanceHistory = (
+  data: KotsaVehicleHistory,
+): KotsaPerformanceHistoryItem[] =>
+  getRawArray(data, "sttusList1")
+    .map((item, index) => {
+      const record = isRecord(item) ? item : {};
+
+      if (
+        !hasAnyValue(record, [
+          "chckYmd",
+          "prfomncChckDrvngDstnc",
+          "acdntYn",
+          "rcptSn",
+        ])
+      ) {
+        return null;
+      }
+
+      return {
+        accidentStatus: asString(record.acdntYn),
+        inspectionBusinessName: asString(record.chckBzentyNm),
+        inspectionDate: asDateLabel(asString(record.chckYmd)),
+        informationBusinessName: asString(record.infrmBzentyNm),
+        id: `performance-${index + 1}`,
+        mileage: normalizeMileage(asString(record.prfomncChckDrvngDstnc)),
+        repairStatus: asString(record.rvsnCdNm),
+        statusCategory: asString(record.crcSeNm),
+        validFrom: asDateLabel(asString(record.prfomncChckInspVldPdBgngYmd)),
+        validTo: asDateLabel(asString(record.prfomncChckInspVldPdEndYmd)),
+      };
+    })
+    .filter((item): item is KotsaPerformanceHistoryItem => Boolean(item))
+    .sort(
+      (left, right) =>
+        getDateSortValue(right.inspectionDate) -
+        getDateSortValue(left.inspectionDate),
+    );
+
+const normalizeInspectionHistory = (
+  data: KotsaVehicleHistory,
+): KotsaInspectionHistoryItem[] =>
+  getRawArray(data, "record")
+    .map((item, index) => {
+      const record = isRecord(item) ? item : {};
+
+      if (!hasAnyValue(record, ["inspYmd", "inspSeNm", "inspSn"])) {
+        return null;
+      }
+
+      return {
+        date: asDateLabel(asString(record.inspYmd)),
+        id: `inspection-${index + 1}`,
+        sequence: asString(record.inspSn),
+        type: asString(record.inspSeNm),
+      };
+    })
+    .filter((item): item is KotsaInspectionHistoryItem => Boolean(item))
+    .sort(
+      (left, right) =>
+        getDateSortValue(right.date) - getDateSortValue(left.date),
+    );
+
+const asDateLabel = (value: string | null) => {
+  const digits = onlyDigits(value);
+
+  if (digits.length !== 8) {
+    return value;
   }
 
-  if (typeof value === "string") {
-    const parsed = parseJsonString(value);
+  return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+};
 
-    return parsed === null
-      ? null
-      : findDeepArrayLengthByKeys(parsed, targetKeys, depth + 1);
-  }
+export const getKotsaDetailedHistory = (
+  data: KotsaVehicleHistory | null | undefined,
+): KotsaDetailedHistory => ({
+  inspection: data ? normalizeInspectionHistory(data) : [],
+  maintenance: data ? normalizeMaintenanceHistory(data) : [],
+  performance: data ? normalizePerformanceHistory(data) : [],
+});
 
-  if (!isRecord(value)) {
-    return null;
-  }
+const getBusinessStatus = (data: KotsaVehicleHistory) =>
+  asString(getFirstRawRow(data.raw).prcsImprtyRsnDtls);
 
-  const normalizedTargets = targetKeys.map(normalizeKey);
+export const toPublicKotsaVehicleHistory = (
+  data: KotsaVehicleHistory,
+): KotsaPublicVehicleHistory => {
+  const detailedHistory = getKotsaDetailedHistory(data);
 
-  for (const [key, item] of Object.entries(value)) {
-    if (normalizedTargets.includes(normalizeKey(key)) && Array.isArray(item)) {
-      return item.length;
-    }
-  }
-
-  for (const item of Object.values(value)) {
-    const found = findDeepArrayLengthByKeys(item, targetKeys, depth + 1);
-
-    if (found !== null) {
-      return found;
-    }
-  }
-
-  return null;
+  return {
+    businessStatus: getBusinessStatus(data),
+    carName: data.carName,
+    detailedHistory,
+    firstRegistrationDate: data.firstRegistrationDate,
+    inspectionRecords: data.inspectionRecords,
+    insuranceActive: data.insuranceActive,
+    insuranceYn: data.insuranceYn,
+    maintenanceHistoryCount: detailedHistory.maintenance.length,
+    mortgageCount: data.mortgageCount,
+    overdueTaxCount: data.overdueTaxCount,
+    performanceCheckCount: detailedHistory.performance.length,
+    responseCode: data.responseCode,
+    responseMessage: data.responseMessage,
+    scrapped: data.scrapped,
+    scrappedYn: data.scrappedYn,
+    seizureCount: data.seizureCount,
+    transferDate: data.transferDate,
+    usage: data.usage,
+    vehicleType: data.vehicleType,
+  };
 };
 
 export const getKotsaVehicleDisplayInfo = (
@@ -281,16 +477,10 @@ export const getKotsaVehicleDisplayInfo = (
   const firstRegistrationDate =
     data.firstRegistrationDate ?? rawFirstRegistrationDate;
   const vehicleType = data.vehicleType ?? rawVehicleType;
-  const maintenanceHistoryCount =
-    data.maintenanceHistoryCount ??
-    findDeepArrayLengthByKeys(data.raw, ["imprmnList", "maintenanceList"]);
-  const performanceCheckCount =
-    data.performanceCheckCount ??
-    findDeepArrayLengthByKeys(data.raw, ["sttusList1", "sttusList2"]);
-  const inspectionHistoryCount =
-    data.inspectionRecords.length ||
-    findDeepArrayLengthByKeys(data.raw, ["record", "inspList", "inspectionList"]) ||
-    (findDeepStringByKeys(data.raw, ["inspVldPdBgngYmd", "inspVldPdEndYmd"]) ? 1 : 0);
+  const detailedHistory = getKotsaDetailedHistory(data);
+  const maintenanceHistoryCount = detailedHistory.maintenance.length;
+  const performanceCheckCount = detailedHistory.performance.length;
+  const inspectionHistoryCount = detailedHistory.inspection.length;
 
   return {
     brand: rawManufacturer,
@@ -298,6 +488,7 @@ export const getKotsaVehicleDisplayInfo = (
     firstRegistrationDate,
     fuelType,
     generation: vehicleType,
+    detailedHistory,
     inspectionHistoryCount,
     latestPerformanceMileage,
     maintenanceHistoryCount,

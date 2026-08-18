@@ -10,7 +10,7 @@ import {
   normalizeCommercialPlateNumber,
 } from "@/utils/vehiclePlateValidation";
 import type { FormEvent } from "react";
-import type { KotsaVehicleHistory } from "@/types/kotsa";
+import type { KotsaPublicVehicleHistory } from "@/types/kotsa";
 
 const pageClassName = cn("min-h-screen bg-black px-4 py-8 text-white sm:px-6");
 const shellClassName = cn("mx-auto w-full max-w-3xl");
@@ -33,7 +33,7 @@ interface CommercialPlateResponse {
   businessVehicle?: boolean;
   cached?: boolean;
   code?: string;
-  data?: KotsaVehicleHistory;
+  data?: KotsaPublicVehicleHistory;
   error?: string;
   ok: boolean;
   requestId?: string;
@@ -57,28 +57,11 @@ const formatYn = (value: boolean | null | undefined) => {
 const formatRiskCount = (value: number | null | undefined) =>
   value === null || value === undefined ? "확인 필요" : `${value.toLocaleString()}건`;
 
-const getBusinessStatus = (data: KotsaVehicleHistory | null) => {
-  const raw = data?.raw;
-
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return null;
-  }
-
-  const first = Array.isArray((raw as { data?: unknown }).data)
-    ? (raw as { data: unknown[] }).data[0]
-    : null;
-
-  if (!first || typeof first !== "object" || Array.isArray(first)) {
-    return null;
-  }
-
-  const value = (first as Record<string, unknown>).prcsImprtyRsnDtls;
-
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-};
+const getBusinessStatus = (data: KotsaPublicVehicleHistory | null) =>
+  data?.businessStatus ?? null;
 
 const getRuleInsights = (
-  data: KotsaVehicleHistory | null,
+  data: KotsaPublicVehicleHistory | null,
   businessStatus: string | null,
 ) => {
   if (!data) {
@@ -142,7 +125,7 @@ const getRuleInsights = (
 
 export default function CommercialPlatePage() {
   const [plateNumber, setPlateNumber] = useState("");
-  const [result, setResult] = useState<KotsaVehicleHistory | null>(null);
+  const [result, setResult] = useState<KotsaPublicVehicleHistory | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);

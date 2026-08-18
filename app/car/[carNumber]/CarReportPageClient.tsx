@@ -42,6 +42,11 @@ import {
 } from "@/utils/reviewHelpful";
 import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
+import type {
+  KotsaDetailedHistory,
+  KotsaMaintenanceHistoryItem,
+  KotsaPerformanceHistoryItem,
+} from "@/types/kotsa";
 import type { VehicleIssueKeywordRule } from "@/utils/vehicleIssueKeywords";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -84,6 +89,7 @@ const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
+type HistoryDetailType = "maintenance" | "performance" | null;
 
 interface CommercialPlateCheckResponse {
   display?: {
@@ -97,6 +103,7 @@ interface CommercialPlateCheckResponse {
     maintenanceHistoryCount?: number | null;
     manufacturer?: string | null;
     performanceCheckCount?: number | null;
+    detailedHistory?: KotsaDetailedHistory | null;
     usage?: string | null;
     vehicleType?: string | null;
     year?: string | null;
@@ -596,6 +603,264 @@ function DealerVehicleRegistrationGuide({
   );
 }
 
+const historyDisclaimer =
+  "표시된 이력은 국토교통부 및 한국교통안전공단에서 제공된 자동차정보를 기반으로 하며, 실제 정비명세서의 전체 내용과 차이가 있을 수 있습니다.";
+
+const formatHistoryMileage = (value: string | null | undefined) => {
+  const digits = String(value ?? "").replace(/\D/g, "");
+
+  return digits ? `${Number(digits).toLocaleString()} km` : "제공 정보 없음";
+};
+
+const formatHistoryValue = (value: string | null | undefined) =>
+  value?.trim() ? value : "제공 정보 없음";
+
+function HistoryCountCard({
+  count,
+  disabled,
+  label,
+  onClick,
+}: {
+  count: number;
+  disabled?: boolean;
+  label: string;
+  onClick?: () => void;
+}) {
+  const valueLabel = disabled && count === 0 ? "정보 없음" : `${count.toLocaleString()}건`;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "min-h-[82px] rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition sm:min-h-[92px] sm:rounded-2xl sm:p-4",
+        !disabled &&
+          "cursor-pointer hover:border-red-500/60 hover:bg-red-500/10 active:scale-[0.99]",
+        disabled && "cursor-default opacity-75",
+      )}
+    >
+      <p className="text-[11px] font-semibold leading-tight text-zinc-400 sm:text-[13px]">
+        {label}
+      </p>
+      <p className="mt-2 text-[21px] font-[750] leading-tight sm:text-[26px]">
+        {valueLabel}
+      </p>
+      {disabled ? (
+        <p className="mt-2 text-[10px] font-semibold leading-tight text-zinc-500 sm:text-xs">
+          제공된 검사 세부정보가 없습니다
+        </p>
+      ) : null}
+    </button>
+  );
+}
+
+function MaintenanceHistoryList({
+  items,
+}: {
+  items: KotsaMaintenanceHistoryItem[];
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-black tracking-[0.14em] text-zinc-500">
+        최근 3건
+      </p>
+      {items.map((item, index) => (
+        <div key={item.id} className="space-y-3">
+          {index === 3 ? (
+            <p className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-center text-sm font-black text-red-100">
+              전체 {items.length.toLocaleString()}건 보기
+            </p>
+          ) : null}
+          <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-white">
+                  {formatHistoryValue(item.date)}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-zinc-500">
+                  당시 주행거리 {formatHistoryMileage(item.mileage)}
+                </p>
+              </div>
+              <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-[11px] font-black text-red-200">
+                {formatHistoryValue(item.jobType)}
+              </span>
+            </div>
+            <dl className="mt-4 grid gap-2 text-sm">
+              <div>
+                <dt className="text-[11px] font-bold text-zinc-500">부품명</dt>
+                <dd className="mt-1 font-semibold text-zinc-100">
+                  {formatHistoryValue(item.componentName)}
+                </dd>
+              </div>
+              {item.businessName ? (
+                <div>
+                  <dt className="text-[11px] font-bold text-zinc-500">정비업체</dt>
+                  <dd className="mt-1 font-semibold text-zinc-100">
+                    {item.businessName}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </article>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PerformanceHistoryList({
+  items,
+}: {
+  items: KotsaPerformanceHistoryItem[];
+}) {
+  const changedFields = new Set<string>();
+
+  if (items.length >= 2) {
+    const [latest, previous] = items;
+    (
+      [
+        ["accidentStatus", "사고 여부"],
+        ["repairStatus", "수리·상태"],
+        ["statusCategory", "상태 구분"],
+        ["mileage", "주행거리"],
+      ] as const
+    ).forEach(([key, label]) => {
+      if (latest[key] && previous[key] && latest[key] !== previous[key]) {
+        changedFields.add(label);
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <article
+          key={item.id}
+          className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-white">
+                {index === 0 ? "최신 점검" : "이전 점검"}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-zinc-500">
+                {formatHistoryValue(item.inspectionDate)}
+              </p>
+            </div>
+            <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-[11px] font-black text-emerald-200">
+              {formatHistoryMileage(item.mileage)}
+            </span>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            {[
+              ["사고 여부", item.accidentStatus],
+              ["수리·상태", item.repairStatus],
+              ["상태 구분", item.statusCategory],
+              ["점검업체", item.inspectionBusinessName],
+              ["제공업체", item.informationBusinessName],
+              [
+                "유효기간",
+                [item.validFrom, item.validTo].filter(Boolean).join(" ~ "),
+              ],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className={cn(
+                  "rounded-xl bg-black/30 p-3",
+                  changedFields.has(String(label)) && "ring-1 ring-red-400/40",
+                )}
+              >
+                <dt className="text-[11px] font-bold text-zinc-500">{label}</dt>
+                <dd className="mt-1 font-semibold text-zinc-100">
+                  {formatHistoryValue(String(value ?? ""))}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function HistoryDetailPanel({
+  detailedHistory,
+  onClose,
+  type,
+}: {
+  detailedHistory: KotsaDetailedHistory;
+  onClose: () => void;
+  type: Exclude<HistoryDetailType, null>;
+}) {
+  const isMaintenance = type === "maintenance";
+  const title = isMaintenance ? "정비이력 상세" : "성능점검 이력 상세";
+  const subtitle = isMaintenance
+    ? `전체 ${detailedHistory.maintenance.length.toLocaleString()}건`
+    : `전체 ${detailedHistory.performance.length.toLocaleString()}건`;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/75 px-0 pt-8 backdrop-blur-sm sm:items-center sm:px-5 sm:py-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="history-detail-title"
+      onClick={onClose}
+    >
+      <section
+        className="modal-enter flex max-h-[calc(100dvh-72px)] w-full flex-col rounded-t-3xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-3xl sm:rounded-3xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-6">
+          <div>
+            <p className="text-[11px] font-black tracking-[0.16em] text-red-400">
+              CARFACT HISTORY
+            </p>
+            <h3
+              id="history-detail-title"
+              className="mt-1.5 text-xl font-black text-white sm:text-2xl"
+            >
+              {title}
+            </h3>
+            <p className="mt-1 text-xs font-semibold text-zinc-500">
+              {subtitle}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 w-10 rounded-full border border-white/10 bg-white/5 text-lg font-black text-white transition hover:bg-white/10"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)] sm:px-6">
+          {isMaintenance ? (
+            <MaintenanceHistoryList items={detailedHistory.maintenance} />
+          ) : (
+            <PerformanceHistoryList items={detailedHistory.performance} />
+          )}
+          <p className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-xs font-medium leading-5 text-zinc-500">
+            {historyDisclaimer}
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function CarReportPage() {
   const params = useParams();
   const router = useRouter();
@@ -614,6 +879,8 @@ export default function CarReportPage() {
   const [showAutoMatching, setShowAutoMatching] = useState(false);
   const [showCommercialIneligibleModal, setShowCommercialIneligibleModal] =
     useState(false);
+  const [activeHistoryDetail, setActiveHistoryDetail] =
+    useState<HistoryDetailType>(null);
   const [dealerRegistrationPermission, setDealerRegistrationPermission] =
     useState<DealerRegistrationPermission>({
       canRegister: false,
@@ -723,6 +990,15 @@ export default function CarReportPage() {
       }),
     [aiKeywordRules, fuelType, generation, model, reviews],
   );
+  const detailedHistory = useMemo<KotsaDetailedHistory>(
+    () =>
+      apiDisplay?.detailedHistory ?? {
+        inspection: [],
+        maintenance: [],
+        performance: [],
+      },
+    [apiDisplay?.detailedHistory],
+  );
   const aiAnalysis = useMemo(
     () =>
       getStructuredAiSummary(brand, model, year, mileage, {
@@ -759,6 +1035,9 @@ export default function CarReportPage() {
     setReviewSort(nextSort);
     setReviewPage(1);
   };
+  const closeHistoryDetail = useCallback(() => {
+    setActiveHistoryDetail(null);
+  }, []);
   const recentTitle =
     [brand, model, generation].filter(Boolean).join(" ") || carNumber;
   const reviewPath = `/car/${encodeURIComponent(carNumber)}/review`;
@@ -868,6 +1147,23 @@ export default function CarReportPage() {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!activeHistoryDetail) {
+      return;
+    }
+
+    window.history.pushState({ carfactHistoryDetail: activeHistoryDetail }, "", window.location.href);
+    const handlePopState = () => {
+      setActiveHistoryDetail(null);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [activeHistoryDetail]);
 
   useEffect(() => {
     let isActive = true;
@@ -1668,27 +1964,26 @@ export default function CarReportPage() {
                     </p>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
-                    {[
-                      ["정비이력", apiDisplay?.maintenanceHistoryCount],
-                      ["성능점검 이력", apiDisplay?.performanceCheckCount],
-                      ["검사이력", apiDisplay?.inspectionHistoryCount],
-                    ].map(([label, count]) => (
-                      <div
-                        key={label}
-                        className="min-h-[82px] rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:min-h-[92px] sm:rounded-2xl sm:p-4"
-                      >
-                        <p className="text-[11px] font-semibold leading-tight text-zinc-400 sm:text-[13px]">
-                          {label}
-                        </p>
-                        <p className="mt-2 text-[22px] font-[750] leading-tight sm:text-[26px]">
-                          {typeof count === "number" ? `${count}건` : "제공 정보 없음"}
-                        </p>
-                      </div>
-                    ))}
+                    <HistoryCountCard
+                      count={detailedHistory.maintenance.length}
+                      disabled={detailedHistory.maintenance.length === 0}
+                      label="정비이력"
+                      onClick={() => setActiveHistoryDetail("maintenance")}
+                    />
+                    <HistoryCountCard
+                      count={detailedHistory.performance.length}
+                      disabled={detailedHistory.performance.length === 0}
+                      label="성능점검 이력"
+                      onClick={() => setActiveHistoryDetail("performance")}
+                    />
+                    <HistoryCountCard
+                      count={detailedHistory.inspection.length}
+                      disabled
+                      label="검사이력"
+                    />
                   </div>
                   <p className="mt-5 text-xs leading-5 text-zinc-600">
-                    세부 이력은 제공 범위와 조회 시점에 따라 달라질 수 있습니다.
-                    A4 리포트 양식은 추후 내려받기 기능에서 사용됩니다.
+                    {historyDisclaimer}
                   </p>
                 </div>
 
@@ -1833,6 +2128,13 @@ export default function CarReportPage() {
           )}
         </div>
       </div>
+      {activeHistoryDetail ? (
+        <HistoryDetailPanel
+          detailedHistory={detailedHistory}
+          onClose={closeHistoryDetail}
+          type={activeHistoryDetail}
+        />
+      ) : null}
     </main>
   );
 }
