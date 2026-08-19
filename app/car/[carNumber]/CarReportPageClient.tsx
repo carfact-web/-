@@ -728,24 +728,23 @@ function MaintenanceHistoryCard({
 
   return (
     <article className="min-w-0 rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:p-3.5">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black text-zinc-500">날짜</p>
-          <p className="mt-1 text-sm font-black leading-tight text-white">
-            {formatHistoryValue(item.date)}
-          </p>
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-black text-zinc-500">주행거리</p>
-          <p className="mt-1 truncate text-sm font-bold leading-tight text-zinc-300">
-            {formatHistoryMileage(item.mileage)}
-          </p>
-        </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black text-zinc-500">날짜</p>
+        <p className="mt-1 text-sm font-black leading-tight text-white">
+          {formatHistoryValue(item.date)}
+        </p>
       </div>
 
-      <div className="mt-3">
-        <p className="text-[10px] font-black text-zinc-500">정비항목</p>
-        {componentItems.length > 0 ? (
+      <div className="mt-3 min-w-0">
+        <p className="text-[10px] font-black text-zinc-500">주행거리</p>
+        <p className="mt-1 text-sm font-bold leading-tight text-zinc-300">
+          {formatHistoryMileage(item.mileage)}
+        </p>
+      </div>
+
+      {componentItems.length > 0 ? (
+        <div className="mt-3 min-w-0">
+          <p className="text-[10px] font-black text-zinc-500">정비항목</p>
           <div className="mt-1.5 grid min-w-0 grid-cols-3 gap-1.5 [grid-template-columns:repeat(3,minmax(0,1fr))]">
             {componentItems.map((component) => (
               <span
@@ -758,12 +757,8 @@ function MaintenanceHistoryCard({
               </span>
             ))}
           </div>
-        ) : (
-          <p className="mt-1.5 text-sm font-semibold text-zinc-500">
-            정비항목 확인 필요
-          </p>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {businessName ? (
         <div className="mt-3">
@@ -952,7 +947,7 @@ function HistoryDetailPanel({
       onClick={onClose}
     >
       <section
-        className="modal-enter flex max-h-full min-w-0 w-full flex-col rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-[800px]"
+        className="modal-enter flex max-h-full min-w-0 w-[calc(100vw-32px)] max-w-full flex-col rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:w-full sm:max-w-[800px]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-zinc-950 px-4 py-4 sm:px-5">
