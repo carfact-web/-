@@ -265,6 +265,7 @@ const normalizeMaintenanceHistory = (
       componentNames: string[];
       date: string | null;
       firstIndex: number;
+      jobTypes: string[];
       mileage: string | null;
     }
   >();
@@ -286,6 +287,7 @@ const normalizeMaintenanceHistory = (
     const date = asString(record.imprmnCmptnYmd);
     const mileage = normalizeMileage(asString(record.imprmnHstryDrvngDstnc));
     const componentName = asVisibleHistoryString(record.cmpntSeNm);
+    const jobType = asVisibleHistoryString(record.jobCnCdNm);
     const businessName = asVisibleHistoryString(record.bzentNm);
     const groupKey = [date, mileage, businessName].join("|");
     const group = groups.get(groupKey);
@@ -293,6 +295,9 @@ const normalizeMaintenanceHistory = (
     if (group) {
       if (componentName && !group.componentNames.includes(componentName)) {
         group.componentNames.push(componentName);
+      }
+      if (jobType && !group.jobTypes.includes(jobType)) {
+        group.jobTypes.push(jobType);
       }
       return;
     }
@@ -302,6 +307,7 @@ const normalizeMaintenanceHistory = (
       componentNames: componentName ? [componentName] : [],
       date,
       firstIndex: index,
+      jobTypes: jobType ? [jobType] : [],
       mileage,
     });
   });
@@ -317,7 +323,7 @@ const normalizeMaintenanceHistory = (
       componentName: item.componentNames.join(" · ") || null,
       date: asDateLabel(item.date),
       id: `maintenance-${index + 1}`,
-      jobType: null,
+      jobType: item.jobTypes.join(" · ") || null,
       mileage: item.mileage,
     }));
 };

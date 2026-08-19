@@ -723,7 +723,7 @@ function MaintenanceHistoryCard({
   item: KotsaMaintenanceHistoryItem;
 }) {
   const [isBusinessNameExpanded, setIsBusinessNameExpanded] = useState(false);
-  const componentItems = splitHistoryItems(item.componentName);
+  const componentItems = splitHistoryItems(item.jobType);
   const businessName = getVisibleHistoryValue(item.businessName);
 
   return (
