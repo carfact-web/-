@@ -219,6 +219,28 @@ const getRawArray = (data: KotsaVehicleHistory, key: string) => {
 const hasAnyValue = (record: Record<string, unknown>, keys: string[]) =>
   keys.some((key) => Boolean(asString(record[key])));
 
+const hiddenHistoryValues = new Set([
+  "x",
+  "null",
+  "미제공",
+  "정보없음",
+  "정보 없음",
+  "해당사항없음",
+  "해당 사항 없음",
+]);
+
+const asVisibleHistoryString = (value: unknown) => {
+  const stringValue = asString(value);
+
+  if (!stringValue) {
+    return null;
+  }
+
+  return hiddenHistoryValues.has(stringValue.replace(/\s+/g, " ").toLowerCase())
+    ? null
+    : stringValue;
+};
+
 const getDateSortValue = (value: string | null) => {
   const digits = onlyDigits(value);
 
@@ -235,7 +257,7 @@ const normalizeMaintenanceHistory = (
       componentNames: string[];
       date: string | null;
       firstIndex: number;
-      jobType: string | null;
+      jobTypes: string[];
       mileage: string | null;
     }
   >();
@@ -256,15 +278,18 @@ const normalizeMaintenanceHistory = (
 
     const date = asString(record.imprmnCmptnYmd);
     const mileage = normalizeMileage(asString(record.imprmnHstryDrvngDstnc));
-    const componentName = asString(record.cmpntSeNm);
-    const jobType = asString(record.jobCnCdNm);
-    const businessName = asString(record.bzentNm);
-    const groupKey = [date, mileage, businessName, jobType].join("|");
+    const componentName = asVisibleHistoryString(record.cmpntSeNm);
+    const jobType = asVisibleHistoryString(record.jobCnCdNm);
+    const businessName = asVisibleHistoryString(record.bzentNm);
+    const groupKey = [date, mileage, businessName].join("|");
     const group = groups.get(groupKey);
 
     if (group) {
       if (componentName && !group.componentNames.includes(componentName)) {
         group.componentNames.push(componentName);
+      }
+      if (jobType && !group.jobTypes.includes(jobType)) {
+        group.jobTypes.push(jobType);
       }
       return;
     }
@@ -274,7 +299,7 @@ const normalizeMaintenanceHistory = (
       componentNames: componentName ? [componentName] : [],
       date,
       firstIndex: index,
-      jobType,
+      jobTypes: jobType ? [jobType] : [],
       mileage,
     });
   });
@@ -287,10 +312,10 @@ const normalizeMaintenanceHistory = (
     )
     .map((item, index) => ({
       businessName: item.businessName,
-      componentName: item.componentNames.join(", ") || null,
+      componentName: item.componentNames.join(" · ") || null,
       date: asDateLabel(item.date),
       id: `maintenance-${index + 1}`,
-      jobType: item.jobType,
+      jobType: item.jobTypes.join(" · ") || null,
       mileage: item.mileage,
     }));
 };

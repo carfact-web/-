@@ -615,6 +615,34 @@ const formatHistoryMileage = (value: string | null | undefined) => {
 const formatHistoryValue = (value: string | null | undefined) =>
   value?.trim() ? value : "제공 정보 없음";
 
+const hiddenHistoryValues = new Set([
+  "x",
+  "null",
+  "미제공",
+  "정보없음",
+  "정보 없음",
+  "해당사항없음",
+  "해당 사항 없음",
+]);
+
+const getVisibleHistoryValue = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return hiddenHistoryValues.has(trimmed.replace(/\s+/g, " ").toLowerCase())
+    ? null
+    : trimmed;
+};
+
+const splitHistoryBadges = (value: string | null | undefined) =>
+  getVisibleHistoryValue(value)
+    ?.split(/[·,]/)
+    .map((item) => getVisibleHistoryValue(item))
+    .filter((item): item is string => Boolean(item)) ?? [];
+
 function HistoryCountCard({
   count,
   disabled,
@@ -661,51 +689,64 @@ function MaintenanceHistoryList({
   items: KotsaMaintenanceHistoryItem[];
 }) {
   return (
-    <div className="space-y-3">
-      <p className="text-xs font-black tracking-[0.14em] text-zinc-500">
-        최근 3건
-      </p>
-      {items.map((item, index) => (
-        <div key={item.id} className="space-y-3">
-          {index === 3 ? (
-            <p className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-center text-sm font-black text-red-100">
-              전체 {items.length.toLocaleString()}건 보기
-            </p>
-          ) : null}
-          <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-white">
-                  {formatHistoryValue(item.date)}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-zinc-500">
-                  당시 주행거리 {formatHistoryMileage(item.mileage)}
-                </p>
-              </div>
-              <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-[11px] font-black text-red-200">
-                {formatHistoryValue(item.jobType)}
-              </span>
-            </div>
-            <dl className="mt-4 grid gap-2 text-sm">
-              <div>
-                <dt className="text-[11px] font-bold text-zinc-500">부품명</dt>
-                <dd className="mt-1 font-semibold text-zinc-100">
-                  {formatHistoryValue(item.componentName)}
-                </dd>
-              </div>
-              {item.businessName ? (
-                <div>
-                  <dt className="text-[11px] font-bold text-zinc-500">정비업체</dt>
-                  <dd className="mt-1 font-semibold text-zinc-100">
-                    {item.businessName}
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-          </article>
-        </div>
+    <div className="space-y-2">
+      {items.map((item) => (
+        <MaintenanceHistoryCard item={item} key={item.id} />
       ))}
     </div>
+  );
+}
+
+function MaintenanceHistoryCard({
+  item,
+}: {
+  item: KotsaMaintenanceHistoryItem;
+}) {
+  const [isBusinessNameExpanded, setIsBusinessNameExpanded] = useState(false);
+  const componentName =
+    getVisibleHistoryValue(item.componentName) ?? "정비 항목 확인 필요";
+  const businessName = getVisibleHistoryValue(item.businessName);
+  const jobTypeBadges = splitHistoryBadges(item.jobType);
+
+  return (
+    <article className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 sm:px-3.5 sm:py-3">
+      <div className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs leading-none">
+        <span className="font-black text-white">
+          {formatHistoryValue(item.date)}
+        </span>
+        <span className="min-w-0 truncate font-semibold text-zinc-500">
+          {formatHistoryMileage(item.mileage)}
+        </span>
+      </div>
+
+      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+        <h4 className="min-w-0 text-[15px] font-black leading-tight text-white sm:text-base">
+          {componentName}
+        </h4>
+        {jobTypeBadges.map((badge) => (
+          <span
+            className="inline-flex h-5 max-w-full items-center rounded-full bg-red-500/15 px-2 text-[10px] font-black leading-none text-red-100"
+            key={badge}
+          >
+            {badge}
+          </span>
+        ))}
+      </div>
+
+      {businessName ? (
+        <button
+          type="button"
+          className={cn(
+            "mt-1 block w-full min-w-0 text-left text-[11px] font-semibold leading-4 text-zinc-500",
+            !isBusinessNameExpanded && "truncate",
+          )}
+          onClick={() => setIsBusinessNameExpanded((current) => !current)}
+          title={businessName}
+        >
+          {businessName}
+        </button>
+      ) : null}
+    </article>
   );
 }
 
@@ -812,17 +853,17 @@ function HistoryDetailPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/75 px-0 pt-8 backdrop-blur-sm sm:items-center sm:px-5 sm:py-8"
+      className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/75 px-4 pt-8 backdrop-blur-sm sm:items-center sm:px-5 sm:py-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby="history-detail-title"
       onClick={onClose}
     >
       <section
-        className="modal-enter flex max-h-[calc(100dvh-72px)] w-full flex-col rounded-t-3xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-3xl sm:rounded-3xl"
+        className="modal-enter flex max-h-[calc(100dvh-72px)] w-full flex-col rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-[800px]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-6">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-4 py-4 sm:px-5">
           <div>
             <p className="text-[11px] font-black tracking-[0.16em] text-red-400">
               CARFACT HISTORY
@@ -846,13 +887,13 @@ function HistoryDetailPanel({
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)] sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5">
           {isMaintenance ? (
             <MaintenanceHistoryList items={detailedHistory.maintenance} />
           ) : (
             <PerformanceHistoryList items={detailedHistory.performance} />
           )}
-          <p className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-xs font-medium leading-5 text-zinc-500">
+          <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs font-medium leading-5 text-zinc-500">
             {historyDisclaimer}
           </p>
         </div>
