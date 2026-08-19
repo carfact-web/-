@@ -44,6 +44,7 @@ import type { Review } from "@/types/review";
 import type { Vehicle } from "@/types/vehicle";
 import type {
   KotsaDetailedHistory,
+  KotsaInspectionHistoryItem,
   KotsaMaintenanceHistoryItem,
   KotsaPerformanceHistoryItem,
 } from "@/types/kotsa";
@@ -89,7 +90,7 @@ const activeSortButtonClassName = cn("bg-red-500 text-white hover:bg-red-500");
 const reviewsPerPage = 5;
 type ReviewSortOption = "latest" | "helpful" | "photo";
 type CommercialPlateCheckState = "checking" | "eligible" | "ineligible" | "error";
-type HistoryDetailType = "maintenance" | "performance" | null;
+type HistoryDetailType = "maintenance" | "performance" | "inspection" | null;
 
 interface CommercialPlateCheckResponse {
   display?: {
@@ -617,12 +618,20 @@ const formatHistoryValue = (value: string | null | undefined) =>
 
 const hiddenHistoryValues = new Set([
   "x",
+  "undefined",
   "null",
+  "신품",
+  "신품(a)",
+  "신품 (a)",
   "미제공",
   "정보없음",
   "정보 없음",
   "해당사항없음",
+  "해당사항없음(x)",
+  "해당사항없음 (x)",
   "해당 사항 없음",
+  "해당 사항 없음(x)",
+  "해당 사항 없음 (x)",
 ]);
 
 const getVisibleHistoryValue = (value: string | null | undefined) => {
@@ -637,18 +646,24 @@ const getVisibleHistoryValue = (value: string | null | undefined) => {
     : trimmed;
 };
 
-const splitHistoryBadges = (value: string | null | undefined) =>
-  getVisibleHistoryValue(value)
-    ?.split(/[·,]/)
-    .map((item) => getVisibleHistoryValue(item))
-    .filter((item): item is string => Boolean(item)) ?? [];
+const splitHistoryItems = (value: string | null | undefined) => {
+  const items =
+    getVisibleHistoryValue(value)
+      ?.split(/[·,]/)
+      .map((item) => getVisibleHistoryValue(item))
+      .filter((item): item is string => Boolean(item)) ?? [];
+
+  return [...new Set(items)];
+};
 
 function HistoryCountCard({
+  ariaLabel,
   count,
   disabled,
   label,
   onClick,
 }: {
+  ariaLabel?: string;
   count: number;
   disabled?: boolean;
   label: string;
@@ -661,6 +676,7 @@ function HistoryCountCard({
       type="button"
       disabled={disabled}
       onClick={onClick}
+      aria-label={ariaLabel ?? label}
       className={cn(
         "min-h-[82px] rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition sm:min-h-[92px] sm:rounded-2xl sm:p-4",
         !disabled &&
@@ -678,7 +694,11 @@ function HistoryCountCard({
         <p className="mt-2 text-[10px] font-semibold leading-tight text-zinc-500 sm:text-xs">
           제공된 검사 세부정보가 없습니다
         </p>
-      ) : null}
+      ) : (
+        <p className="mt-2 text-[10px] font-black leading-tight text-red-200/90 sm:text-xs">
+          눌러서 세부 이력 확인 〉
+        </p>
+      )}
     </button>
   );
 }
@@ -703,48 +723,63 @@ function MaintenanceHistoryCard({
   item: KotsaMaintenanceHistoryItem;
 }) {
   const [isBusinessNameExpanded, setIsBusinessNameExpanded] = useState(false);
-  const componentName =
-    getVisibleHistoryValue(item.componentName) ?? "정비 항목 확인 필요";
+  const componentItems = splitHistoryItems(item.componentName);
   const businessName = getVisibleHistoryValue(item.businessName);
-  const jobTypeBadges = splitHistoryBadges(item.jobType);
 
   return (
-    <article className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 sm:px-3.5 sm:py-3">
-      <div className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs leading-none">
-        <span className="font-black text-white">
-          {formatHistoryValue(item.date)}
-        </span>
-        <span className="min-w-0 truncate font-semibold text-zinc-500">
-          {formatHistoryMileage(item.mileage)}
-        </span>
+    <article className="min-w-0 rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:p-3.5">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black text-zinc-500">날짜</p>
+          <p className="mt-1 text-sm font-black leading-tight text-white">
+            {formatHistoryValue(item.date)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black text-zinc-500">주행거리</p>
+          <p className="mt-1 truncate text-sm font-bold leading-tight text-zinc-300">
+            {formatHistoryMileage(item.mileage)}
+          </p>
+        </div>
       </div>
 
-      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
-        <h4 className="min-w-0 text-[15px] font-black leading-tight text-white sm:text-base">
-          {componentName}
-        </h4>
-        {jobTypeBadges.map((badge) => (
-          <span
-            className="inline-flex h-5 max-w-full items-center rounded-full bg-red-500/15 px-2 text-[10px] font-black leading-none text-red-100"
-            key={badge}
-          >
-            {badge}
-          </span>
-        ))}
+      <div className="mt-3">
+        <p className="text-[10px] font-black text-zinc-500">정비항목</p>
+        {componentItems.length > 0 ? (
+          <div className="mt-1.5 grid min-w-0 grid-cols-3 gap-1.5 [grid-template-columns:repeat(3,minmax(0,1fr))]">
+            {componentItems.map((component) => (
+              <span
+                className="grid min-h-8 min-w-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/25 px-2 py-1"
+                key={component}
+              >
+                <span className="line-clamp-2 min-w-0 text-center text-[12px] font-black leading-tight break-keep text-zinc-100 [overflow-wrap:anywhere]">
+                  {component}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-1.5 text-sm font-semibold text-zinc-500">
+            정비항목 확인 필요
+          </p>
+        )}
       </div>
 
       {businessName ? (
-        <button
-          type="button"
-          className={cn(
-            "mt-1 block w-full min-w-0 text-left text-[11px] font-semibold leading-4 text-zinc-500",
-            !isBusinessNameExpanded && "truncate",
-          )}
-          onClick={() => setIsBusinessNameExpanded((current) => !current)}
-          title={businessName}
-        >
-          {businessName}
-        </button>
+        <div className="mt-3">
+          <p className="text-[10px] font-black text-zinc-500">정비업체</p>
+          <button
+            type="button"
+            className={cn(
+              "mt-1 block w-full min-w-0 text-left text-xs font-semibold leading-4 text-zinc-400",
+              !isBusinessNameExpanded && "truncate",
+            )}
+            onClick={() => setIsBusinessNameExpanded((current) => !current)}
+            title={businessName}
+          >
+            {businessName}
+          </button>
+        </div>
       ) : null}
     </article>
   );
@@ -825,6 +860,46 @@ function PerformanceHistoryList({
   );
 }
 
+function InspectionHistoryList({
+  items,
+}: {
+  items: KotsaInspectionHistoryItem[];
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <article
+          className="rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:p-3.5"
+          key={item.id}
+        >
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-[10px] font-black text-zinc-500">검사일자</dt>
+              <dd className="mt-1 font-black text-white">
+                {formatHistoryValue(item.date)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-black text-zinc-500">검사 종류</dt>
+              <dd className="mt-1 font-bold text-zinc-200">
+                {formatHistoryValue(item.type)}
+              </dd>
+            </div>
+            {getVisibleHistoryValue(item.sequence) ? (
+              <div className="col-span-2">
+                <dt className="text-[10px] font-black text-zinc-500">검사 식별값</dt>
+                <dd className="mt-1 font-semibold text-zinc-400">
+                  {item.sequence}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function HistoryDetailPanel({
   detailedHistory,
   onClose,
@@ -835,10 +910,18 @@ function HistoryDetailPanel({
   type: Exclude<HistoryDetailType, null>;
 }) {
   const isMaintenance = type === "maintenance";
-  const title = isMaintenance ? "정비이력 상세" : "성능점검 이력 상세";
-  const subtitle = isMaintenance
-    ? `전체 ${detailedHistory.maintenance.length.toLocaleString()}건`
-    : `전체 ${detailedHistory.performance.length.toLocaleString()}건`;
+  const isPerformance = type === "performance";
+  const title = isMaintenance
+    ? "정비이력 상세"
+    : isPerformance
+      ? "성능점검 이력 상세"
+      : "검사이력 상세";
+  const activeItemsCount = isMaintenance
+    ? detailedHistory.maintenance.length
+    : isPerformance
+      ? detailedHistory.performance.length
+      : detailedHistory.inspection.length;
+  const subtitle = `전체 ${activeItemsCount.toLocaleString()}건`;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -851,19 +934,28 @@ function HistoryDetailPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/75 px-4 pt-8 backdrop-blur-sm sm:items-center sm:px-5 sm:py-8"
+      className="fixed inset-0 z-[10000] flex items-start justify-center bg-black/75 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-[calc(env(safe-area-inset-top)+16px)] backdrop-blur-sm sm:items-center sm:px-5 sm:py-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby="history-detail-title"
       onClick={onClose}
     >
       <section
-        className="modal-enter flex max-h-[calc(100dvh-72px)] w-full flex-col rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-[800px]"
+        className="modal-enter flex max-h-full min-w-0 w-full flex-col rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 sm:max-h-[82vh] sm:max-w-[800px]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-4 py-4 sm:px-5">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-zinc-950 px-4 py-4 sm:px-5">
           <div>
             <p className="text-[11px] font-black tracking-[0.16em] text-red-400">
               CARFACT HISTORY
@@ -887,11 +979,13 @@ function HistoryDetailPanel({
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5">
           {isMaintenance ? (
             <MaintenanceHistoryList items={detailedHistory.maintenance} />
-          ) : (
+          ) : isPerformance ? (
             <PerformanceHistoryList items={detailedHistory.performance} />
+          ) : (
+            <InspectionHistoryList items={detailedHistory.inspection} />
           )}
           <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs font-medium leading-5 text-zinc-500">
             {historyDisclaimer}
@@ -2006,21 +2100,25 @@ export default function CarReportPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                     <HistoryCountCard
+                      ariaLabel="정비이력 세부 내용 보기"
                       count={detailedHistory.maintenance.length}
                       disabled={detailedHistory.maintenance.length === 0}
                       label="정비이력"
                       onClick={() => setActiveHistoryDetail("maintenance")}
                     />
                     <HistoryCountCard
+                      ariaLabel="성능점검이력 세부 내용 보기"
                       count={detailedHistory.performance.length}
                       disabled={detailedHistory.performance.length === 0}
-                      label="성능점검 이력"
+                      label="성능점검이력"
                       onClick={() => setActiveHistoryDetail("performance")}
                     />
                     <HistoryCountCard
+                      ariaLabel="검사이력 세부 내용 보기"
                       count={detailedHistory.inspection.length}
-                      disabled
+                      disabled={detailedHistory.inspection.length === 0}
                       label="검사이력"
+                      onClick={() => setActiveHistoryDetail("inspection")}
                     />
                   </div>
                   <p className="mt-5 text-xs leading-5 text-zinc-600">

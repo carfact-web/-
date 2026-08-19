@@ -221,12 +221,20 @@ const hasAnyValue = (record: Record<string, unknown>, keys: string[]) =>
 
 const hiddenHistoryValues = new Set([
   "x",
+  "undefined",
   "null",
+  "신품",
+  "신품(a)",
+  "신품 (a)",
   "미제공",
   "정보없음",
   "정보 없음",
   "해당사항없음",
+  "해당사항없음(x)",
+  "해당사항없음 (x)",
   "해당 사항 없음",
+  "해당 사항 없음(x)",
+  "해당 사항 없음 (x)",
 ]);
 
 const asVisibleHistoryString = (value: unknown) => {
