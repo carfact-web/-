@@ -12,6 +12,7 @@ import {
   sanitizeMileage,
   sanitizeVehiclePlateNumber,
 } from "@/utils/inputSanitizer";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import type { Vehicle } from "@/types/vehicle";
 
 const pageClassName = cn("min-h-screen bg-black p-6 text-white sm:p-10");
@@ -134,9 +135,12 @@ export default function VehicleSetupPage() {
   }, [isAuthReady, isProfileReady, session?.access_token]);
 
   useEffect(() => {
-    const recentTitle = [brandValue, modelValue, generationValue]
-      .filter(Boolean)
-      .join(" ") || carNumber;
+    const recentTitle =
+      getVehicleDisplayName({
+        brand: brandValue,
+        generation: generationValue,
+        model: modelValue,
+      }) || carNumber;
     saveRecentView(carNumber, recentTitle, vehicle ?? undefined);
   }, [carNumber, brandValue, generationValue, modelValue, saveRecentView, vehicle]);
 
