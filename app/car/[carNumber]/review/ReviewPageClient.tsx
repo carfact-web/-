@@ -56,6 +56,10 @@ const submitButtonClassName = cn(
 );
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 const maxReviewImages = 3;
+const reviewResultStorageKeyPrefix = "carfact-review-result-";
+
+const getReviewResultStorageKey = (plateNumber: string) =>
+  reviewResultStorageKeyPrefix + sanitizeVehiclePlateNumber(plateNumber);
 
 const getReviewSaveErrorMessage = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
@@ -458,7 +462,11 @@ export default function ReviewPage() {
     }, 2000);
 
     window.setTimeout(() => {
-      router.push("/car/" + encodeURIComponent(carNumber));
+      window.sessionStorage.setItem(
+        getReviewResultStorageKey(carNumber),
+        editingReviewId ? "updated" : "created",
+      );
+      router.replace("/car/" + encodeURIComponent(carNumber));
     }, 850);
   };
 

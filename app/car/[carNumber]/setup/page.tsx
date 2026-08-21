@@ -184,7 +184,7 @@ export default function VehicleSetupPage() {
       return;
     }
 
-    window.location.href = `/car/${encodeURIComponent(carNumber)}`;
+    router.replace(`/car/${encodeURIComponent(carNumber)}`);
   };
 
   if (isCheckingPermission) {

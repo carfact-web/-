@@ -69,7 +69,7 @@ export default function VehicleEditPage() {
     };
 
     await saveVehicle(nextVehicle);
-    window.location.href = `/car/${encodeURIComponent(carNumber)}`;
+    router.replace(`/car/${encodeURIComponent(carNumber)}`);
   };
 
   return (

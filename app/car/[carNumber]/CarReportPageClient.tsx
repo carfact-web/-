@@ -137,6 +137,154 @@ interface DealerRegistrationPermission {
   role: string;
 }
 
+interface ReportSnapshot {
+  display: CommercialPlateCheckResponse["display"];
+  match: CommercialPlateCheckResponse["match"];
+  savedAt: number;
+  vehicle: Vehicle;
+}
+
+const reportSnapshotMaxAgeMs = 6 * 60 * 60 * 1000;
+const reportSnapshotStorageKeyPrefix = "carfact-report-snapshot-";
+const reviewResultStorageKeyPrefix = "carfact-review-result-";
+
+const getReportSnapshotStorageKey = (plateNumber: string) =>
+  reportSnapshotStorageKeyPrefix + sanitizeVehiclePlateNumber(plateNumber);
+
+export const getReviewResultStorageKey = (plateNumber: string) =>
+  reviewResultStorageKeyPrefix + sanitizeVehiclePlateNumber(plateNumber);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const readReportSnapshot = (plateNumber: string): ReportSnapshot | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const rawSnapshot = window.sessionStorage.getItem(
+    getReportSnapshotStorageKey(plateNumber),
+  );
+
+  if (!rawSnapshot) {
+    return null;
+  }
+
+  try {
+    const snapshot = JSON.parse(rawSnapshot) as unknown;
+
+    if (!isRecord(snapshot) || !isRecord(snapshot.vehicle)) {
+      return null;
+    }
+
+    const savedAt = Number(snapshot.savedAt ?? 0);
+    const vehicleRecord = snapshot.vehicle;
+    const vehicle = {
+      brand: String(vehicleRecord.brand ?? ""),
+      fuelType: String(vehicleRecord.fuelType ?? ""),
+      generation: String(vehicleRecord.generation ?? ""),
+      id:
+        typeof vehicleRecord.id === "string"
+          ? vehicleRecord.id
+          : undefined,
+      mileage: String(vehicleRecord.mileage ?? ""),
+      model: String(vehicleRecord.model ?? ""),
+      plateNumber: sanitizeVehiclePlateNumber(
+        String(vehicleRecord.plateNumber ?? ""),
+      ),
+      year: String(vehicleRecord.year ?? ""),
+    } satisfies Vehicle;
+
+    if (
+      !Number.isFinite(savedAt) ||
+      Date.now() - savedAt > reportSnapshotMaxAgeMs ||
+      sanitizeVehiclePlateNumber(vehicle.plateNumber) !==
+        sanitizeVehiclePlateNumber(plateNumber)
+    ) {
+      window.sessionStorage.removeItem(getReportSnapshotStorageKey(plateNumber));
+      return null;
+    }
+
+    return {
+      display: isRecord(snapshot.display)
+        ? (snapshot.display as CommercialPlateCheckResponse["display"])
+        : null,
+      match: isRecord(snapshot.match)
+        ? (snapshot.match as CommercialPlateCheckResponse["match"])
+        : null,
+      savedAt,
+      vehicle,
+    };
+  } catch {
+    window.sessionStorage.removeItem(getReportSnapshotStorageKey(plateNumber));
+    return null;
+  }
+};
+
+const writeReportSnapshot = ({
+  display,
+  match,
+  vehicle,
+}: {
+  display: CommercialPlateCheckResponse["display"];
+  match: CommercialPlateCheckResponse["match"];
+  vehicle: Vehicle;
+}) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    getReportSnapshotStorageKey(vehicle.plateNumber),
+    JSON.stringify({
+      display: display ?? null,
+      match: match ?? null,
+      savedAt: Date.now(),
+      vehicle,
+    } satisfies ReportSnapshot),
+  );
+};
+
+const removeReportSnapshot = (plateNumber: string) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(getReportSnapshotStorageKey(plateNumber));
+};
+
+const getVehicleFromCommercialPayload = (
+  payload: CommercialPlateCheckResponse,
+  plateNumber: string,
+): Vehicle => {
+  const display = payload.display;
+  const registrationYear = display?.firstRegistrationDate
+    ?.replace(/\D/g, "")
+    .slice(0, 4);
+  const persistedVehicle = payload.vehicle
+    ? {
+        ...payload.vehicle,
+        plateNumber,
+      }
+    : null;
+  const matchedVehicle = payload.match?.vehicle;
+
+  return (
+    persistedVehicle ??
+    (matchedVehicle
+      ? { ...matchedVehicle, plateNumber }
+      : {
+          brand: display?.manufacturer ?? display?.brand ?? "",
+          fuelType: display?.fuelType ?? "",
+          generation: display?.generation ?? display?.vehicleType ?? "",
+          mileage: display?.latestPerformanceMileage ?? "",
+          model: display?.carName ?? display?.vehicleType ?? "",
+          plateNumber,
+          year: display?.year ?? registrationYear ?? "",
+        })
+  );
+};
+
 const getParsedTime = (dateLabel: string, fallbackTime: number | string) => {
   const parsedTime = Date.parse(dateLabel);
 
@@ -1005,6 +1153,7 @@ export default function CarReportPage() {
   const [apiVehicle, setApiVehicle] = useState<Vehicle | null>(null);
   const [apiDisplay, setApiDisplay] =
     useState<NonNullable<CommercialPlateCheckResponse["display"]> | null>(null);
+  const [reviewStatusMessage, setReviewStatusMessage] = useState("");
   const [autoMatchingState, setAutoMatchingState] =
     useState<AutoMatchingState | null>(null);
   const [showAutoMatching, setShowAutoMatching] = useState(false);
@@ -1198,7 +1347,10 @@ export default function CarReportPage() {
 
       if (!didDelete) {
         window.alert("삭제 권한이 없거나 이미 삭제된 후기입니다.");
+        return;
       }
+
+      setReviewStatusMessage("삭제되었습니다.");
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : "후기 삭제에 실패했습니다.",
@@ -1389,6 +1541,26 @@ export default function CarReportPage() {
     const accessToken = session?.access_token;
     if (!accessToken || !carNumber) return;
 
+    const cachedSnapshot = readReportSnapshot(carNumber);
+
+    if (cachedSnapshot) {
+      void Promise.resolve().then(() => {
+        setApiDisplay(cachedSnapshot.display ?? null);
+        setApiVehicle(cachedSnapshot.vehicle);
+        setAutoMatchingState({
+          candidates: cachedSnapshot.match?.candidates ?? [],
+          display: cachedSnapshot.display ?? null,
+          status: cachedSnapshot.match?.status ?? "matched",
+          vehicle: cachedSnapshot.vehicle,
+        });
+        setCommercialPlateCheckError("");
+        setCommercialPlateCheckState("eligible");
+        setShowAutoMatching(false);
+        setShowCommercialIneligibleModal(false);
+      });
+      return;
+    }
+
     const controller = new AbortController();
     let isActive = true;
 
@@ -1441,27 +1613,7 @@ export default function CarReportPage() {
         if (!isActive) return;
 
         const display = payload.display;
-        const registrationYear = display?.firstRegistrationDate
-          ?.replace(/\D/g, "")
-          .slice(0, 4);
-        const persistedVehicle = payload.vehicle
-          ? {
-              ...payload.vehicle,
-              plateNumber: carNumber,
-            }
-          : null;
-        const matchedVehicle = payload.match?.vehicle;
-        const nextVehicle: Vehicle = persistedVehicle ?? (matchedVehicle
-          ? { ...matchedVehicle, plateNumber: carNumber }
-          : {
-              brand: display?.manufacturer ?? display?.brand ?? "",
-              fuelType: display?.fuelType ?? "",
-              generation: display?.generation ?? display?.vehicleType ?? "",
-              mileage: display?.latestPerformanceMileage ?? "",
-              model: display?.carName ?? display?.vehicleType ?? "",
-              plateNumber: carNumber,
-              year: display?.year ?? registrationYear ?? "",
-            });
+        const nextVehicle = getVehicleFromCommercialPayload(payload, carNumber);
 
         setApiDisplay(display ?? null);
         setApiVehicle(nextVehicle);
@@ -1469,6 +1621,11 @@ export default function CarReportPage() {
           candidates: payload.match?.candidates ?? [],
           display: display ?? null,
           status: payload.match?.status,
+          vehicle: nextVehicle,
+        });
+        writeReportSnapshot({
+          display: display ?? null,
+          match: payload.match ?? null,
           vehicle: nextVehicle,
         });
         setShowAutoMatching(true);
@@ -1493,6 +1650,28 @@ export default function CarReportPage() {
       controller.abort();
     };
   }, [carNumber, commercialPlateRetryCount, isAuthenticated, session?.access_token]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = getReviewResultStorageKey(carNumber);
+    const result = window.sessionStorage.getItem(storageKey);
+
+    if (!result) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+    void Promise.resolve().then(() => {
+      setReviewStatusMessage(
+        result === "updated"
+          ? "후기가 수정되었습니다."
+          : "후기가 등록되었습니다.",
+      );
+    });
+  }, [carNumber]);
 
   useEffect(() => {
     let isActive = true;
@@ -1634,6 +1813,7 @@ export default function CarReportPage() {
   }, []);
 
   const resetReportToHome = useCallback(() => {
+    removeReportSnapshot(carNumber);
     setApiVehicle(null);
     setAutoMatchingState(null);
     setCommercialPlateCheckError("");
@@ -1641,7 +1821,7 @@ export default function CarReportPage() {
     setShowCommercialIneligibleModal(false);
     setShowAutoMatching(false);
     router.replace("/");
-  }, [router]);
+  }, [carNumber, router]);
 
   const goToDealerRegistration = useCallback(() => {
     if (!dealerRegistrationPermission.canRegister) {
@@ -1696,7 +1876,8 @@ export default function CarReportPage() {
     setShowCommercialIneligibleModal(false);
     setShowAutoMatching(false);
     setCommercialPlateRetryCount((count) => count + 1);
-  }, [commercialPlateCheckState]);
+    removeReportSnapshot(carNumber);
+  }, [carNumber, commercialPlateCheckState]);
 
   const selectAutoMatchingCandidate = useCallback(
     (candidate: NonNullable<AutoMatchingState["candidates"]>[number]) => {
@@ -1711,6 +1892,23 @@ export default function CarReportPage() {
       };
 
       setApiVehicle(nextVehicle);
+      writeReportSnapshot({
+        display: apiDisplay,
+        match: {
+          candidates: autoMatchingState?.candidates ?? [],
+          status: "matched",
+          vehicle: {
+            brand: nextVehicle.brand,
+            fuelType: nextVehicle.fuelType,
+            generation: nextVehicle.generation,
+            id: nextVehicle.id,
+            mileage: nextVehicle.mileage,
+            model: nextVehicle.model,
+            year: nextVehicle.year,
+          },
+        },
+        vehicle: nextVehicle,
+      });
       setAutoMatchingState((current) =>
         current
           ? {
@@ -1722,7 +1920,14 @@ export default function CarReportPage() {
       );
       setShowAutoMatching(true);
     },
-    [apiVehicle?.fuelType, apiVehicle?.mileage, apiVehicle?.year, carNumber],
+    [
+      apiDisplay,
+      apiVehicle?.fuelType,
+      apiVehicle?.mileage,
+      apiVehicle?.year,
+      autoMatchingState?.candidates,
+      carNumber,
+    ],
   );
 
   if (isGuestReportChecking) {
@@ -2183,6 +2388,14 @@ export default function CarReportPage() {
                   </button>
                 </div>
               </div>
+              {reviewStatusMessage && (
+                <p
+                  className="mb-5 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-100"
+                  aria-live="polite"
+                >
+                  {reviewStatusMessage}
+                </p>
+              )}
 
               {reviews.length === 0 ? (
                 <p className="text-gray-400 mb-8">
