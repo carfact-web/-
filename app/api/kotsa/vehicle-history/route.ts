@@ -56,6 +56,7 @@ interface VehicleMasterMatch {
   }>;
   status: "matched" | "multiple_candidates" | "unmatched";
   vehicle: {
+    id?: string;
     brand: string;
     fuelType: string;
     generation: string;
@@ -70,6 +71,7 @@ const createSuccessPayload = (
   cached: boolean,
   requestId: string,
   match: VehicleMasterMatch | null,
+  vehicle: VehicleMasterMatch["vehicle"],
 ) => ({
   ok: true,
   businessVehicle: isKotsaBusinessVehicle(result),
@@ -78,6 +80,7 @@ const createSuccessPayload = (
   display: getKotsaVehicleDisplayInfo(result),
   match,
   requestId,
+  vehicle,
 });
 
 interface HandleKotsaVehicleHistoryOptions {
@@ -230,6 +233,92 @@ const getVehicleMasterMatch = async (
       year: display.year ?? "",
     },
   };
+};
+
+const getYearFromDisplay = (display: KotsaVehicleDisplayInfo | null) =>
+  display?.year ||
+  display?.firstRegistrationDate?.replace(/\D/g, "").slice(0, 4) ||
+  "";
+
+const upsertReviewVehicleFromKotsa = async ({
+  clients,
+  display,
+  match,
+  vehicleNumber,
+}: {
+  clients: ReturnType<typeof getSupabaseAdminClients>;
+  display: KotsaVehicleDisplayInfo | null;
+  match: VehicleMasterMatch | null;
+  vehicleNumber: string;
+}): Promise<VehicleMasterMatch["vehicle"]> => {
+  if (!clients || !display) {
+    return null;
+  }
+
+  const matchedVehicle = match?.vehicle;
+  const year = matchedVehicle?.year || getYearFromDisplay(display);
+  const model =
+    matchedVehicle?.model ||
+    display.carName ||
+    display.vehicleType ||
+    display.generation ||
+    "";
+
+  if (!vehicleNumber || !model || !year) {
+    return null;
+  }
+
+  const brand =
+    matchedVehicle?.brand ||
+    display.manufacturer ||
+    display.brand ||
+    "제조사 확인 필요";
+  const generation =
+    matchedVehicle?.generation ||
+    display.generation ||
+    display.vehicleType ||
+    "";
+  const mileage =
+    matchedVehicle?.mileage || display.latestPerformanceMileage || "";
+  const fuelType = matchedVehicle?.fuelType || display.fuelType || "";
+  const now = new Date().toISOString();
+  const { data, error } = await clients.admin
+    .from("vehicles")
+    .upsert(
+      {
+        car_number: vehicleNumber,
+        fuel_type: fuelType || null,
+        generation: generation || null,
+        manufacturer: brand,
+        mileage: mileage || null,
+        model,
+        updated_at: now,
+        year,
+      },
+      { onConflict: "car_number" },
+    )
+    .select("id,manufacturer,model,generation,year,mileage,fuel_type")
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const persistedVehicle = {
+    brand: data.manufacturer,
+    fuelType: data.fuel_type ?? "",
+    generation: data.generation ?? "",
+    id: data.id,
+    mileage: data.mileage ?? "",
+    model: data.model,
+    year: data.year,
+  };
+
+  if (match?.vehicle) {
+    match.vehicle = persistedVehicle;
+  }
+
+  return persistedVehicle;
 };
 
 const checkCommercialPlateRollingQuota = async ({
@@ -518,6 +607,12 @@ export async function handleKotsaVehicleHistoryRequest(
         authResult.clients,
         cachedDisplay,
       );
+      const cachedVehicle = await upsertReviewVehicleFromKotsa({
+        clients: authResult.clients,
+        display: cachedDisplay,
+        match: cachedMatch,
+        vehicleNumber,
+      });
 
       await writeKotsaAuditLog({
         endpoint,
@@ -542,7 +637,13 @@ export async function handleKotsaVehicleHistoryRequest(
       });
 
       const response = NextResponse.json(
-        createSuccessPayload(cachedResult, true, requestId, cachedMatch),
+        createSuccessPayload(
+          cachedResult,
+          true,
+          requestId,
+          cachedMatch,
+          cachedVehicle,
+        ),
       );
       response.headers.set("x-request-id", requestId);
       return response;
@@ -722,6 +823,12 @@ export async function handleKotsaVehicleHistoryRequest(
     await setCachedVehicleHistoryInDb(vehicleNumber, result);
     const display = getKotsaVehicleDisplayInfo(result);
     const match = await getVehicleMasterMatch(authResult.clients, display);
+    const reviewVehicle = await upsertReviewVehicleFromKotsa({
+      clients: authResult.clients,
+      display,
+      match,
+      vehicleNumber,
+    });
 
     await writeKotsaAuditLog({
       endpoint,
@@ -747,7 +854,7 @@ export async function handleKotsaVehicleHistoryRequest(
     });
 
     const response = NextResponse.json(
-      createSuccessPayload(result, false, requestId, match),
+      createSuccessPayload(result, false, requestId, match, reviewVehicle),
     );
     response.headers.set("x-request-id", requestId);
     return response;

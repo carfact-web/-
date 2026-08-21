@@ -118,6 +118,7 @@ interface CommercialPlateCheckResponse {
     status?: "matched" | "multiple_candidates" | "unmatched";
     vehicle?: Omit<Vehicle, "plateNumber"> | null;
   } | null;
+  vehicle?: Vehicle | null;
   error?: string;
   ok?: boolean;
 }
@@ -1443,8 +1444,14 @@ export default function CarReportPage() {
         const registrationYear = display?.firstRegistrationDate
           ?.replace(/\D/g, "")
           .slice(0, 4);
+        const persistedVehicle = payload.vehicle
+          ? {
+              ...payload.vehicle,
+              plateNumber: carNumber,
+            }
+          : null;
         const matchedVehicle = payload.match?.vehicle;
-        const nextVehicle: Vehicle = matchedVehicle
+        const nextVehicle: Vehicle = persistedVehicle ?? (matchedVehicle
           ? { ...matchedVehicle, plateNumber: carNumber }
           : {
               brand: display?.manufacturer ?? display?.brand ?? "",
@@ -1454,7 +1461,7 @@ export default function CarReportPage() {
               model: display?.carName ?? display?.vehicleType ?? "",
               plateNumber: carNumber,
               year: display?.year ?? registrationYear ?? "",
-            };
+            });
 
         setApiDisplay(display ?? null);
         setApiVehicle(nextVehicle);

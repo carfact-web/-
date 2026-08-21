@@ -209,10 +209,36 @@ export const fetchSupabaseVehicle = async (plateNumber: string) => {
     return null;
   }
 
+  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+
   const { data, error } = await supabase
     .from("vehicles")
     .select("*")
-    .eq("car_number", sanitizeVehiclePlateNumber(plateNumber))
+    .eq("car_number", normalizedPlateNumber)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapVehicleRow(data) : null;
+};
+
+const fetchSupabaseVehicleByIdAndPlate = async (
+  vehicleId: string | undefined,
+  plateNumber: string,
+) => {
+  if (!supabase || !vehicleId) {
+    return null;
+  }
+
+  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+
+  const { data, error } = await supabase
+    .from("vehicles")
+    .select("*")
+    .eq("id", vehicleId)
+    .eq("car_number", normalizedPlateNumber)
     .maybeSingle();
 
   if (error) {
@@ -471,11 +497,13 @@ export const saveSupabaseReview = async (
     return null;
   }
 
+  const normalizedPlateNumber = sanitizeVehiclePlateNumber(plateNumber);
+  const snapshotVehicleId = review.vehicleSnapshot?.id;
   const vehicle =
-    (await fetchSupabaseVehicle(plateNumber)) ||
-    (review.vehicleSnapshot
-      ? await saveSupabaseVehicle(review.vehicleSnapshot)
-      : null);
+    (await fetchSupabaseVehicleByIdAndPlate(
+      snapshotVehicleId,
+      normalizedPlateNumber,
+    )) || (await fetchSupabaseVehicle(normalizedPlateNumber));
 
   if (!vehicle?.id) {
     throw new Error("vehicle-not-found");
@@ -504,7 +532,7 @@ export const saveSupabaseReview = async (
     vehicle_snapshot: {
       ...(review.vehicleSnapshot ?? vehicle),
       id: vehicle.id,
-      plateNumber: sanitizeVehiclePlateNumber(plateNumber),
+      plateNumber: normalizedPlateNumber,
     } as Json,
     helpful_count: review.helpfulCount ?? 0,
     report_count: review.reportCount ?? 0,
@@ -512,8 +540,6 @@ export const saveSupabaseReview = async (
     created_at: now,
     updated_at: now,
   };
-
-  console.log("review-insert-payload", payload);
 
   const { data, error } = await supabase
     .from("reviews")

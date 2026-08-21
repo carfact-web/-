@@ -57,6 +57,28 @@ const submitButtonClassName = cn(
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 const maxReviewImages = 3;
 
+const getReviewSaveErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+
+  if (
+    message.includes("vehicle-not-found") ||
+    message.includes("row-level security") ||
+    message.includes("violates row-level security")
+  ) {
+    return "차량 조회 정보가 만료되었습니다. 차량 조회를 다시 완료한 뒤 후기를 등록해주세요.";
+  }
+
+  if (message.includes("author-nickname-required")) {
+    return "후기 작성자명을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  if (message.includes("storage")) {
+    return "사진 업로드 중 문제가 발생했습니다. 이미지를 다시 선택한 뒤 시도해주세요.";
+  }
+
+  return "후기 등록 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.";
+};
+
 const isAllowedImageType = (
   type: string
 ): type is ReviewImageAttachment["type"] =>
@@ -357,15 +379,9 @@ export default function ReviewPage() {
       supabase ? await supabase.auth.getSession() : { data: { session: null }, error: null };
     const sessionUserId = sessionData.session?.user.id ?? null;
 
-    console.log("review-auth-session", {
-      sessionUserId,
-      hookUserId: user?.id ?? null,
-      userIdMatches: sessionUserId === user?.id,
-    });
-
     if (sessionError) {
       setIsSubmitting(false);
-      setValidationMessage(sessionError.message);
+      setValidationMessage("로그인 세션을 확인하지 못했습니다. 다시 로그인해주세요.");
       return;
     }
 
@@ -414,11 +430,7 @@ export default function ReviewPage() {
     } catch (error) {
       console.error("review-save-error", error);
       setIsSubmitting(false);
-      setValidationMessage(
-        error instanceof Error
-          ? error.message
-          : "후기 저장 실패: 알 수 없는 오류"
-      );
+      setValidationMessage(getReviewSaveErrorMessage(error));
       return;
     }
 
