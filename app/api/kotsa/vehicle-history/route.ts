@@ -41,6 +41,7 @@ import {
   type KotsaVehicleHistory,
 } from "@/types/kotsa";
 import { normalizeKotsaVehicleHistory } from "@/lib/server/kotsa/normalize";
+import { normalizeVehicleBrandName } from "@/utils/vehicleDisplayName";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -268,11 +269,12 @@ const upsertReviewVehicleFromKotsa = async ({
     return null;
   }
 
-  const brand =
+  const brand = normalizeVehicleBrandName(
     matchedVehicle?.brand ||
-    display.manufacturer ||
-    display.brand ||
-    "제조사 확인 필요";
+      display.manufacturer ||
+      display.brand ||
+      "제조사 확인 필요",
+  );
   const generation =
     matchedVehicle?.generation ||
     display.generation ||

@@ -3,6 +3,7 @@ import { getCommunityCategoryLabel } from "@/lib/communityCategories";
 import { supabase } from "@/lib/supabase";
 import { mapReviewRow } from "@/lib/supabaseData";
 import { getCommunityPreviewText } from "@/utils/communityRichContent";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import type { CommunityCategory, CommunityPost } from "@/types/community";
 import type { Review, ReviewRow } from "@/types/review";
@@ -87,8 +88,7 @@ export const fetchAccountActivity = async (
         href: getReviewHref(review),
         label: "차량 후기",
         searchText: [
-          review.vehicleSnapshot?.brand,
-          review.vehicleSnapshot?.model,
+          getVehicleDisplayName(review.vehicleSnapshot),
           review.vehicleSnapshot?.plateNumber,
           review.content,
         ]
@@ -96,8 +96,7 @@ export const fetchAccountActivity = async (
           .join(" "),
         title: review.vehicleSnapshot
           ? [
-              review.vehicleSnapshot.brand,
-              review.vehicleSnapshot.model,
+              getVehicleDisplayName(review.vehicleSnapshot),
               review.vehicleSnapshot.plateNumber,
             ]
               .filter(Boolean)

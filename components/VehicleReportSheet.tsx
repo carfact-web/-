@@ -1,6 +1,7 @@
 "use client";
 
 import type { Vehicle } from "@/types/vehicle";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 
 interface VehicleReportSheetProps {
   carNumber: string;
@@ -38,9 +39,7 @@ export function VehicleReportSheet({
   reviewCount,
   vehicle,
 }: VehicleReportSheetProps) {
-  const vehicleName = [vehicle.brand, vehicle.model, vehicle.generation]
-    .filter(Boolean)
-    .join(" ");
+  const vehicleName = getVehicleDisplayName(vehicle);
   const maskedPlate =
     carNumber.length > 4 ? `${carNumber.slice(0, -4)}****` : "****";
 

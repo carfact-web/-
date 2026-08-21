@@ -17,6 +17,7 @@ import {
 } from "@/lib/supabaseData";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import {
   addHelpfulVote,
   getHelpfulSnapshot,
@@ -215,9 +216,7 @@ export function ReviewCard({
   const resolvedVehicleId = vehicleId ?? review.vehicleSnapshot?.id ?? null;
   const vehicleSnapshotText = vehicleSnapshot
     ? [
-        vehicleSnapshot.brand,
-        vehicleSnapshot.model,
-        vehicleSnapshot.generation,
+        getVehicleDisplayName(vehicleSnapshot),
         vehicleSnapshot.year && `${vehicleSnapshot.year}년`,
         vehicleSnapshot.fuelType,
         vehicleSnapshot.mileage &&

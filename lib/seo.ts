@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getVehicleDisplayName as getCommonVehicleDisplayName } from "@/utils/vehicleDisplayName";
 
 export const siteUrl = "https://carfact.kr";
 export const siteName = "카팩트";
@@ -65,12 +66,11 @@ export const createPageMetadata = ({
 export const getVehicleDisplayName = (vehicle?: {
   brand?: string | null;
   generation?: string | null;
+  manufacturer?: string | null;
   model?: string | null;
+  modelDetail?: string | null;
 } | null) =>
-  [vehicle?.brand, vehicle?.model, vehicle?.generation]
-    .map((value) => value?.trim())
-    .filter(Boolean)
-    .join(" ");
+  getCommonVehicleDisplayName(vehicle);
 
 export const getTextExcerpt = (value: string, maxLength = 42) => {
   const normalizedValue = value.replace(/\s+/g, " ").trim();

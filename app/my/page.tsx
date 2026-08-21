@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/utils/cn";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
 import { getCommunityPreviewText } from "@/utils/communityRichContent";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 
 const pageClassName = cn(
   "min-h-screen bg-black px-4 py-8 pb-28 text-white sm:px-6",
@@ -403,16 +404,14 @@ export default function MyPage() {
               meta: review.createdAt,
               title: review.vehicleSnapshot
                 ? [
-                    review.vehicleSnapshot.brand,
-                    review.vehicleSnapshot.model,
+                    getVehicleDisplayName(review.vehicleSnapshot),
                     review.vehicleSnapshot.plateNumber,
                   ]
                     .filter(Boolean)
                     .join(" · ")
                 : review.content,
               searchText: [
-                review.vehicleSnapshot?.brand,
-                review.vehicleSnapshot?.model,
+                getVehicleDisplayName(review.vehicleSnapshot),
                 review.vehicleSnapshot?.plateNumber,
                 review.content,
               ]

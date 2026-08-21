@@ -30,6 +30,10 @@ import { getStructuredAiSummary } from "@/utils/aiSummary";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import {
+  getVehicleDisplayName,
+  normalizeVehicleBrandName,
+} from "@/utils/vehicleDisplayName";
+import {
   getReviewKeywordStats,
   type ReviewKeywordStat,
 } from "@/utils/reviewKeywordStats";
@@ -1318,8 +1322,7 @@ export default function CarReportPage() {
   const closeHistoryDetail = useCallback(() => {
     setActiveHistoryDetail(null);
   }, []);
-  const recentTitle =
-    [brand, model, generation].filter(Boolean).join(" ") || carNumber;
+  const recentTitle = getVehicleDisplayName(vehicle) || carNumber;
   const reviewPath = `/car/${encodeURIComponent(carNumber)}/review`;
   const reviewLoginPath = `/login?redirectTo=${encodeURIComponent(reviewPath)}`;
   const getCanManageReview = (review: Review) =>
@@ -1954,7 +1957,7 @@ export default function CarReportPage() {
       );
     }
 
-    const vehicleTitle = [brand, model, generation].filter(Boolean).join(" ");
+    const vehicleTitle = getVehicleDisplayName(vehicle);
     const teaserFields = [
       { label: "현재 주행거리", hint: "로그인 후 공개" },
       { label: "주요 제원", hint: "로그인 후 공개" },
@@ -2239,10 +2242,10 @@ export default function CarReportPage() {
                         CARFACT VEHICLE DATA
                       </p>
                       <p className="mt-2 max-w-full truncate text-[14px] font-semibold leading-[1.2] text-zinc-400 sm:text-[15px]">
-                        {brand || "제조사 정보 없음"}
+                        {normalizeVehicleBrandName(brand) || "제조사 정보 없음"}
                       </p>
                       <h2 className="mt-1 max-w-full text-[22px] font-[750] leading-[1.2] tracking-tight text-white sm:text-[26px]">
-                        {model || "조회 차량"}
+                        {getVehicleDisplayName(vehicle) || model || "조회 차량"}
                       </h2>
                       <p className="mt-1.5 text-xs font-semibold text-zinc-500 sm:text-sm">
                         공공데이터에서 확인된 항목만 표시합니다.

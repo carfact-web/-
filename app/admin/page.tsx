@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
 import { stripCommunityTextColorMarkup } from "@/utils/communityTextColor";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import {
   countVehicleIssueKeywordMentions,
   extractVehicleIssueKeywords,
@@ -1017,11 +1018,15 @@ const formatProviderLabel = (value: string | null | undefined) =>
 
 const formatReviewVehicleSummary = (review: AdminReview) => {
   const snapshot = review.vehicle_snapshot;
-  const brand = getJsonString(snapshot, "brand");
-  const model = getJsonString(snapshot, "model");
   const plateNumber = getReviewPlateNumber(review);
   const year = getJsonString(snapshot, "year");
-  const vehicleName = [brand, model].filter(Boolean).join(" ");
+  const vehicleName = getVehicleDisplayName({
+    brand: getJsonString(snapshot, "brand"),
+    generation: getJsonString(snapshot, "generation"),
+    manufacturer: getJsonString(snapshot, "manufacturer"),
+    model: getJsonString(snapshot, "model"),
+    modelDetail: getJsonString(snapshot, "modelDetail"),
+  });
 
   return [vehicleName || review.vehicle_id, plateNumber, year ? year + "년" : ""]
     .filter(Boolean)
@@ -1157,11 +1162,15 @@ const getReviewPlateNumber = (review: AdminReview) =>
 
 const getReviewVehicleModel = (review: AdminReview) => {
   const snapshot = review.vehicle_snapshot;
-  const brand = getJsonString(snapshot, "brand");
-  const model = getJsonString(snapshot, "model");
-  const generation = getJsonString(snapshot, "generation");
-
-  return [brand, generation || model].filter(Boolean).join(" ") || "차량 정보 없음";
+  return (
+    getVehicleDisplayName({
+      brand: getJsonString(snapshot, "brand"),
+      generation: getJsonString(snapshot, "generation"),
+      manufacturer: getJsonString(snapshot, "manufacturer"),
+      model: getJsonString(snapshot, "model"),
+      modelDetail: getJsonString(snapshot, "modelDetail"),
+    }) || "차량 정보 없음"
+  );
 };
 
 const getReviewFuelType = (review: AdminReview) =>

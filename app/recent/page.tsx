@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { cn } from "@/utils/cn";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 
 const pageClassName = cn("min-h-screen bg-black px-4 pt-8 pb-28 text-white sm:px-6 sm:pt-10");
 const shellClassName = cn("mx-auto max-w-3xl space-y-6");
@@ -43,9 +44,7 @@ const getVehicleSnapshotLabel = (vehicleSnapshot?: {
   }
 
   return [
-    vehicleSnapshot.brand,
-    vehicleSnapshot.model,
-    vehicleSnapshot.generation,
+    getVehicleDisplayName(vehicleSnapshot),
     vehicleSnapshot.year && `${vehicleSnapshot.year}년`,
     vehicleSnapshot.fuelType,
     vehicleSnapshot.mileage && `${Number(vehicleSnapshot.mileage).toLocaleString()}km`,

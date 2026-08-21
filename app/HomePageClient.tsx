@@ -35,6 +35,7 @@ import {
 } from "@/lib/supabaseData";
 import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import {
   formatVehiclePlateNumberForDisplay,
   isValidVehiclePlateNumber,
@@ -1338,14 +1339,8 @@ export default function Home() {
                 >
                   {(recentFactPages[activeRecentSlideIndex] ?? []).map(
                     (fact) => {
-                        const vehicleTitle = fact.vehicle
-                          ? [
-                              fact.vehicle.brand,
-                              fact.vehicle.generation || fact.vehicle.model,
-                            ]
-                              .filter(Boolean)
-                              .join(" ")
-                          : fact.carNumber;
+                        const vehicleTitle =
+                          getVehicleDisplayName(fact.vehicle) || fact.carNumber;
                         const yearRange = formatVehicleYearRange(
                           fact.vehicle?.year,
                         );
@@ -1630,9 +1625,10 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                     {maskPlateNumber(vehicle.carNumber ?? "")}
                   </span>
                   <span className={topRankingSubTextClassName}>
-                    {[vehicle.manufacturer, vehicle.model]
-                      .filter(Boolean)
-                      .join(" ") || "차량 정보 없음"}
+                    {getVehicleDisplayName({
+                      manufacturer: vehicle.manufacturer,
+                      model: vehicle.model,
+                    }) || "차량 정보 없음"}
                   </span>
                 </span>
                 <span className={topRankingViewClassName}>
@@ -1688,9 +1684,10 @@ function HomeTopVehiclesPanel({ rankings }: { rankings: HomeTrafficRankings }) {
                           {maskPlateNumber(vehicle.carNumber ?? "")}
                         </span>
                         <span className={topRankingSubTextClassName}>
-                          {[vehicle.manufacturer, vehicle.model]
-                            .filter(Boolean)
-                            .join(" ") || "차종 정보 없음"}
+                          {getVehicleDisplayName({
+                            manufacturer: vehicle.manufacturer,
+                            model: vehicle.model,
+                          }) || "차종 정보 없음"}
                         </span>
                         <span className="mt-1 block truncate text-xs font-medium text-zinc-500">
                           {formatTopVehicleModel(vehicle)}

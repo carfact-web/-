@@ -15,6 +15,7 @@ import { cn } from "@/utils/cn";
 import { sanitizeVehiclePlateNumber } from "@/utils/inputSanitizer";
 import { validateReviewContent } from "@/utils/reviewValidation";
 import { compressImage } from "@/utils/imageCompression";
+import { getVehicleDisplayName } from "@/utils/vehicleDisplayName";
 import type { Review } from "@/types/review";
 import type { ReviewImageAttachment } from "@/types/review";
 
@@ -164,11 +165,7 @@ export default function ReviewPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [didLoadEditingReview, setDidLoadEditingReview] = useState(false);
   const isEditing = Boolean(editingReviewId);
-  const vehicleTitle = vehicle
-    ? [vehicle.brand, vehicle.model, vehicle.generation]
-        .filter(Boolean)
-        .join(" ")
-    : "";
+  const vehicleTitle = getVehicleDisplayName(vehicle);
   const vehicleDetails = vehicle
     ? [
         vehicle.year && `${vehicle.year}년식`,
