@@ -46,8 +46,34 @@ const businessUsagePattern =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const asString = (value: unknown) =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
+const asString = (value: unknown) => {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+};
+
+const parseJsonString = (value: string) => {
+  const trimmed = value.trim();
+
+  if (
+    !trimmed ||
+    (!trimmed.startsWith("{") && !trimmed.startsWith("["))
+  ) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+};
 
 const normalizeKey = (key: string) => key.replace(/[_\-\s]/g, "").toLowerCase();
 
@@ -56,7 +82,7 @@ const findDeepStringByKeys = (
   targetKeys: string[],
   depth = 0,
 ): string | null => {
-  if (depth > 5) {
+  if (depth > 12) {
     return null;
   }
 
@@ -70,6 +96,14 @@ const findDeepStringByKeys = (
     }
 
     return null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseJsonString(value);
+
+    return parsed === null
+      ? null
+      : findDeepStringByKeys(parsed, targetKeys, depth + 1);
   }
 
   if (!isRecord(value)) {
@@ -128,7 +162,29 @@ export const getKotsaVehicleDisplayInfo = (
     return null;
   }
 
+  const rawCarName = findDeepStringByKeys(data.raw, [
+    "atmbNm",
+    "carName",
+    "vhclNm",
+    "modelNm",
+  ]);
+  const rawFirstRegistrationDate = findDeepStringByKeys(data.raw, [
+    "frstRegYmd",
+    "firstRegistrationDate",
+  ]);
+  const rawVehicleType = findDeepStringByKeys(data.raw, [
+    "carmdlAsortNm",
+    "vehicleType",
+    "vhclTypeNm",
+  ]);
+  const rawUsage = findDeepStringByKeys(data.raw, [
+    "usgSeNm",
+    "usgDtlSeNm",
+    "usage",
+  ]);
   const rawYear = findDeepStringByKeys(data.raw, [
+    "yridnw",
+    "mdlYr",
     "yr",
     "year",
     "modelYear",
@@ -137,37 +193,43 @@ export const getKotsaVehicleDisplayInfo = (
     "vhclYy",
   ]);
   const fuelType = findDeepStringByKeys(data.raw, [
+    "useFuelNm",
     "fuel",
     "fuelType",
     "fuelNm",
     "fuelKndNm",
-    "useFuelNm",
     "ffuelCdNm",
   ]);
   const latestPerformanceMileage = normalizeMileage(
     findDeepStringByKeys(data.raw, [
+      "drvngDstnc",
+      "prfomncCheckDrvngDstnc",
+      "imprmnHstryDrvngDstnc",
       "mileage",
       "odometer",
       "trvlDstnc",
       "drvnDstnc",
-      "drvngDstnc",
       "prfomncChckMlg",
       "acmlMlg",
     ]),
   );
+  const firstRegistrationDate =
+    data.firstRegistrationDate ?? rawFirstRegistrationDate;
 
   return {
-    carName: data.carName,
-    firstRegistrationDate: data.firstRegistrationDate,
+    carName: data.carName ?? rawCarName,
+    firstRegistrationDate,
     fuelType,
     inspectionHistoryCount: data.inspectionRecords.length,
     latestPerformanceMileage,
     maintenanceHistoryCount: data.maintenanceHistoryCount,
     performanceCheckCount: data.performanceCheckCount,
     scrapped: data.scrapped,
-    usage: data.usage,
-    vehicleType: data.vehicleType,
-    year: onlyDigits(rawYear).slice(0, 4) || getYearFromDate(data.firstRegistrationDate),
+    usage: data.usage ?? rawUsage,
+    vehicleType: data.vehicleType ?? rawVehicleType,
+    year:
+      onlyDigits(rawYear).slice(0, 4) ||
+      getYearFromDate(firstRegistrationDate),
   };
 };
 
