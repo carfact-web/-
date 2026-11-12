@@ -25,6 +25,7 @@ export function dbError(error: { code?: string; message?: string } | null) {
  if (error.message?.includes("edit_conflict")) throw new WebtoonError("다른 변경이 먼저 저장됐습니다. 새로고침 후 다시 편집해주세요.", 409);
  if (error.message?.includes("not_found")) throw new WebtoonError("항목을 찾을 수 없습니다.", 404);
  if (error.message?.includes("cover_required")) throw new WebtoonError("공개하려면 표지를 선택해주세요.");
+ if (error.message?.includes("invalid_pdf")) throw new WebtoonError("공개할 PDF 한 개를 업로드하고 이미지 목록을 비워주세요.");
  if (error.message?.includes("invalid_pages")) throw new WebtoonError("공개할 회차에는 이미지가 1~100장 필요합니다.");
  if (error.message?.includes("invalid_asset") || error.message?.includes("duplicate_pages")) throw new WebtoonError("같은 작품의 업로드 완료 이미지만 중복 없이 선택해주세요.");
  throw new WebtoonError("저장소 처리에 실패했습니다. 잠시 후 다시 시도해주세요.", 503);

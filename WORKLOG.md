@@ -170,3 +170,44 @@ in addition to the new DB/Storage migration. No deployment, Nginx/PM2 operation,
 production DB/Storage mutation occurred. docs/webtoons.md describes local use,
 security/tests/limits; docs/webtoons-release.md contains gated DB/Storage changes,
 backup/deployment/non-destructive code rollback and disaster-recovery plan.
+
+## 2026-11-12 회차별 PDF 업로드·가상화 뷰어
+
+기존 이미지 웹툰356d86f 기준 구현을 확장했다. 회차 이미지/PDF 배타 선택,
+50MiB·1~200페이지 PDF 서버 검증(암호화/손상 거부), 실제 XHR 진행률/재시도,
+관리자 미리보기·임시저장·공개 취소·같은 작품 파일 재사용을 추가했다.
+PDF.js6.5.438과 같은 설치 패키지의 worker/fonts/cmaps/wasm을 로컬 제공한다.
+주변 최대5페이지 캔버스/각150만 픽셀, 멀어진 캔버스·page cleanup 및 문서 worker
+해제, 고정 페이지 슬롯, 모바일 버튼/두 손가락 확대, 현재/전체, 브라우저 이어보기.
+다운로드 버튼은 없으며 저장 완전 차단을 주장하지 않는다. 파일 자체는 전체 다운로드다.
+
+20261112100000 PDF migration은 로컬에만 적용했다. 기존4테이블 중2개 확장,
+asset 읽기 RLS·회차 RPC 교체·표지 MIME·PDF GC 참조 보호 및 private bucket의
+50MiB/PDF 허용을 추가한다. 서버의 실제 Auth/관리자 검증과 no-store 재검증 프록시,
+직접 Storage 차단은 동일하다. 운영 관련 작업은 실행하지 않았다.
+
+검증: Node22.23.0 npm ci 성공, lint0 errors/20 기존 warnings, tsc --noEmit 성공,
+일반 npm run build EXIT0(환경 검증 우회/preview 없음). 승인된 공개 sitemap 읽기와
+Google Fonts만 허용하는 기존 빌드 설정을 사용했으며 운영 쓰기/유료 API 차단 유지.
+로컬 .env.local은 로컬 값/ignored 상태를 유지했다. 설치 후 로컬 앱을 다시 실행했다.
+기존 이미지 API/RLS/Storage/순서/공개 취소/GC 회귀 통과.
+합성30/40/60페이지 한글 PDF 성공, 손상/암호화/201페이지/크기초과/비관리자 거부,
+비공개 media 차단·관리자 preview·공개 및 취소·혼합 콘텐츠 거부 확인.
+Chrome390×844 한글 시각 확인, 페이지1→10→20→끝 순서, 최대5캔버스,
+버튼/합성 두 손가락 이벤트 확대, 처음부터, 새로고침 이어보기 통과.
+관리자 업로드503→파일유지 재시도→preview→비공개 저장→공개 UI 통과, JS 오류0.
+메모리 측정 범위/상한 근거/실기기 미검증 사항은 docs/webtoons-pdf.md에 기록했다.
+실제 사용자의 PDF 및 실제 iOS/Android 기기, 최악 복잡도 PDF 부하/서버 전체RSS는
+아직 검증하지 않았다. 합성 텍스트 파일 성능을 실제 스캔 작품 성능으로 일반화하지 않는다.
+
+npm audit19건(critical1 포함)은 기존 Next/Sharp 등 갱신 검토로 남긴다. 새 PDF
+패키지는 보고 목록에 없으며 범위를 넘는 일괄 의존성 변경은 하지 않았다.
+운영 적용 정확한 SQL/RPC/RLS/Storage 목록·Nginx12m/52m 근거·실제 백업 확보 및
+격리 복구 검증·별도 release 배포·비파괴 롤백을 docs/webtoons-release.md에 보완했다.
+운영 백업 확보/복원은 아직 하지 않았고 실제 운영 데이터는 로컬에 복제하지 않았다.
+마지막 UI 검토에서 저장/공개 버튼을 긴 PDF 미리보기 위로 이동했다. 이후 기존
+이미지 전체 브라우저 흐름(재시도/정렬/제거/재사용/모바일/이전다음)과 PDF 브라우저
+흐름을 재실행해 모두 통과했다. 오래된 참조 PDF는 GC claim에서 보존되고 참조 없는
+PDF만 대상으로 잡히는 테스트도 통과했다. 공개/비공개 PDF의 일반 사용자 접근과
+실제 페이지 번호까지 추가 확인했다. 변경 파일의 로컬/운영 참조값·테스트 비밀번호
+검사 및 Git 제외 확인 통과. 최종 일반 빌드 후 앱과 로컬 백엔드를 유지한다.

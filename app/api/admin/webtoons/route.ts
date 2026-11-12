@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
    return Response.json(result.data, { headers: NO_STORE });
   }
   if (body.kind !== "episode" || !Array.isArray(body.pageIds) || body.pageIds.length > 100) throw new WebtoonError("회차 이미지 수는 100장 이내로 선택해주세요.");
-  const result = await db.rpc("webtoon_save_episode", { p_id: uuid(body.id), p_version: integer(body.version), p_title: title(body.title), p_number: integer(body.number), p_published: bool(body.published), p_assets: body.pageIds.map(uuid) }); dbError(result.error);
+  const result = await db.rpc("webtoon_save_episode", { p_id: uuid(body.id), p_version: integer(body.version), p_title: title(body.title), p_number: integer(body.number), p_published: bool(body.published), p_assets: body.pageIds.map(uuid), p_type: body.contentType === "pdf" ? "pdf" : "images", p_pdf: body.pdfAssetId ? uuid(body.pdfAssetId) : null }); dbError(result.error);
   return Response.json(result.data, { headers: NO_STORE });
  } catch (error) { return failure(error); }
 }

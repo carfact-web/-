@@ -146,3 +146,10 @@ Tests use only verified local services. Browser tests block nonlocal requests.
 Logs, PNG fixtures and screenshots-webtoons are in the private parent workspace,
 not the repository. Production deployment and production DB/Storage application
 remain pending explicit user approval. See webtoons-release.md for that plan.
+
+## PDF 확장
+
+회차 콘텐츠 방식에서 이미지 여러 장 또는 PDF 한 개를 선택한다. PDF 한 개는
+내부 세로 뷰어로 열람한다. 사용 순서·자원 상한·검증 범위는 [webtoons-pdf.md](webtoons-pdf.md),
+추가 마이그레이션과 배포 전 검토는 [webtoons-release.md](webtoons-release.md)를 따른다.
+기존 이미지 방식은 유지된다. 아래 PDF 확장 문서가 이미지 전용 설명의 상한을 보완한다.

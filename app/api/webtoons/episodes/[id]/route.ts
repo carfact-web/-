@@ -10,9 +10,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
    db.from("webtoon_episode_pages").select("*").eq("episode_id", id).order("position"),
   ]); dbError(work.error); dbError(neighbors.error); dbError(pages.error);
   if (!work.data) throw new WebtoonError("공개된 작품을 찾을 수 없습니다.", 404);
+  const pdf = episode.data.pdf_asset_id ? await db.from("webtoon_assets").select("id,page_count,page_sizes").eq("id", episode.data.pdf_asset_id).eq("mime", "application/pdf").maybeSingle() : { data: null, error: null }; dbError(pdf.error);
   const ids = (pages.data ?? []).map(p => p.asset_id);
   const assets = ids.length ? await db.from("webtoon_assets").select("id,width,height").in("id", ids) : { data: [], error: null }; dbError(assets.error);
   const index = (neighbors.data ?? []).findIndex(e => e.id === id);
-  return Response.json({ work: work.data, episode: episode.data, pages: (pages.data ?? []).map(p => ({ ...assets.data?.find(a => a.id === p.asset_id), id: p.asset_id })), previousId: neighbors.data?.[index - 1]?.id ?? null, nextId: neighbors.data?.[index + 1]?.id ?? null }, { headers: NO_STORE });
+  return Response.json({ work: work.data, episode: episode.data, pdf: pdf.data, pages: (pages.data ?? []).map(p => ({ ...assets.data?.find(a => a.id === p.asset_id), id: p.asset_id })), previousId: neighbors.data?.[index - 1]?.id ?? null, nextId: neighbors.data?.[index + 1]?.id ?? null }, { headers: NO_STORE });
  } catch (error) { return failure(error); }
 }
