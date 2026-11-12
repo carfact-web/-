@@ -285,3 +285,36 @@ assets allowed; .env.local unchanged and local flags off in build. Verification
 .next is not deployable. Local development app restored on127.0.0.1:3100.
 Lint0 errors/20 existing warnings. Screenshots/state outside Git. No production
 server access/deployment/DB/Storage/Nginx mutation and no production data copied.
+
+## 2026-11-12 — real admin navigation and server-gated editor
+
+Retained the laptop development branch. Kept the previous requested English label
+change CARFACT ORIGINAL without changing styles or the Korean heading.
+Moved the existing lower dashboard webtoon shortcut into the actual admin nav as
+웹툰 관리. Reused useAuth admin/readiness checks and hid it for suspended profiles.
+Local yellow banner remains behind the unchanged development/private/public flag
+and loopback server gate; its admin shortcut now uses the same role-aware link.
+
+Split /admin/webtoons into a dynamic server page and the reused client editor.
+Menu entry exchanges the existing human Bearer session, after requireWebtoonAdmin
+Auth/role/suspension validation, for a5-minute scoped HttpOnly/SameSite strict
+cookie (Secure in production). Actual Host/proxy protocol Origin checking denies
+cross-origin session creation. Page access repeats the real server check; no
+cookie/invalid/ordinary/suspended user returns404 without editor payload. APIs
+still independently require Bearer Auth and do not accept this page cookie.
+Logout and local synthetic account switching clear the page cookie. No new auth
+provider, production account, DB migration, Storage permission or Nginx change.
+
+Local synthetic admin/ordinary/anonymous tests passed for actual desktop/mobile
+menu visibility/navigation, direct URL and every webtoon API denial, forged role/
+service key/cookie, Origin, cookie scope/HttpOnly, admin reload, live suspension
+revocation and logout removal; JS errors0. Image and30/40-page PDF browser suites
+passed after updating entry through the role-aware link. Existing isolation and
+production feature gates passed. See docs/webtoons-admin-access.md.
+
+Final normal npm run build passed compile/TypeScript/26 static pages; admin
+webtoon page is now dynamic. A temporary127.0.0.1:3101 production-mode server
+served home200 without yellow banner/test/admin links, and returned404 for
+anonymous/forged-role admin page and local-test even with local flags supplied.
+The temporary server was stopped. Lint0 errors/20 existing warnings. No production
+connection, server deployment, DB/Storage/Nginx mutation or new migration.

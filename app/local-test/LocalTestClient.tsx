@@ -1,4 +1,5 @@
 "use client";
+import { clearWebtoonAdminSession } from "@/lib/webtoons/admin-session";
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ export default function LocalTestClient() {
       const email = String(form.get("email") ?? "");
       const password = String(form.get("password") ?? "");
       const create = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "signup";
+      await clearWebtoonAdminSession();
       const { error } = create
         ? await supabase.auth.signUp({ email, password })
         : await supabase.auth.signInWithPassword({ email, password });
@@ -40,7 +42,7 @@ export default function LocalTestClient() {
       <button className="rounded border p-2" disabled={busy} name="action" value="signup">테스트 계정 만들기</button>
     </form>
     <p role="status">{message}</p>
-    <button className="rounded border p-2" onClick={async () => { await supabase?.auth.signOut(); setMessage("로그아웃 완료"); }}>로그아웃</button>
+    <button className="rounded border p-2" onClick={async () => { await clearWebtoonAdminSession(); await supabase?.auth.signOut(); setMessage("로그아웃 완료"); }}>로그아웃</button>
     <p><Link href="/car/123가4567">합성 테스트 차량 보기</Link></p>
     <p><Link href="/car/123가4567/review">테스트 후기 작성</Link></p>
     <p>소셜 OAuth 대신 로컬 이메일·비밀번호 Auth를 사용합니다.</p>

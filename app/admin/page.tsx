@@ -1,4 +1,5 @@
 "use client";
+import { WebtoonAdminLink } from "@/components/webtoons/WebtoonAdminLink";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -5254,6 +5255,7 @@ export default function AdminPage() {
             </button>
           </div>
           <nav
+            aria-label="관리자 메뉴"
             className={cn(
               "mt-4 gap-1 lg:grid",
               isMobileAdminNavOpen ? "grid" : "hidden",
@@ -5352,6 +5354,7 @@ export default function AdminPage() {
                 </button>
               ),
             )}
+            <WebtoonAdminLink className={cn(tabButtonClassName, "justify-start text-left no-underline")} />
           </nav>
           <div
             className={cn(
@@ -5366,9 +5369,6 @@ export default function AdminPage() {
             >
               새로고침
             </button>
-            <Link href="/admin/webtoons" className={cn(actionButtonClassName, "no-underline")}>
-              웹툰 작품·회차 관리
-            </Link>
             <Link
               href="/admin/preflight"
               className={cn(actionButtonClassName, "no-underline")}

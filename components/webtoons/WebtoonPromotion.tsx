@@ -66,7 +66,7 @@ export function LatestWebtoon() {
  const data = useContext(PromotionContext), card = data?.latest;
  if (!card) return null;
  return <section aria-labelledby="latest-webtoon-title" className="mt-10 rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-900 to-black p-5 text-white sm:p-7">
-  <p className="text-xs font-black tracking-[0.2em] text-red-400">LATEST WEBTOON</p><h2 id="latest-webtoon-title" className="mt-2 text-xl font-black sm:text-2xl">최신 웹툰</h2>
+  <p className="text-xs font-black tracking-[0.2em] text-red-400">CARFACT ORIGINAL</p><h2 id="latest-webtoon-title" className="mt-2 text-xl font-black sm:text-2xl">최신 웹툰</h2>
   <div className="mt-5 flex items-start gap-4 sm:gap-7"><img src={card.coverUrl} alt={`${card.workTitle} 홍보 표지`} width={144} height={192} loading="lazy" className="max-h-48 w-24 shrink-0 rounded-xl bg-zinc-900 object-contain sm:w-36" /><div className="min-w-0 flex-1"><h3 className="break-words text-lg font-black sm:text-2xl">{card.workTitle}</h3><p className="mt-2 break-words text-sm font-bold text-zinc-200 sm:text-base">{card.episodeTitle}</p>{card.description ? <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-zinc-400">{card.description}</p> : null}<Link href={card.href} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black transition hover:bg-red-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">웹툰 보러 가기 →</Link></div></div>
  </section>;
 }

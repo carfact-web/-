@@ -1,4 +1,5 @@
 "use client";
+import { clearWebtoonAdminSession } from "@/lib/webtoons/admin-session";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -433,6 +434,7 @@ export function useAuth(): UseAuthResult {
 
     setAuthError("");
 
+    try { await clearWebtoonAdminSession(); } catch (error) { setAuthError(error instanceof Error ? error.message : "로그아웃하지 못했습니다."); return; }
     const { error } = await supabase.auth.signOut();
 
     if (error) {

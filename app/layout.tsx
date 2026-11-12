@@ -1,3 +1,4 @@
+import { WebtoonAdminLink } from "@/components/webtoons/WebtoonAdminLink";
 import { WebtoonPromotionProvider } from "@/components/webtoons/WebtoonPromotion";
 import Link from "next/link";
 import { isLocalSandboxServer } from "@/lib/local/sandbox.server";
@@ -97,7 +98,7 @@ export default function RootLayout({
                 <Link href="/car/123가4567">④ 등록된 후기 확인</Link>
                 <Link href="/local-test">테스트 로그인</Link>
                 <Link href="/webtoons">웹툰 열람</Link>
-                <Link href="/admin/webtoons">웹툰 관리</Link>
+                <WebtoonAdminLink />
               </nav>
             </div>
           </aside>
