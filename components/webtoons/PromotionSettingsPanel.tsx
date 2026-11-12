@@ -1,0 +1,21 @@
+"use client";
+import { useEffect, useState } from "react";
+import { webtoonRequest } from "@/lib/webtoons/client";
+import { koreanInput, type PromotionSettings } from "@/lib/webtoons/promotion";
+type Choice = { id: string; title: string; content_type: string; webtoon_works: { title: string } };
+export function PromotionSettingsPanel() {
+ const [settings, setSettings] = useState<PromotionSettings | null>(null), [choices, setChoices] = useState<Choice[]>([]);
+ const [start, setStart] = useState(""), [end, setEnd] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+ function accept(value: PromotionSettings) { setSettings(value); setStart(koreanInput(value.starts_at)); setEnd(koreanInput(value.ends_at)); }
+ async function load() { setBusy(true); setError(""); try { const value = await webtoonRequest<{ settings: PromotionSettings; choices: Choice[] }>("/api/admin/webtoons/promotion"); accept(value.settings); setChoices(value.choices); } catch (e) { setError(e instanceof Error ? e.message : "설정을 불러오지 못했습니다."); } finally { setBusy(false); } }
+ useEffect(() => { let alive = true; const abort = new AbortController(); webtoonRequest<{ settings: PromotionSettings; choices: Choice[] }>("/api/admin/webtoons/promotion", { signal: abort.signal }).then(value => { if (alive) { accept(value.settings); setChoices(value.choices); } }).catch(e => { if (alive) setError(e.message); }); return () => { alive = false; abort.abort(); }; }, []);
+ async function save(event: React.FormEvent) {
+  event.preventDefault(); if (!settings) return; setBusy(true); setError(""); setNotice("");
+  try { const value = await webtoonRequest<PromotionSettings>("/api/admin/webtoons/promotion", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, starts_at: start ? new Date(start + ":00+09:00").toISOString() : null, ends_at: end ? new Date(end + ":00+09:00").toISOString() : null }) }); accept(value); setNotice("웹툰 홍보 설정을 저장했습니다."); } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했습니다."); } finally { setBusy(false); }
+ }
+ const input = "mt-1 block w-full rounded-lg border border-zinc-300 bg-white p-2 text-black";
+ return <section aria-labelledby="promotion-settings-title" className="rounded-xl border border-zinc-300 bg-white p-5"><h2 id="promotion-settings-title" className="text-xl font-black">선택형 웹툰 홍보 팝업</h2><p className="mt-2 text-sm text-zinc-600">기본 비활성화 · 모든 시간은 한국 시간(KST)입니다. 공개 취소하면 홍보가 중단되며, 다시 공개해도 자동 활성화되지 않습니다.</p><button type="button" onClick={() => void load()} disabled={busy} className="my-3 rounded border px-3 py-2 text-sm">홍보 회차·설정 새로고침</button>
+  {error ? <p role="alert" className="text-red-700">{error}</p> : null}{notice ? <p role="status" className="text-green-800">{notice}</p> : null}
+  {settings ? <form onSubmit={save} className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2">홍보할 공개 회차<select aria-label="홍보할 공개 회차" className={input} disabled={busy} value={settings.episode_id ?? ""} onChange={e => setSettings({ ...settings, episode_id: e.target.value || null })}><option value="">선택하지 않음</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.webtoon_works.title} · {choice.title} ({choice.content_type === "pdf" ? "PDF" : "이미지"})</option>)}</select></label><label className="sm:col-span-2">홍보 안내 문구<textarea className={input} rows={2} maxLength={280} disabled={busy} value={settings.message} onChange={e => setSettings({ ...settings, message: e.target.value })} /></label><label>노출 시작일 (한국 시간)<input className={input} type="datetime-local" disabled={busy} value={start} onChange={e => setStart(e.target.value)} /></label><label>노출 종료일 (한국 시간)<input className={input} type="datetime-local" disabled={busy} value={end} onChange={e => setEnd(e.target.value)} /></label><label className="flex items-center gap-2"><input type="checkbox" disabled={busy} checked={settings.enabled} onChange={e => setSettings({ ...settings, enabled: e.target.checked })} />홍보 팝업 활성화</label><button type="submit" disabled={busy} className="min-h-11 rounded-lg bg-zinc-900 px-4 py-2 font-bold text-white disabled:opacity-50">홍보 설정 저장</button></form> : <p className="text-sm">설정을 불러오는 중입니다.</p>}
+ </section>;
+}

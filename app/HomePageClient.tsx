@@ -1,4 +1,5 @@
 "use client";
+import { LatestWebtoon } from "@/components/webtoons/WebtoonPromotion";
 
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -1585,6 +1586,7 @@ export default function Home() {
             </div>
           ) : null}
         </section>
+        <LatestWebtoon />
       </div>
     </main>
   );

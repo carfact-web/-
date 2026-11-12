@@ -14,7 +14,7 @@ reject((s,a)=>{a.SUPABASE_SERVICE_ROLE_KEY='wrong-local-key';},'mixed server key
 reject((s,a)=>{a.NEXT_PUBLIC_SUPABASE_ANON_KEY='wrong-local-key';},'mixed browser key');
 reject((s,a)=>{delete a.CARFACT_LOCAL_SANDBOX;},'missing private flag');
 const publicSource=fs.readFileSync(path.join(repo,'lib/local/sandbox.ts'),'utf8').replace('export function','function');
-const privateSource=fs.readFileSync(path.join(repo,'lib/local/sandbox.server.ts'),'utf8').replace(/^import .*;\n/gm,'').replace('export function','function');
+const privateSource=fs.readFileSync(path.join(repo,'lib/local/sandbox.server.ts'),'utf8').replace(/\r\n/g,'\n').replace(/^import .*;\n/gm,'').replace('export function','function');
 for(const [node,flag,server,url,expected] of [['development','1','1','http://127.0.0.1:54321',true],['production','1','1','http://127.0.0.1:54321',false],['development','1','0','http://127.0.0.1:54321',false],['development','1','1','https://example.supabase.co',false]]){
  const env={NODE_ENV:node,NEXT_PUBLIC_LOCAL_SANDBOX:flag,CARFACT_LOCAL_SANDBOX:server,NEXT_PUBLIC_SUPABASE_URL:url};
  assert.equal(vm.runInNewContext(publicSource+'\n'+privateSource+'\nisLocalSandboxServer()',{URL,process:{env}}),expected);

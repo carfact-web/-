@@ -1,3 +1,4 @@
+import { WebtoonPromotionProvider } from "@/components/webtoons/WebtoonPromotion";
 import Link from "next/link";
 import { isLocalSandboxServer } from "@/lib/local/sandbox.server";
 import type { Metadata } from "next";
@@ -107,8 +108,7 @@ export default function RootLayout({
           <PageViewTracker />
         </Suspense>
         <MaintenanceModeGate />
-        <div className="flex-1 pb-24">{children}</div>
-        <BottomTabNav />
+        <WebtoonPromotionProvider><div className="flex-1 pb-24">{children}</div><BottomTabNav /></WebtoonPromotionProvider>
       </body>
     </html>
   );

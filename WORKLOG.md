@@ -211,3 +211,77 @@ npm audit19건(critical1 포함)은 기존 Next/Sharp 등 갱신 검토로 남�
 PDF만 대상으로 잡히는 테스트도 통과했다. 공개/비공개 PDF의 일반 사용자 접근과
 실제 페이지 번호까지 추가 확인했다. 변경 파일의 로컬/운영 참조값·테스트 비밀번호
 검사 및 Git 제외 확인 통과. 최종 일반 빌드 후 앱과 로컬 백엔드를 유지한다.
+
+## 2026-11-12 — Windows laptop preparation (not a completed runtime verification)
+
+Separate laptop branch dev/carfact-windows-2026-11-12 based on exact remote
+PDF commit dd6e2665034a0ead891165181ecca7b04b9358e7. Mac mini unpushed changes
+and running work remain unverified. No shared-branch edits or push, no production
+server access, no production credentials/member data used.
+
+Project-local official checksum-verified Windows Node22.23.0/npm10.9.8 and npm ci
+completed; Supabase CLI3.1.0/pg installed outside Git. Native Supabase does not
+support Windows; the Windows CLI exposes Docker commands instead of Mac native
+flags. User approved Docker Desktop/WSL installation; installed both and enabled
+VirtualMachinePlatform + Microsoft-Windows-Subsystem-Linux with NoRestart.
+Windows returned RestartNeeded=True. No automatic reboot or backend start.
+
+Added a PowerShell Node wrapper, separate Windows doctor/SQL preparation/guarded
+app entry point, preserving existing Mac wrapper/manage.py. Reused the nine-table
+local bootstrap and two shims in a separate Windows backend directory; no SQL
+applied. Fixed seed's hardcoded repo/.env.local path; browser checks now resolve
+installed Windows Chrome/Edge while preserving Mac Chrome. See docs/local-windows.md.
+
+Base Windows lint passed with 0 errors/20 existing warnings and tsc passed.
+SQL/config preparation passed; app startup without verified local state refused.
+No DB/Auth/Storage integration or 30/40-page browser test has yet run here.
+Post-reboot Docker local binding/config/status adapter, private-file ACLs,
+synthetic fixture generation and full isolation/image/PDF regression remain.
+Do not interpret preparation scripts or installed Docker as a working sandbox.
+
+Additional Windows preparation checks passed: in-memory synthetic endpoint/key/
+flag negative checks, installed browser resolution, repeatable SQL preparation
+including PDF migration without creating .env.local, and actual PDF validator
+worker acceptance of synthetic30/40/60-page PDFs plus201-page/corrupt rejection.
+These are parser-only checks, not Korean rendering/upload/browser/backend tests.
+
+## 2026-11-12 — Windows runtime verified after reboot
+
+Docker Linux engine/named-pipe context, eager local stack and all published
+loopback bindings verified after the user rebooted. CLI experimental stack status
+already matches verify.cjs; no fabricated adapter or relaxed gate. Mac scripts
+remain unchanged. Windows manager implements scoped prepare/doctor/start/status/
+seed/app/stop and restricted private-file ACLs. Existing51 migrations applied
+locally; generated only synthetic users/vehicle/images/PDFs. CRLF VM-check fix.
+Local Auth/review CRUD/RLS/Storage, image API/browser/concurrency regression and
+Korean30/40/60-page PDF API plus30/40-page browser suites passed, zero JS errors.
+Actual mobile hardware/complex scanned-PDF load remains unverified.
+
+## 2026-11-12 — latest webtoon home card and optional promotion popup
+
+Kept laptop branch dev/carfact-windows-2026-11-12 based on dd6e266. Remote shared
+branch still dd6e266 at start; Mac mini unpushed changes remain unknown. Reused
+admin Auth/role/suspension checks, webtoon APIs, Sharp and local isolation tools.
+
+Added published_at transition trigger (historical fallback=updated_at), latest
+public image/PDF episode card at home bottom, default-disabled singleton promotion
+settings in existing admin UI, KST start/end inputs, publication-filtered public
+RPC, separate360x480-max reencoded cover proxy with pre/post visibility checks.
+No private Storage permissions broadened. Only new promotion migration applied
+to the verified local DB. Public cancellation/deletion disables selected campaign;
+republishing does not reactivate it. Open UI polls15s/focus/path and fails closed.
+Nonmodal popup<=48dvh, named dialog, keyboard/ESC/focus restoration, watch-now,
+close/session suppression and KST-date today-hide. See docs/webtoons-promotion.md.
+
+Local synthetic API/browser suite verifies publication sorting (edits do not
+reorder), image/PDF selection, no-public-content hiding, admin UI save, private/
+deleted/unpublished rejection, expiry/future schedule, cancellation auto-stop,
+derivative cover bounds/private direct-read denial, KST midnight/US timezone,
+navigation/reload suppression, today-hide and actual viewer navigation.
+Normal npm run build passed (compile, TypeScript,27 static pages), no preview or
+validator changes. Process-only test alias rewrites only three existing sitemap
+SELECTs to real synthetic local DB, with writes/other external APIs denied, font
+assets allowed; .env.local unchanged and local flags off in build. Verification
+.next is not deployable. Local development app restored on127.0.0.1:3100.
+Lint0 errors/20 existing warnings. Screenshots/state outside Git. No production
+server access/deployment/DB/Storage/Nginx mutation and no production data copied.

@@ -223,3 +223,17 @@ DB·Storage migration → 임시 loopback 프로세스 smoke → Nginx 두 업�
 Next16.2.6·Sharp0.34.5 등 기존 직접 의존성도 포함한다. 새 PDF 두 패키지는 감사
 대상 취약점 목록에 없었다. 이번 범위에서 무차별 npm audit fix/프레임워크 갱신은
 실행하지 않았으며 운영 출시 전 별도 영향 검토가 필요하다.
+
+## 메인/선택형 홍보 추가 — 아직 운영 미적용
+
+추가 migration: `20261112110000_add_webtoon_promotion.sql`.
+기존 이미지/PDF 두 migration 다음에 승인 후 적용한다. published_at 컬럼·인덱스와
+공개 전환 시각 trigger, 기본 비활성화 singleton 홍보 설정, 공개 요약 전용 RPC,
+공개 취소/삭제 시 홍보 중단 trigger를 추가한다. 기존 공개일은 updated_at 대체값이다.
+테이블 직접 client 접근은 허용하지 않는다. Storage·버킷·Nginx 변경은 없다.
+홍보 표지는 앱이 별도 축소 WebP로 만들며 생성 전후 공개 상태를 재검사한다.
+정확한 API·권한·사용·검증/철회 지연은 webtoons-promotion.md를 따른다.
+
+이번 로컬 일반 빌드는 합성 DB를 쓰는 프로세스 한정 테스트 주소 매핑으로 수행했다.
+그 .next는 테스트 artifact이며 배포하지 않는다. 실제 배포는 승인된 릴리스 환경에서
+다시 빌드한다. 운영 백업/복구·별도 release·승인 게이트는 계속 미완료 상태다.

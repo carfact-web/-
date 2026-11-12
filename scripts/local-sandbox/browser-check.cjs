@@ -7,7 +7,7 @@ const {chromium}=require(path.join(work,'browser-tools/node_modules/playwright-c
 const fs=require('node:fs'),assert=require('node:assert/strict');
 (async()=>{
  const account=JSON.parse(fs.readFileSync('local-test-account.json'));
- const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
+ const browser=await chromium.launch({executablePath:require('./browser-path.cjs').browserPath(),headless:true});
  const context=await browser.newContext({viewport:{width:1280,height:950},serviceWorkers:'block'});
  const external=[];await context.route('**/*',async r=>{const u=new URL(r.request().url());if(['http:','https:'].includes(u.protocol)&&!['127.0.0.1','localhost'].includes(u.hostname)){external.push('blocked-external');return r.abort();}return r.continue();});
  const page=await context.newPage();page.setDefaultTimeout(20000);page.on('dialog',d=>d.accept());

@@ -1,4 +1,5 @@
 "use client";
+import { PromotionSettingsPanel } from "@/components/webtoons/PromotionSettingsPanel";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +60,7 @@ export default function WebtoonAdminPage() {
  return <main className="min-h-screen bg-zinc-100 px-4 py-6 text-zinc-950">
   <div className="mx-auto max-w-6xl space-y-5">
    <header className="space-y-2"><h1 className="text-3xl font-black">웹툰 작품·회차 관리</h1><p className="text-sm text-zinc-600">임시저장한 이미지와 회차는 관리자만 볼 수 있습니다. 작품과 회차가 모두 공개되어야 공개 목록과 뷰어에 표시됩니다.</p><nav className="flex gap-4 text-sm underline"><Link href="/admin">관리자 홈</Link><Link href="/webtoons" target="_blank">공개 웹툰 목록 보기</Link></nav></header>
+   <PromotionSettingsPanel />
    {error ? <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">{error}</p> : null}
    <p role="status" className="text-sm font-semibold">{notice}</p>
    <section className="grid gap-4 rounded-xl bg-white p-4 md:grid-cols-2">

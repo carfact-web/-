@@ -5,7 +5,7 @@ require(path.join(repo,'scripts/local-sandbox/verify.cjs')).verify();
 const {chromium}=require(path.join(work,'browser-tools/node_modules/playwright-core'));
 let runningBrowser;
 (async()=>{
- const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});runningBrowser=browser;
+ const browser=await chromium.launch({executablePath:require('../local-sandbox/browser-path.cjs').browserPath(),headless:true});runningBrowser=browser;
  async function context(viewport){const c=await browser.newContext({viewport,serviceWorkers:'block'});await c.route('**/*',r=>{const u=new URL(r.request().url());return ['http:','https:'].includes(u.protocol)&&!['127.0.0.1','localhost'].includes(u.hostname)?r.abort():r.continue();});return c;}
  async function login(page,file){const account=JSON.parse(fs.readFileSync(file));await page.goto('http://127.0.0.1:3100/local-test');await page.getByLabel('테스트 이메일').fill(account.email);await page.getByLabel('테스트 비밀번호').fill(account.password);await page.getByRole('button',{name:'로그인',exact:true}).click();await page.getByRole('status').filter({hasText:'로컬 로그인 완료'}).waitFor();}
  const ctx=await context({width:1360,height:1000});const page=await ctx.newPage();page.setDefaultTimeout(25000);const errors=[];page.on('pageerror',()=>errors.push('page-error'));
