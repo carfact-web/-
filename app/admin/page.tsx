@@ -5366,6 +5366,9 @@ export default function AdminPage() {
             >
               새로고침
             </button>
+            <Link href="/admin/webtoons" className={cn(actionButtonClassName, "no-underline")}>
+              웹툰 작품·회차 관리
+            </Link>
             <Link
               href="/admin/preflight"
               className={cn(actionButtonClassName, "no-underline")}

@@ -1105,6 +1105,8 @@ export default function Home() {
             <Link href="/" aria-label="카팩트 홈" className="shrink-0">
               <BrandLogo className={homeLogoClassName} />
             </Link>
+            <div className="ml-auto flex items-center gap-2">
+              <Link href="/webtoons" className={authButtonClassName}>웹툰</Link>
             {isAuthReady && isAuthenticated ? (
               <button
                 type="button"
@@ -1120,6 +1122,7 @@ export default function Home() {
                 로그인
               </Link>
             )}
+            </div>
           </div>
           {activeNotice ? (
             <Link

@@ -1,3 +1,4 @@
+import type { WebtoonTables, WebtoonFunctions } from "./webtoon";
 export type Json =
   | string
   | number
@@ -9,6 +10,11 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      webtoon_works: WebtoonTables["webtoon_works"];
+      webtoon_episodes: WebtoonTables["webtoon_episodes"];
+      webtoon_assets: WebtoonTables["webtoon_assets"];
+      webtoon_episode_pages: WebtoonTables["webtoon_episode_pages"];
+
       community_posts: {
         Row: {
           id: string;
@@ -1043,6 +1049,10 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
+      webtoon_save_work: WebtoonFunctions["webtoon_save_work"];
+      webtoon_save_episode: WebtoonFunctions["webtoon_save_episode"];
+      webtoon_claim_orphans: WebtoonFunctions["webtoon_claim_orphans"];
+
       admin_delete_community_post: {
         Args: {
           target_post_id: string;

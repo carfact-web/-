@@ -133,3 +133,40 @@ synthetic demonstration review → confirmed it in the report. Kept logged-in
 home, lookup, blank review form and registered-review tabs open for the user.
 Home/lookup have the test plate prefilled. External browser requests are blocked.
 No production deployment/data change. Lint/type checks passed (20 old warnings).
+
+## 2026-11-12 — admin webtoon upload and public reading
+
+Read AGENTS/WORKLOG and searched local source, history and remote branches first.
+Existing dev/carfact-webtoon-chatgpt-20261112 was fetched and is still c9a1267
+with no webtoon diff/schema. Reused Auth/profile roles, server Supabase helper,
+admin navigation and local-isolation tooling; did not overwrite prior work.
+
+Added private-work/episode authoring, title/introduction/cover/publication,
+multi-file retry queue, previews, order/removal/reuse, transactional draft/public
+save and optimistic edit versions. Public list→episode list→vertical mobile
+reader, prior/next and home/admin entry links added. Four tables + read RLS +
+service-only RPCs + private bucket/restrictive storage policy are in one new
+additive migration. Human admin token/current role/suspension checked for every
+admin API. No client writes/direct Storage read/signing allowed. Images are
+bounded, decoded/reencoded WebP; privacy proxy rechecks visibility/no-store.
+Old unreferenced files use explicit admin GC, with per-work transaction locks
+and deleting-state claims to prevent concurrent attachment/file-loss races.
+
+Applied only to verified local DB/Storage. Created separate synthetic local
+admin; no production member/data/file copy. API/RLS/Storage privacy and mutation
+negative tests, invalid/oversized images, order/reuse/conflict/foreign-ID checks,
+unpublish revocation and orphan retention pass. Deterministic concurrent attach
+then GC test preserves the newly referenced object. Browser multi-upload forced
+503→retry, preview/reorder/remove/reuse/reselect/save/publish and ordinary-user
+block pass. Anonymous reading at375px and previous/next pass, page errors0.
+Screenshots visually checked. npm ci, lint0 errors/20 old warnings, TypeScript and
+normal Node22 npm run build passed (27 static pages, no preview/validator bypass).
+Sharp existing0.34.5 is now direct dependency, versions unchanged; original libc
+metadata retained. Local developer app/backend restored and kept running.
+
+Read-only operating check: Git still ahead1/lock modified; no explicit Nginx
+body-size directive. Production needs an approved narrow upload-limit change
+in addition to the new DB/Storage migration. No deployment, Nginx/PM2 operation,
+production DB/Storage mutation occurred. docs/webtoons.md describes local use,
+security/tests/limits; docs/webtoons-release.md contains gated DB/Storage changes,
+backup/deployment/non-destructive code rollback and disaster-recovery plan.
