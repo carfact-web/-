@@ -1,5 +1,7 @@
 # Webtoon production change, backup and rollback plan
 
+> 2026-11-13 인수 상태와 통합3개 migration 범위는 [최신 운영 준비 검토](webtoons-preflight-2026-11-13.md)가 우선한다. 아래 과거 한 개/두 개 migration 안내를 단독 실행하지 않는다.
+
 **Prepared only. Nothing in this document has been executed in production.**
 Deployment, DB migration, Storage policy/bucket changes and any Nginx/PM2 changes
 require the user's final approval of the exact release and backup readiness.

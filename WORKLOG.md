@@ -318,3 +318,42 @@ served home200 without yellow banner/test/admin links, and returned404 for
 anonymous/forged-role admin page and local-test even with local flags supplied.
 The temporary server was stopped. Lint0 errors/20 existing warnings. No production
 connection, server deployment, DB/Storage/Nginx mutation or new migration.
+
+## 2026-11-13 KST — Mac mini deployment preparation handoff
+
+Read AGENTS, WORKLOG and release/access/promotion/PDF documents. Original Mac
+repo remained dev/carfact-2026-11-12@dd6e266, clean and no unpushed commits.
+ls-remote/fetch reverified main c9a1267, Mac dd6e266 and laptop f989cad; laptop
+is two commits ahead by ancestry. No pull/reset or overwrite. Created separate
+release/webtoon-review-2026-11-13 worktree based on exact laptop HEAD.
+Reproduced the absent laptop-only PDF guide simplification and concentrated
+technical detail in docs/webtoons-pdf.md; parser/limits/dependencies unchanged.
+Targeted PdfUpload ESLint and diff check passed. Existing passing runtime/build
+suites were not repeated for this copy/document-only change.
+
+Read-only SSH confirmed operating main2e14443+dirty lockfile(0+/108-), same
+lock hash as preserved branch, PM2 root/npm start online, Nginx→3000 without
+upload limit, pm2-root unit absent. Existing preservation checksums and incremental
+bundles verify. No production install/build/restart/config change. Source/config
+left intact; metadata/hash records are not a complete operational backup.
+Supabase GET-only checks from server: profile required columns200; five webtoon
+tables404/PGRST205 and no webtoon RPC/catalog; bucket list200 with no webtoon-private.
+Migration history406/PGRST106, not exposed: direct catalog/history verification
+remains pending. Keys were neither printed nor copied. No operational data read.
+
+Production-only npm audit (no package changes) reports6 vulnerable packages:
+critical1/high4/moderate1. Official Next/Sharp advisories reviewed; deployed and
+candidate Next16.2.6/Sharp0.34.5 fall in reported ranges. Security remediation and
+appropriate regression/build remain a release gate, not completed by this audit.
+Actual DB/Storage/server backup and isolated restoration remain unverified.
+Tracked test tooling and runtime local-fixture imports require production-artifact
+exclusion review; inactive local gates alone do not prove code physically absent.
+No laptop real PDF or member data imported. No test artifact deployed.
+
+docs/webtoons-preflight-2026-11-13.md records exact source/production status,
+all3 migration hashes, private Storage/Nginx scope, security findings, artifact
+and backup gates, approval/release/rollback sequence. Read-only catalog SQL is
+prepared in docs/sql/webtoon-preflight-readonly.sql and was not run in production.
+The legacy dirty-dir pull/broad db push checklist is explicitly superseded.
+Final release-review branch SHA is recorded in the completion report; it is a
+review candidate pending the documented gates and user final approval.

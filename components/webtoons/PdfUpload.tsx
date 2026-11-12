@@ -21,7 +21,7 @@ export function PdfUpload({ workId, disabled, onBusy, onComplete }: { workId: st
   finally { setRunning(false); onBusy(false); }
  }
  return <section className="space-y-3 rounded border p-3"><label className="block text-sm font-bold">회차 PDF 선택<input disabled={disabled} type="file" accept="application/pdf,.pdf" className="mt-2 block w-full text-sm" onChange={e => { const selected = e.target.files?.[0] ?? null; e.target.value = ""; setError(""); if (selected && (selected.type !== "application/pdf" || !selected.size || selected.size > PDF_MAX_BYTES)) { setError("PDF 한 개, 50MiB 이하 파일을 선택해주세요."); return; } setFile(selected); }} /></label>
-  <p className="text-xs text-zinc-600">일반 분량 30~40페이지 · 최대 {PDF_MAX_PAGES}페이지 / 50MiB · 암호화 PDF 미지원. 서버 검증은 15초·192MiB 예산으로 처리합니다. 모바일은 주변 최대 5페이지만 렌더링합니다.</p>
+  <p className="text-xs text-zinc-600">PDF 최대 50MB · 최대 {PDF_MAX_PAGES}페이지 · 암호화 PDF 미지원</p>
   {file ? <p className="break-all text-sm">{file.name} · {(file.size / 1048576).toFixed(1)}MiB</p> : null}
   {running ? <div role="status"><progress max={100} value={progress} className="w-full" />PDF 업로드 {progress}%{progress === 100 ? " · 서버 검증·저장 중…" : ""}</div> : null}
   {error ? <p role="alert" className="text-sm text-red-800">{error}</p> : null}
