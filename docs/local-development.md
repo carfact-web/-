@@ -126,3 +126,22 @@ and live maintenance status. No production server setting/process or data was
 changed. The local `.env.local` now points to production; do not start ordinary
 unrestricted browser tests, because page-view tracking and other UI features
 can write data. Continue using blocked API/external requests for local UI checks.
+
+## Scoped-network normal build succeeded: 2026-11-12
+
+The latest verification in WORKLOG.md supersedes the offline-build blocker
+above. The blanket test network deny was removed. Google font downloads and
+the existing sitemap's three public SELECT queries were allowed, with other
+network operations including writes and paid vehicle APIs still denied.
+Normal `npm run build` passed on Node 22.23.0 without preview mode or validator
+changes; all three reads returned 200 and all 24 static pages were generated.
+No execution-environment network limitation remained. Fonts, sitemap and cache
+policy were not changed.
+
+The resulting local production server passed isolated Chrome checks for home,
+lookup and login (all 200, no page JS errors), plate input validation, home login
+navigation, and enabled Kakao/Google buttons. API/external requests were blocked
+in the browser; OAuth and vehicle lookups were not submitted. This is UI
+verification, not live backend or authentication verification. The server was
+stopped after checking. Continue to block writes and paid APIs when using the
+local production-project public settings.
