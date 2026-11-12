@@ -1,10 +1,11 @@
+import { isLocalSandbox } from "@/lib/local/sandbox";
 import Script from "next/script";
 
 const gaMeasurementId =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-PG4WB3T5S5";
 
 export function GoogleAnalytics() {
-  if (!gaMeasurementId) {
+  if (isLocalSandbox() || !gaMeasurementId) {
     return null;
   }
 

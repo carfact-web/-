@@ -1,3 +1,5 @@
+import { isLocalSandbox } from "@/lib/local/sandbox";
+import { localVehicleFixture } from "@/lib/local/vehicleFixture";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { writeKotsaAuditLog } from "@/lib/server/kotsa/audit";
@@ -530,6 +532,7 @@ export async function handleKotsaVehicleHistoryRequest(
   request: NextRequest,
   options: HandleKotsaVehicleHistoryOptions = {},
 ) {
+  if (isLocalSandbox()) return localVehicleFixture(request);
   const endpoint = request.nextUrl.pathname;
   const requestId = randomUUID();
   const startedAt = Date.now();

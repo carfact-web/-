@@ -1,3 +1,4 @@
+import { isLocalSandbox } from "@/lib/local/sandbox";
 import { indexNowSitemapUrl } from "@/lib/indexNow";
 
 type NotifyIndexNowInput = {
@@ -6,6 +7,7 @@ type NotifyIndexNowInput = {
 };
 
 export const notifyIndexNow = async ({ reason, urls }: NotifyIndexNowInput) => {
+  if (isLocalSandbox()) return;
   const uniqueUrls = Array.from(new Set([...urls, indexNowSitemapUrl]));
 
   if (uniqueUrls.length === 0) {
