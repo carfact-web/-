@@ -101,6 +101,49 @@ const normalizeMatchText = (value: string | null | undefined) =>
     .replace(/bmw/g, "비엠더블유")
     .replace(/[^0-9a-z가-힣]/g, "");
 
+const vehicleClassLabels = new Set([
+  "경형",
+  "소형",
+  "중형",
+  "대형",
+  "승용",
+  "승용차",
+  "승합",
+  "승합차",
+  "화물",
+  "화물차",
+  "특수",
+  "특수차",
+]);
+
+const isVehicleClassLabel = (value: string | null | undefined) =>
+  vehicleClassLabels.has((value ?? "").replace(/\s+/g, "").trim());
+
+const hasRequiredModelMatch = (
+  row: {
+    aliases: unknown;
+    model: string;
+    model_detail: string;
+    search_text: string | null;
+    search_text_normalized: string | null;
+  },
+  normalizedModel: string,
+) => {
+  if (!normalizedModel) {
+    return true;
+  }
+
+  const normalizedRowModel = normalizeMatchText(row.model);
+  const normalizedAliases = Array.isArray(row.aliases)
+    ? row.aliases.map((alias) => normalizeMatchText(String(alias)))
+    : [];
+
+  return (
+    normalizedRowModel === normalizedModel ||
+    normalizedAliases.includes(normalizedModel)
+  );
+};
+
 const getYearFromDetail = (detail: string) =>
   [...detail.matchAll(/\d{2,4}/g)]
     .map((match) => {
@@ -114,13 +157,46 @@ const getYearFromDetail = (detail: string) =>
     })
     .filter((value): value is number => Boolean(value));
 
+const currentYear = new Date().getFullYear();
+
+const getYearRangeFromDetail = (detail: string) => {
+  const yearBlocks = [...detail.matchAll(/\(([^)]*(?:년|~)[^)]*)\)/g)].map(
+    (match) => match[1],
+  );
+  const years = yearBlocks.flatMap(getYearFromDetail);
+
+  if (years.length === 0) {
+    return null;
+  }
+
+  const hasOpenEnd = yearBlocks.some(
+    (block) => /년\s*~/.test(block) || /\d{2,4}\s*~\s*$/.test(block),
+  );
+
+  return {
+    earliestYear: Math.min(...years),
+    latestYear: hasOpenEnd ? currentYear + 1 : Math.max(...years),
+  };
+};
+
+const matchesModelYear = (detail: string, year: number | null) => {
+  if (!year) {
+    return true;
+  }
+
+  const range = getYearRangeFromDetail(detail);
+
+  if (!range) {
+    return true;
+  }
+
+  return year >= range.earliestYear && year <= range.latestYear;
+};
+
 const buildMatchTokens = (display: KotsaVehicleDisplayInfo | null) =>
   [
-    display?.manufacturer,
-    display?.brand,
     display?.carName,
-    display?.vehicleType,
-    display?.generation,
+    isVehicleClassLabel(display?.generation) ? null : display?.generation,
   ]
     .flatMap((value) => (value ?? "").split(/[\s/()·,]+/))
     .map(normalizeMatchText)
@@ -135,13 +211,21 @@ const getVehicleMasterMatch = async (
   }
 
   const tokens = [...new Set(buildMatchTokens(display))].slice(0, 6);
+  const normalizedManufacturer = normalizeVehicleBrandName(
+    display.manufacturer || display.brand,
+  );
+  const normalizedModel = normalizeMatchText(display.carName);
   const fullQuery = normalizeMatchText(
-    [display.manufacturer, display.carName, display.vehicleType]
+    [
+      normalizedManufacturer,
+      display.carName,
+      isVehicleClassLabel(display.generation) ? null : display.generation,
+    ]
       .filter(Boolean)
       .join(" "),
   );
 
-  if (!fullQuery || tokens.length === 0) {
+  if (!normalizedModel && (!fullQuery || tokens.length === 0)) {
     return {
       candidates: [],
       status: "unmatched",
@@ -151,20 +235,38 @@ const getVehicleMasterMatch = async (
 
   const selectFields =
     "id, manufacturer, model, model_detail, aliases, search_text, search_text_normalized, active_car_count";
-  const runTokenQuery = () =>
-    clients.admin
+  const createBaseQuery = () => {
+    let query = clients.admin
       .from("vehicle_master")
-      .select(selectFields)
+      .select(selectFields);
+
+    if (normalizedManufacturer) {
+      query = query.eq("manufacturer", normalizedManufacturer);
+    }
+
+    return query;
+  };
+  const runModelQuery = () =>
+    createBaseQuery()
+      .ilike("search_text_normalized", `%${normalizedModel || fullQuery}%`)
+      .limit(80);
+  const runTokenQuery = () => {
+    if (tokens.length === 0) {
+      return runModelQuery();
+    }
+
+    return createBaseQuery()
       .or(tokens.map((token) => `search_text_normalized.ilike.%${token}%`).join(","))
       .limit(80);
+  };
   const { data, error } =
-    fullQuery.length >= 4
-      ? await clients.admin
-          .from("vehicle_master")
-          .select(selectFields)
+    normalizedModel
+      ? await runModelQuery()
+      : fullQuery.length >= 4
+        ? await createBaseQuery()
           .ilike("search_text_normalized", `%${fullQuery}%`)
           .limit(80)
-      : await runTokenQuery();
+        : await runTokenQuery();
 
   if (error) {
     return null;
@@ -172,7 +274,7 @@ const getVehicleMasterMatch = async (
 
   let rows = data ?? [];
 
-  if (rows.length === 0 && tokens.length > 0 && fullQuery.length >= 4) {
+  if (rows.length === 0 && !normalizedModel && tokens.length > 0 && fullQuery.length >= 4) {
     const fallback = await runTokenQuery();
 
     if (!fallback.error) {
@@ -181,6 +283,8 @@ const getVehicleMasterMatch = async (
   }
   const rawYear = display.year ? Number(display.year) : null;
   const scored = rows
+    .filter((row) => hasRequiredModelMatch(row, normalizedModel))
+    .filter((row) => matchesModelYear(row.model_detail, rawYear))
     .map((row) => {
       const aliases = Array.isArray(row.aliases) ? row.aliases.join(" ") : "";
       const haystack = normalizeMatchText(
@@ -194,9 +298,10 @@ const getVehicleMasterMatch = async (
         ].join(" "),
       );
       const score =
-        (fullQuery && haystack.includes(fullQuery) ? 80 : 0) +
+        (normalizedModel && normalizeMatchText(row.model) === normalizedModel ? 90 : 0) +
+        (fullQuery && haystack.includes(fullQuery) ? 40 : 0) +
         tokens.reduce((total, token) => total + (haystack.includes(token) ? 12 : 0), 0) +
-        (rawYear && getYearFromDetail(row.model_detail).includes(rawYear) ? 10 : 0) +
+        (rawYear && matchesModelYear(row.model_detail, rawYear) ? 10 : 0) +
         Math.min(Number(row.active_car_count ?? 0), 20) / 10;
 
       return { row, score };
