@@ -79,3 +79,50 @@ Raw installation/build/browser logs, screenshots, and the isolated browser test
 script are in the parent local work directory, outside the repository. No app
 behavior was changed to bypass unavailable services. Existing lint warnings
 remain in admin/community/report hooks and image components.
+
+## General build follow-up: 2026-11-12
+
+The two approved public Supabase variables were copied directly over the
+existing SSH connection into the ignored local `.env.local` (mode 0600).
+Only those two names were extracted; the anon key role was checked before
+writing. No service-role key or other production secret was copied. The values
+were not placed in commands, responses, logs, or commits. `.env.local` is
+excluded by `.gitignore` and is not tracked. This supersedes the missing-variable
+state in the earlier verification above.
+
+Before running the build, the prerender paths were inspected. `app/sitemap.ts`
+issues SELECT queries against vehicles, reviews, and community_posts during
+static generation when the public client is configured. It does not perform a
+write, but it creates a build dependency on the live database. Dynamic vehicle
+and community routes can read data at request time; they were not requested.
+The root layout also uses Google-hosted Geist fonts. npm has no custom postbuild
+script, and no business API or database-write action was found in the reviewed
+prerender entry points.
+
+The normal `npm run build` was executed with VERCEL_ENV removed and no change to
+`scripts/validate-env.mjs`. A local Node preload denied fetch/http/https requests,
+and a macOS process sandbox denied non-loopback outbound traffic, including
+native Turbopack traffic. Output was filtered in memory to redact the two copied
+values and the project hostname before being saved to the local build log.
+
+Result: the normal environment precheck passed, but the build exited 1 during
+compilation because Google Fonts could not be downloaded under the network
+block. It did not reach sitemap static generation. This is not a successful
+normal build, and no normal-build browser smoke test was claimed. The earlier
+successful preview build and credential-free UI checks remain separate results.
+
+To complete a fully offline normal build without live services, the Google font
+assets need to be provisioned locally and sitemap generation needs a deliberate
+strategy that does not query production during build (for example, runtime
+sitemap generation with a reviewed caching policy). Both choices affect product
+assets or sitemap behavior and were not silently introduced as build-test fixes.
+A less restrictive verification could allow only public static font downloads,
+but the current sitemap would still require a read strategy. Fake database
+results were not substituted, and no environment validator was bypassed.
+
+Remaining unverified: successful normal compilation/prerender, normal-build
+local production UI, actual OAuth, vehicle API, database and Storage behavior,
+and live maintenance status. No production server setting/process or data was
+changed. The local `.env.local` now points to production; do not start ordinary
+unrestricted browser tests, because page-view tracking and other UI features
+can write data. Continue using blocked API/external requests for local UI checks.
