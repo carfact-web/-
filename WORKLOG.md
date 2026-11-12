@@ -121,3 +121,15 @@ page errors 0. Production HTTP flags injected in query/body/header/cookie did
 not enable local features. Actual app startup refusal was tested for hosted
 app URL, remote Auth override and mismatched server key. The local developer
 server is running again on port 3100 with the independent backend active.
+
+## 2026-11-12 — visible browser demo prepared
+
+Added a server-gated sticky local-only banner explaining that this is not the
+production service and 123가4567 is a synthetic vehicle with mocked history and
+isolated local DB/Auth/Storage. Included navigation links for the demo steps.
+Opened a separate visible Chrome profile, logged in with the private synthetic
+account, followed home plate lookup → review form → submitted a clearly labeled
+synthetic demonstration review → confirmed it in the report. Kept logged-in
+home, lookup, blank review form and registered-review tabs open for the user.
+Home/lookup have the test plate prefilled. External browser requests are blocked.
+No production deployment/data change. Lint/type checks passed (20 old warnings).

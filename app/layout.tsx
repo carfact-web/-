@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { isLocalSandboxServer } from "@/lib/local/sandbox.server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -82,6 +84,21 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {isLocalSandboxServer() ? (
+          <aside aria-label="로컬 테스트 환경 안내" className="sticky top-0 z-[100001] border-b-2 border-amber-500 bg-amber-100 px-4 py-3 text-sm text-black">
+            <div className="mx-auto max-w-5xl">
+              <p className="font-black">로컬 테스트 전용 · 운영 서비스가 아닙니다</p>
+              <p>123가4567은 합성 테스트 차량입니다. 차량 이력은 모의 응답이며, 후기·회원·이미지는 분리된 로컬 환경에만 저장됩니다.</p>
+              <nav aria-label="테스트 시연 순서" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-bold underline">
+                <Link href="/">① 홈</Link>
+                <Link href="/lookup">② 차량조회</Link>
+                <Link href="/car/123가4567/review">③ 후기 작성</Link>
+                <Link href="/car/123가4567">④ 등록된 후기 확인</Link>
+                <Link href="/local-test">테스트 로그인</Link>
+              </nav>
+            </div>
+          </aside>
+        ) : null}
         <GoogleAnalytics />
         <JsonLd data={createWebSiteJsonLd()} />
         <Suspense fallback={null}>
