@@ -20,9 +20,11 @@ def run(args):
 def status():
  s=json.loads(run(['status','--output-format','json']))
  if s.get('readiness')!='ready':raise SystemExit('Local services not ready.')
- for k in ['API_URL','DB_URL']:
+ for k in [name for name in s['env'] if name.endswith('_URL')]:
   from urllib.parse import urlparse
   if urlparse(s['env'][k]).hostname not in ['127.0.0.1','localhost']:raise SystemExit('Nonlocal endpoint refused.')
+ for key,value in s['endpoints'].items():
+  if urlparse(value['url']).hostname not in ['127.0.0.1','localhost','::1']:raise SystemExit('Nonlocal service endpoint refused: '+key)
  p=work/'native-status-private.json';p.write_text(json.dumps(s));p.chmod(0o600)
  return s
 
@@ -54,6 +56,7 @@ elif command=='seed':
  status();subprocess.run([str(work/'toolchain/node-v22.23.0-darwin-arm64/bin/node'),str(Path(__file__).parent/'seed.cjs')],env=env,cwd=repo,check=True)
 elif command=='app':
  status()
+ subprocess.run([str(work/'toolchain/node-v22.23.0-darwin-arm64/bin/node'),str(Path(__file__).parent/'verify.cjs')],env=env,cwd=repo,check=True)
  env['NODE_OPTIONS']='--require='+str(Path(__file__).parent/'network.cjs')
  env['NEXT_TELEMETRY_DISABLED']='1'
  os.chdir(repo)

@@ -134,3 +134,26 @@ Real OAuth, live vehicle data and paid providers remain intentionally untested.
 No production server, DB, Auth or Storage setting was changed. This native CLI
 runtime is experimental; use the documented management commands and keep the
 existing local state separate from any future container runtime.
+
+## Final review hardening
+
+`/local-test` now has a server page that returns 404 unless the private server
+flag CARFACT_LOCAL_SANDBOX=1, development mode, public local flag and loopback
+URL all match. The client form is a separate component. The shared vehicle
+handler and fixture itself independently enforce that same server-only gate;
+query/body/header/cookie fields cannot activate it.
+
+`manage.py app` validates current CLI status and active application settings
+before starting. The synchronous network preload repeats that validation in
+the server process. DB, REST, Auth and Storage endpoints and other advertised
+service URLs must all be loopback. App origin and both keys must match the
+local stack; inherited endpoint overrides are checked too. A mixed production
+URL/key aborts startup. `seed` validates the complete backend endpoint set
+before writing local fixtures.
+
+Run `sh scripts/with-project-node.sh node scripts/local-sandbox/safety-check.cjs`
+for the negative endpoint/key/server-gate tests. See
+[local-schema-parity.md](local-schema-parity.md) for exact shared and intentionally
+different policies, live-production audit limits and the successful normal-build
+review. The general build used approved public read-only settings in its process
+only; it did not change the active loopback .env.local or loosen validation.

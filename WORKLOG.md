@@ -89,3 +89,35 @@ runtime status remain private outside Git. Real OAuth/paid APIs/production data
 are intentionally untested. Browser image upload UI not covered; SDK Storage is.
 
 Local synthetic-account signup UI also passed; the reusable management app launcher was verified.
+
+## 2026-11-12 — final sandbox security/build review
+
+Split local login into a server-gated page (404 outside local development) and
+client form. Added a private CARFACT_LOCAL_SANDBOX flag and server-only import
+boundary; shared vehicle route and fixture each check it. Browser query/body/
+headers/cookies do not affect process flags. Production gate test and actual
+production HTTP checks passed: /local-test 404; injected mock API request 401,
+no mock response.
+
+Added full local DB/REST/Auth/Storage/service URL validation, inherited endpoint
+override checks, app-origin consistency and exact local key matching. App launch
+and server preload both enforce it; seed validates before writing. Remote/mixed
+endpoint and key negative tests, including real launcher refusal, passed.
+
+Read-only production-checkout SQL hashes match all 49 local original SQL files.
+Live production DB catalog not audited. docs/local-schema-parity.md records
+source-shared behavior, stricter/different local policies and untested areas.
+
+Normal Node22 npm run build passed, no preview or validator bypass: compile,
+TypeScript, 24 static pages. Only approved production public read settings were
+in the build process, local flags off/service-role empty; active .env.local
+remained local. Font/sitemap reads allowed, writes/paid APIs blocked; cached
+sitemap fetch data could be reused. Temporary production test server stopped;
+local development app and DB restored for user access. Lint/type checks pass.
+
+After hardening, safety matrix, local backend CRUD/RLS/Storage checks and the
+actual browser login→review create→edit→delete→logout flow passed again; browser
+page errors 0. Production HTTP flags injected in query/body/header/cookie did
+not enable local features. Actual app startup refusal was tested for hosted
+app URL, remote Auth override and mismatched server key. The local developer
+server is running again on port 3100 with the independent backend active.

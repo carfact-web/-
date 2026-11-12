@@ -1,8 +1,10 @@
+import { isLocalSandboxServer } from "./sandbox.server";
 import type { KotsaDetailedHistory } from "@/types/kotsa";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdminClients } from "@/lib/server/kotsa/supabaseAdmin";
 
 export async function localVehicleFixture(request: NextRequest) {
+  if (!isLocalSandboxServer()) return NextResponse.json({ ok: false }, { status: 404 });
   const clients = getSupabaseAdminClients();
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   if (!clients || !token) return NextResponse.json({ ok: false, error: "로컬 로그인이 필요합니다." }, { status: 401 });

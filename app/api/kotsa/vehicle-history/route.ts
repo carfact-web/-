@@ -1,4 +1,4 @@
-import { isLocalSandbox } from "@/lib/local/sandbox";
+import { isLocalSandboxServer } from "@/lib/local/sandbox.server";
 import { localVehicleFixture } from "@/lib/local/vehicleFixture";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -532,7 +532,7 @@ export async function handleKotsaVehicleHistoryRequest(
   request: NextRequest,
   options: HandleKotsaVehicleHistoryOptions = {},
 ) {
-  if (isLocalSandbox()) return localVehicleFixture(request);
+  if (isLocalSandboxServer()) return localVehicleFixture(request);
   const endpoint = request.nextUrl.pathname;
   const requestId = randomUUID();
   const startedAt = Date.now();

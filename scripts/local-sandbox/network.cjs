@@ -3,8 +3,7 @@
 const p=require('node:path');
 const repo=p.resolve(__dirname,'../..');
 require(p.join(repo,'node_modules/@next/env')).loadEnvConfig(repo,true,{info(){},error(){}});
-const u=new URL(process.env.NEXT_PUBLIC_SUPABASE_URL||'https://invalid');
-if(process.env.NEXT_PUBLIC_LOCAL_SANDBOX!=='1'||u.protocol!=='http:'||!['127.0.0.1','localhost'].includes(u.hostname))throw Error('Refusing to start local sandbox with a nonlocal database');
+require('./verify.cjs').verify();
 function allowed(url,method='GET'){
  const u=new URL(url);
  if(u.protocol==='data:')return true;
