@@ -3,10 +3,12 @@ import { failure, NO_STORE, requireWebtoonAdmin, WebtoonError } from "@/lib/serv
 export const dynamic = "force-dynamic";
 const cookieName = "carfact_webtoon_admin";
 function sameOrigin(request: Request) {
- const expected = new URL(request.url);
- const host = request.headers.get("host"), protocol = request.headers.get("x-forwarded-proto");
- if (host) expected.host = host;
- if (protocol === "https" || protocol === "http") expected.protocol = protocol + ":";
+ const internal = new URL(request.url);
+ const host = request.headers.get("host") || internal.host;
+ const forwardedProtocol = request.headers.get("x-forwarded-proto");
+ const protocol = forwardedProtocol === "https" || forwardedProtocol === "http" ? forwardedProtocol + ":" : internal.protocol;
+ // A fresh authority prevents Next's internal listener port surviving a portless public Host.
+ const expected = new URL(`${protocol}//${host}`);
  if (request.headers.get("origin") !== expected.origin) throw new WebtoonError("같은 서비스에서 다시 접속해주세요.", 403);
 }
 function response(token: string) {
