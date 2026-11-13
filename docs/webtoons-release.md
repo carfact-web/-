@@ -1,5 +1,6 @@
 # Webtoon production change, backup and rollback plan
 
+> 최신 의존성 수정·artifact 분리·실제 제한 백업/복구 결과는 [운영 준비 결과](webtoons-release-readiness-2026-11-13.md)를 우선한다. DB 직접 인증/정식 통합 복구는 아직 미완료다.
 > 2026-11-13 인수 상태와 통합3개 migration 범위는 [최신 운영 준비 검토](webtoons-preflight-2026-11-13.md)가 우선한다. 아래 과거 한 개/두 개 migration 안내를 단독 실행하지 않는다.
 
 **Prepared only. Nothing in this document has been executed in production.**

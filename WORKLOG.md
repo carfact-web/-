@@ -357,3 +357,61 @@ prepared in docs/sql/webtoon-preflight-readonly.sql and was not run in productio
 The legacy dirty-dir pull/broad db push checklist is explicitly superseded.
 Final release-review branch SHA is recorded in the completion report; it is a
 review candidate pending the documented gates and user final approval.
+
+## 2026-11-13 KST — security remediation, production packaging and encrypted backup
+
+On release/webtoon-review-2026-11-13: Next16.4.1/Sharp0.35.5 minimal official
+patched versions pinned, eslint-config-next aligned. PostCSS8.5.23/nanoid3.3.20,
+source-map-js1.2.2/baseline-browser-mapping2.11.37 remove all6 production-audit
+package findings; production audit0. No audit fix/force. Full including dev still
+13 findings; vendored-code/SBOM limitations recorded without claiming universal
+security. Separate local node_modules preserves original Mac checkout. Next dev
+regenerated AGENTS instruction block; retained that automatic version update.
+
+Added clean tracked-source exporter, production-only removal of local route/
+fixture/branches, standalone stager(public/static/provenance), offline secret/
+local-marker/symlink-boundary scanner and rejection/no-overwrite regression.
+Local development source/config remains unchanged. Exported production source
+npm ci/normal npm run build passed, no preview/validator bypass; fonts and old
+public sitemap reads only, production writes/paid APIs blocked. Mac artifact is
+Darwin/arm64 verification only, not deployable to Ubuntu. Production source
+manifest dirty=true during verification is deliberately nondeployable; final
+clean SHA export must be pinned and built on approved Linux environment.
+
+Image API/UI/GC/concurrency, Korean30/40/60 PDF API and30/40 browser, independent
+admin page/API/Origin/cookie/suspension, latest card and optional promotion API/
+UI/mobile/KST/expiry/unpublish/retry all pass. JS errors0. tsc pass, lint0 errors/
+21 warnings (old20 plus new Next warning about existing location.assign).
+Standalone runtime on loopback3101: home/static200, local route absent404,
+anonymous/forged admin404, flags cannot enable fixture, local matched PDF worker/
+font200; temp server stopped. Known local keys/passwords absent from artifact.
+
+Read-only production backup streamed straight into local AES256-GCM encryption,
+outside Git with0600 files/0700 directories and separate key folder. Source/
+current.next/env/Nginx/PM2 archive72,120,320bytes; isolated file restore3106 hashes,
+Git fsck/HEAD/BUILD_ID successful, no restored app/config executed. API snapshot
+15,572,548bytes:31 REST table/view resources24431rows, Auth14users,43 Storage
+objects3451064bytes. Isolated JSON/object restoration, all object SHA256 and GCM
+integrity/tamper rejection pass. Plaintext recovery directories removed. Real
+production data never entered developer DB/Auth/Storage. No offsite/new paid
+backup and no personal SSH key copy. This is NOT a transactionally consistent
+Postgres/PITR backup or full DB/Auth/RLS restore test. Certificate/key directories
+and TLS key material were not archived; key recovery/offsite remain gates.
+
+Existing pooler URL lacks password; no DB credentials/pgpass/service/management
+access token available. No production psql installation, diagnostic RPC or
+schema change. Direct catalog/migration comparison cannot be completed with the
+API service key; required secure connection/auth items recorded in backup report.
+Prepared read-only SQL remains unapplied. No guessed migration application.
+
+Latest docs/webtoons-release-readiness-2026-11-13.md records exact3 SQL hashes,
+5 tables/RPC/RLS/triggers/private bucket and Nginx12m/52m proposal/rollback.
+PM2 boot registration is a separate proposal; no startup/save/enable/restart/
+reboot performed. Operating source/dirty lock/PM2/Nginx/DB/Storage/traffic remain
+unchanged. Final completion report pins the new reviewed commit; database/full
+recovery authorization material remains needed before production execution.
+Final lockfile review restored16 unrelated unchanged-version Linux libc metadata
+entries dropped by npm10. Package versions/integrities unchanged by that cleanup;
+clean-source npm ci/build is repeated for the final lockfile, not all functional
+suites. Final read-only operating check still shows identical HEAD/lock/Nginx
+hash and same PM2 PID717764 online; no production process change occurred.
