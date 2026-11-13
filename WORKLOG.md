@@ -415,3 +415,11 @@ entries dropped by npm10. Package versions/integrities unchanged by that cleanup
 clean-source npm ci/build is repeated for the final lockfile, not all functional
 suites. Final read-only operating check still shows identical HEAD/lock/Nginx
 hash and same PM2 PID717764 online; no production process change occurred.
+Follow-up backup coverage review added a separate30,720byte AES-GCM archive for
+active KOTSA/TLS certificate/key and renewal/account settings, explicitly excluding
+personal SSH key paths. All8 files recovered/hash-verified in isolation, TLS
+certificate/private-key public values matched1pair, GCM authentication/tamper
+checks pass. Temporary plaintext removed. No service start, certificate renewal
+or paid KOTSA request. This supersedes the earlier service-key exclusion gap;
+PostgreSQL direct authentication/full transactional restoration remains missing.
+Docs-only follow-up does not alter the already validated production source files.

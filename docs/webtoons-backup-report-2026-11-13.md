@@ -12,6 +12,7 @@ SSH 스트림을 로컬 Node AES-256-GCM으로 즉시 암호화했고 토큰·�
 |---|---:|---|
 | source.aes256gcm | 72,120,320 | 70c168eb39ebbe40657efee04d09b9e4067f74b0660e7bc5c766a5115dfe87be |
 | api.aes256gcm | 15,572,548 | ba0029dadee8ef3049e329eb2932d666f9dcc603ef7440b1a8cd476bf3912e8f |
+| service.aes256gcm | 30,720 | c415af78751e69c8c6a4cf57fc031bdff3810a82b8da59c8c94875648bd77030 |
 
 ## 소스·현재 빌드·설정
 
@@ -19,7 +20,7 @@ SSH 스트림을 로컬 Node AES-256-GCM으로 즉시 암호화했고 토큰·�
 현재 .next(cache 제외), 활성 환경파일, Nginx 설정/symlink, PM2 dump 및 현재
 running-processes JSON을 포함한다. 환경/PM2 자료는 비밀값이 있어 암호화 파일로만
 보관한다. node_modules, 개인 SSH 키, 별도 KOTSA 인증서/개인키 디렉터리와 TLS
-인증서·개인키 파일은 포함하지 않았다. 별도 키 복구 준비는 여전히 필요하다.
+인증서·개인키 파일은 포함하지 않았다. 이 제외분의 서비스 파일은 아래 별도 암호화 보완 백업으로 확보했다.
 
 운영과 연결되지 않은 임시 로컬 파일시스템에 복호화/복원하여 regular file3,106개의
 크기/SHA256을 archive manifest와 전부 대조했다. Git fsck 성공,
@@ -28,6 +29,16 @@ BUILD_ID W9b_KtP3rykVMZYQ9Ed7n 확인. 환경파일·Nginx·PM2 정의 복원 �
 symlink는 활성화하지 않았고, 복원된 앱/PM2/Nginx를 실행하지 않았다.
 검사 후 임시 plaintext 및 추출 디렉터리를 제거했다. 운영 바이너리의 실제 부팅
 복구까지 검증한 결과는 아니며 재해 복구에는 Linux Node/의존성/인증서도 필요하다.
+
+## 서비스 인증서·키 보완 백업
+
+세 번째 산출물에 현재 환경이 참조하는 KOTSA 인증서/키, 활성 Nginx TLS fullchain/키,
+Let’s Encrypt 갱신/계정 설정을 별도 암호화했다. 개인 SSH 키 경로는 명시적으로 차단했다.
+격리 파일 복원8개의 bytes/SHA256 전부 일치, KOTSA 두 파일 복구 확인, TLS 인증서의
+공개키와 복원한 개인키에서 계산한 공개키1쌍 일치 확인. 값은 출력하지 않았다.
+GCM 인증/변조 거부도 통과했고 임시 plaintext는 제거했다. KOTSA 유료 API 호출,
+인증서 갱신, 서비스 실행이나 실제 인증서 배치/권한 변경은 하지 않았다.
+복구 가능한 서비스 키 자료를 추가 확보한 것이며 전체 서버 부팅 검증은 아니다.
 
 ## DB·Auth·Storage: 제한된 API 스냅샷
 

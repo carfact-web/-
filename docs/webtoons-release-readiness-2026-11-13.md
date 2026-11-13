@@ -41,6 +41,8 @@ REST 리소스31/24,431행 및 Auth14, Storage43객체/3,451,064bytes를 별도 
 확보했다. JSON 파일 복구·개수 및 모든 객체 checksum 확인, GCM 변조 거부도 통과.
 실제 운영 자료는 개발 DB/Auth/Storage에 넣지 않았고 복구 plaintext는 검사 후 제거했다.
 새 유료 서비스나 외부 저장소 전송은 없으며 개인 SSH 키는 복사하지 않았다.
+추가30,720bytes 암호화 백업으로 서비스 인증서/키/갱신 설정8파일도 복원·checksum
+확인했고 TLS 공개키/개인키 일치1쌍을 확인했다. 실제 갱신/유료API/서비스 실행은 하지 않았다.
 
 이는 DB schema/roles/RLS/functions/Auth hash를 포함한 정식 pg_dump/PITR가 아니다.
 시점 일관성이 없고 PostgreSQL/권한/Auth 통합 복구도 미검증이므로 완전한 재해 복구
@@ -100,7 +102,7 @@ ops/nginx/webtoon-upload-locations.conf.example는 검토용이며 운영에 미
 ## 배포 및 롤백
 
 선행 조건: DB 직접 catalog/이력 대조, 정식 DB+Storage 일관 백업 및 격리 통합 복구,
-별도 키/인증서 복구 준비, 정확한 Linux artifact·환경·Nginx diff와 실행 계획 승인.
+서비스 인증서 배치/권한을 포함하는 통합 복구, 정확한 Linux artifact·환경·Nginx diff와 실행 계획 승인.
 새 외부 보관소/유료 백업이 필요하면 먼저 목적지/비용만 제시한다.
 
 승인 후에는 기존 /root/carfact와 root PM2를 유지한 채 별도 clean release와 임시
