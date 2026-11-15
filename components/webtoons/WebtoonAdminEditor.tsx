@@ -684,7 +684,7 @@ function FileFirstComposer({ auth }: { auth: ReturnType<typeof useAuth> }) {
             </button>
           </>
         ) : null}
-        {data?.ready ? (
+        {data && (data.ready || draft?.mode === "edit") ? (
           <section className="space-y-4 rounded-2xl bg-white p-5">
             <h2 className="text-xl font-bold">미리보기</h2>
             <p className="text-sm">
@@ -767,7 +767,7 @@ function FileFirstComposer({ auth }: { auth: ReturnType<typeof useAuth> }) {
             </button>
             <button
               className={button + " ml-2 bg-zinc-950 text-white"}
-              disabled={busy || !data.title.trim() || !data.ready}
+              disabled={busy || !data.title.trim() || (!data.ready && !(draft?.mode === "edit" && !data.published && data.jobs.length===0))}
               onClick={() => void publish()}
             >
               {draft?.mode === "edit" ? "변경사항 저장" : "게시하기"}

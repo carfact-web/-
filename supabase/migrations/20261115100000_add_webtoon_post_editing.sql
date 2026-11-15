@@ -42,7 +42,7 @@ begin
  if d.status='published' then return d; end if;
  if d.status<>'editing' or d.version<>p_version then raise exception 'edit_conflict'; end if;
  if length(btrim(p_title)) not between 1 and 120 then raise exception 'invalid_title'; end if;
- if coalesce((d.data->>'ready')::boolean,false)<>true then raise exception 'invalid_pages'; end if;
+ if coalesce((d.data->>'ready')::boolean,false)<>true and not (not p_published and jsonb_array_length(coalesce(d.data->'jobs','[]'))=0 and nullif(d.data->>'pdfAssetId','') is null and jsonb_array_length(coalesce(d.data->'pageIds','[]'))=0) then raise exception 'invalid_pages'; end if;
  perform pg_advisory_xact_lock(hashtextextended(d.work_id::text,928341));
  select * into e from webtoon_episodes where id=d.episode_id for update;
  select * into w from webtoon_works where id=d.work_id for update;
@@ -58,8 +58,10 @@ begin
  if p_popup and change_popup and (p_start is null or p_end is null or p_end<=p_start or length(btrim(p_message)) not between 1 and 280) then raise exception 'invalid_popup'; end if;
  select coalesce(array_agg(x::uuid),'{}'::uuid[]) into pages from jsonb_array_elements_text(coalesce(d.data->'pageIds','[]')) x;
  pdf:=nullif(d.data->>'pdfAssetId','')::uuid;cover:=nullif(d.data->>'coverAssetId','')::uuid;
- perform 1 from webtoon_assets where id=cover and work_id=w.id and state='ready' and mime='image/webp' for update;
- if not found then raise exception 'cover_required'; end if;
+ if cover is not null then
+  perform 1 from webtoon_assets where id=cover and work_id=w.id and state='ready' and mime='image/webp' for update;
+  if not found then raise exception 'cover_required'; end if;
+ elsif p_published then raise exception 'cover_required'; end if;
  select count(*)=1 into single_post from webtoon_episodes where work_id=w.id;
  if p_published and not w.published and not single_post then raise exception 'series_private'; end if;
  perform webtoon_save_episode(e.id,e.version,btrim(p_title),e.number,p_published,case when pdf is null then pages else '{}'::uuid[] end,case when pdf is null then 'images' else 'pdf' end,pdf);
