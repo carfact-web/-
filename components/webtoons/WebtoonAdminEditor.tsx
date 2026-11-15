@@ -1,111 +1,749 @@
 "use client";
-import { PromotionSettingsPanel } from "@/components/webtoons/PromotionSettingsPanel";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { isLocalSandbox } from "@/lib/local/sandbox";
-import { webtoonRequest } from "@/lib/webtoons/client";
-import { AdminImage } from "@/components/webtoons/AdminImage";
-import { PdfUpload } from "@/components/webtoons/PdfUpload";
-import { PdfViewer } from "@/components/webtoons/PdfViewer";
-import { UploadQueue } from "@/components/webtoons/UploadQueue";
-import type { WebtoonAsset, WebtoonEpisode, WebtoonEpisodeEditor, WebtoonWork } from "@/types/webtoon";
-interface Payload { works: WebtoonWork[]; episodes: WebtoonEpisodeEditor[]; assets: WebtoonAsset[]; }
-const button = "rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40";
-const input = "mt-1 block w-full rounded-lg border border-zinc-300 bg-white p-2 text-black";
-export default function WebtoonAdminEditor() {
- const { isAdmin, isAuthReady, isProfileReady, user } = useAuth();
- const [works, setWorks] = useState<WebtoonWork[]>([]), [episodes, setEpisodes] = useState<WebtoonEpisodeEditor[]>([]), [assets, setAssets] = useState<WebtoonAsset[]>([]);
- const [work, setWork] = useState<WebtoonWork | null>(null), [episode, setEpisode] = useState<WebtoonEpisodeEditor | null>(null);
- const [newTitle, setNewTitle] = useState(""), [newEpisodeTitle, setNewEpisodeTitle] = useState(""), [newNumber, setNewNumber] = useState(1);
- const [libraryOpen, setLibraryOpen] = useState(false), [libraryLimit, setLibraryLimit] = useState(60);
- const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
- useEffect(() => {
-  if (!isAdmin) return;
-  const abort = new AbortController();
-  webtoonRequest<Payload>("/api/admin/webtoons", { signal: abort.signal }).then(data => setWorks(data.works)).catch(e => { if (!abort.signal.aborted) setError(e.message); });
-  return () => abort.abort();
- }, [isAdmin]);
- async function action(task: () => Promise<void>) {
-  setBusy(true); setError(""); setNotice("");
-  try { await task(); } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했습니다."); } finally { setBusy(false); }
- }
- async function load(id: string) {
-  const data = await webtoonRequest<Payload>("/api/admin/webtoons?workId=" + id);
-  setWorks(data.works); setEpisodes(data.episodes); setAssets(data.assets); return data;
- }
- async function choose(id: string) {
-  setLibraryOpen(false); setLibraryLimit(60);
-  if (!id) { setWork(null); setEpisode(null); return; }
-  await action(async () => { const data = await load(id); setWork(data.works.find(w => w.id === id) ?? null); setEpisode(null); setNewNumber(Math.max(0, ...data.episodes.map(e => e.number)) + 1); });
- }
- async function saveEpisode(published: boolean) {
-  if (!episode) return;
-  await action(async () => {
-   const saved = await webtoonRequest<WebtoonEpisode>("/api/admin/webtoons", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "episode", id: episode.id, version: episode.version, title: episode.title, number: episode.number, published, pageIds: episode.content_type === "pdf" ? [] : episode.page_ids, contentType: episode.content_type, pdfAssetId: episode.content_type === "pdf" ? episode.pdf_asset_id : null }) });
-   await load(saved.work_id); setEpisode({ ...saved, page_ids: episode.page_ids }); setNotice(published ? "회차를 공개했습니다. 작품도 공개 상태여야 일반 사용자에게 보입니다." : "회차를 비공개 임시저장했습니다.");
+import { supabase } from "@/lib/supabase";
+import { webtoonRequest, mediaUrl } from "@/lib/webtoons/client";
+import { PdfViewer } from "./PdfViewer";
+import { AdminImage } from "./AdminImage";
+import type {
+  WebtoonUploadDraft,
+  WebtoonAsset,
+  WebtoonWork,
+} from "@/types/webtoon";
+import type { DraftData, DraftFile } from "@/lib/webtoons/draft";
+const LegacyEditor = dynamic(() => import("./LegacyWebtoonEditor"));
+const storagePrefix = "carfact.webtoon.draft.v1";
+const button = "rounded-lg border px-4 py-2 font-bold disabled:opacity-40";
+const input = "block w-full rounded-lg border p-3";
+const endpoint = "/api/admin/webtoons/drafts";
+function draftData(d: WebtoonUploadDraft) {
+  return d.data as unknown as DraftData;
+}
+function emptyData(): DraftData {
+  return {
+    jobs: [],
+    pageIds: [],
+    pdfAssetId: null,
+    coverAssetId: null,
+    coverUploadId: crypto.randomUUID(),
+    title: "",
+    popup: false,
+    message: "",
+    startsAt: "",
+    endsAt: "",
+  };
+}
+async function upload(
+  workId: string,
+  id: string,
+  file: File,
+  onProgress: (percent: number) => void,
+  onProcessing: () => void,
+) {
+  const { data } = supabase
+    ? await supabase.auth.getSession()
+    : { data: { session: null } };
+  return new Promise<WebtoonAsset>((resolve, reject) => {
+    const xhr = new XMLHttpRequest(),
+      form = new FormData();
+    form.set("workId", workId);
+    form.set("file", file);
+    xhr.open(
+      "POST",
+      file.type === "application/pdf"
+        ? "/api/admin/webtoons/pdf-upload"
+        : "/api/admin/webtoons/upload",
+    );
+    xhr.setRequestHeader(
+      "Authorization",
+      "Bearer " + (data.session?.access_token ?? ""),
+    );
+    xhr.setRequestHeader("X-Upload-Id", id);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable)
+        onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.upload.onload = onProcessing;
+    xhr.onload = () => {
+      let result;
+      try {
+        result = JSON.parse(xhr.responseText);
+      } catch {
+        reject(
+          Error(
+            `서버 응답 오류 (${xhr.status}). 업로드 제한이나 연결 상태를 확인하고 재시도해주세요.`,
+          ),
+        );
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(result);
+      else reject(Error(result.error || `업로드 실패 (${xhr.status})`));
+    };
+    xhr.onerror = () =>
+      reject(
+        Error(
+          "네트워크 연결이 끊겼습니다. 다시 시도하면 완료된 파일을 재사용합니다.",
+        ),
+      );
+    xhr.timeout = 120000;
+    xhr.ontimeout = () =>
+      reject(
+        Error(
+          "서버 처리 대기 시간이 초과됐습니다. 같은 파일로 재시도해주세요.",
+        ),
+      );
+    xhr.send(form);
   });
- }
- function attach(uploaded: WebtoonAsset[], cover = false) {
-  setAssets(current => [...current.filter(a => !uploaded.some(u => u.id === a.id)), ...uploaded]);
-  const id = work?.id;
-  if (cover) setWork(current => current && current.id === id ? { ...current, cover_asset_id: uploaded[0]?.id ?? current.cover_asset_id } : current);
-  else setEpisode(current => current && current.work_id === id ? { ...current, page_ids: [...new Set([...current.page_ids, ...uploaded.map(a => a.id)])].slice(0, 100) } : current);
- }
- function move(index: number, direction: number) {
-  setEpisode(current => { if (!current) return current; const pages = [...current.page_ids], target = index + direction; if (target < 0 || target >= pages.length) return current; [pages[index], pages[target]] = [pages[target], pages[index]]; return { ...current, page_ids: pages }; });
- }
- if (!isAuthReady || !isProfileReady) return <main className="p-8">관리자 권한을 확인하고 있습니다.</main>;
- if (!user || !isAdmin) return <main className="space-y-4 p-8"><h1 className="text-2xl font-bold">관리자 권한이 필요합니다.</h1><Link className="underline" href={isLocalSandbox() ? "/local-test" : "/login?redirectTo=/admin/webtoons"}>관리자 계정으로 로그인</Link></main>;
- return <main className="min-h-screen bg-zinc-100 px-4 py-6 text-zinc-950">
-  <div className="mx-auto max-w-6xl space-y-5">
-   <header className="space-y-2"><h1 className="text-3xl font-black">웹툰 작품·회차 관리</h1><p className="text-sm text-zinc-600">임시저장한 이미지와 회차는 관리자만 볼 수 있습니다. 작품과 회차가 모두 공개되어야 공개 목록과 뷰어에 표시됩니다.</p><nav className="flex gap-4 text-sm underline"><Link href="/admin">관리자 홈</Link><Link href="/webtoons" target="_blank">공개 웹툰 목록 보기</Link></nav></header>
-   <aside aria-label="PDF 업로드 안내" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
-    <p className="font-bold">작품을 먼저 만든 뒤 회차에 PDF를 업로드하세요</p>
-    <p className="mt-1">작품 선택 → 회차 만들기 또는 선택 → ‘회차 콘텐츠 방식’에서 ‘PDF 한 개’ 선택 → ‘회차 PDF 선택’ 후 ‘PDF 업로드’</p>
-   </aside>
-   <PromotionSettingsPanel />
-   {error ? <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">{error}</p> : null}
-   <p role="status" className="text-sm font-semibold">{notice}</p>
-   <section className="grid gap-4 rounded-xl bg-white p-4 md:grid-cols-2">
-    <div className="space-y-2"><label className="text-sm font-bold">작품 선택<select aria-label="작품 선택" className={input} value={work?.id ?? ""} disabled={busy} onChange={e => void choose(e.target.value)}><option value="">작품을 선택하세요</option>{works.map(w => <option key={w.id} value={w.id}>{w.title} · {w.published ? "공개" : "비공개"}</option>)}</select></label></div>
-    <div className="space-y-2"><label className="text-sm font-bold">새 작품 제목<input className={input} value={newTitle} maxLength={120} disabled={busy} onChange={e => setNewTitle(e.target.value)} /></label><button className={button} disabled={busy || !newTitle.trim()} onClick={() => void action(async () => { const created = await webtoonRequest<WebtoonWork>("/api/admin/webtoons", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "work", title: newTitle }) }); await load(created.id); setWork(created); setEpisode(null); setNewTitle(""); setNewNumber(1); setNotice("비공개 작품을 만들었습니다. 표지와 소개를 입력해주세요."); })}>작품 만들기</button></div>
-   </section>
-   {work ? <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-    <section className="space-y-4 rounded-xl bg-white p-4" aria-label="작품 편집">
-     <h2 className="text-xl font-bold">작품 편집</h2>
-     <label className="block text-sm font-bold">작품 제목<input className={input} value={work.title} maxLength={120} disabled={busy} onChange={e => setWork({ ...work, title: e.target.value })} /></label>
-     <label className="block text-sm font-bold">작품 소개<textarea className={input} rows={5} maxLength={5000} value={work.description} disabled={busy} onChange={e => setWork({ ...work, description: e.target.value })} /></label>
-     {work.cover_asset_id ? <div><AdminImage key={work.cover_asset_id} id={work.cover_asset_id} alt="작품 표지 미리보기" /><button disabled={busy} className={button} onClick={() => setWork({ ...work, cover_asset_id: null })}>표지 연결 해제</button></div> : <p className="text-sm text-zinc-500">표지가 없습니다.</p>}
-     <UploadQueue key={work.id + "cover"} workId={work.id} label="표지 이미지 선택" available={1} disabled={busy} onBusy={setBusy} onComplete={a => attach(a, true)} />
-     <label className="block text-sm font-bold">기존 이미지로 표지 재사용<select aria-label="기존 이미지로 표지 재사용" className={input} disabled={busy} value={work.cover_asset_id ?? ""} onChange={e => setWork({ ...work, cover_asset_id: e.target.value || null })}><option value="">표지 없음</option>{assets.filter(a => a.mime === "image/webp").map((a, i) => <option key={a.id} value={a.id}>이미지 {i + 1} · {a.width}×{a.height}</option>)}</select></label>
-     <label className="flex items-center gap-2"><input type="checkbox" checked={work.published} disabled={busy} onChange={e => setWork({ ...work, published: e.target.checked })} />작품 공개</label>
-     <button className={button + " w-full"} disabled={busy} onClick={() => void action(async () => { const saved = await webtoonRequest<WebtoonWork>("/api/admin/webtoons", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "work", id: work.id, version: work.version, title: work.title, description: work.description, coverAssetId: work.cover_asset_id, published: work.published }) }); setWork(saved); setWorks(current => current.map(w => w.id === saved.id ? saved : w)); setNotice("작품을 저장했습니다."); })}>작품 저장</button>
-     <p className="text-xs text-zinc-500">파일은 수정하지 않고 재사용합니다. 표지·회차에서 제거해도 파일은 보관되며, 24시간 지난 미사용 파일만 정리할 수 있습니다.</p>
-     <button className={button} disabled={busy} onClick={() => { if (!window.confirm("24시간 지난 미사용 파일을 영구 삭제할까요? 저장된 표지와 회차 이미지는 유지됩니다.")) return; void action(async () => { const result = await webtoonRequest<{ removed: number; failed: number }>("/api/admin/webtoons/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workId: work.id }) }); await load(work.id); setNotice(`미사용 파일 ${result.removed}개 삭제, ${result.failed}개 재시도 필요`); }); }}>미사용 파일 정리</button>
-    </section>
-    <section className="min-w-0 space-y-4 rounded-xl bg-white p-4" aria-label="회차 편집">
-     <h2 className="text-xl font-bold">회차 관리</h2>
-     <label className="block text-sm font-bold">회차 선택<select aria-label="회차 선택" value={episode?.id ?? ""} className={input} disabled={busy} onChange={e => setEpisode(episodes.find(ep => ep.id === e.target.value) ?? null)}><option value="">회차를 선택하세요</option>{episodes.map(e => <option key={e.id} value={e.id}>{e.number}화 · {e.title} · {e.published ? "공개" : "임시저장"}</option>)}</select></label>
-     <div className="flex flex-wrap items-end gap-2 rounded border p-3"><label className="w-24 text-sm font-bold">새 회차 번호<input className={input} type="number" min={1} max={99999} value={newNumber} disabled={busy} onChange={e => setNewNumber(Number(e.target.value))} /></label><label className="min-w-0 flex-1 text-sm font-bold">새 회차 제목<input className={input} value={newEpisodeTitle} maxLength={120} disabled={busy} onChange={e => setNewEpisodeTitle(e.target.value)} /></label><button className={button} disabled={busy || !newEpisodeTitle.trim()} onClick={() => void action(async () => { const created = await webtoonRequest<WebtoonEpisode>("/api/admin/webtoons", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "episode", workId: work.id, title: newEpisodeTitle, number: newNumber }) }); await load(work.id); setEpisode({ ...created, page_ids: [] }); setNewNumber(newNumber + 1); setNewEpisodeTitle(""); setNotice("임시저장 회차를 만들었습니다."); })}>회차 만들기</button></div>
-     {episode ? <div className="space-y-4" key={episode.id}>
-      <div className="grid gap-3 sm:grid-cols-[6rem_1fr]"><label className="text-sm font-bold">회차 번호<input className={input} value={episode.number} min={1} max={99999} type="number" disabled={busy} onChange={e => setEpisode({ ...episode, number: Number(e.target.value) })} /></label><label className="text-sm font-bold">회차 제목<input className={input} value={episode.title} maxLength={120} disabled={busy} onChange={e => setEpisode({ ...episode, title: e.target.value })} /></label></div>
-      <label className="block text-sm font-bold">회차 콘텐츠 방식<select aria-label="회차 콘텐츠 방식" className={input} disabled={busy} value={episode.content_type || "images"} onChange={e => setEpisode({ ...episode, content_type: e.target.value as "images" | "pdf" })}><option value="images">이미지 여러 장</option><option value="pdf">PDF 한 개</option></select></label>
-      <div className="flex flex-wrap gap-3 border-t pt-4"><button className={button} disabled={busy} onClick={() => void saveEpisode(false)}>{episode.published ? "비공개로 저장" : "임시저장"}</button><button className={button + " !bg-red-600 !text-white"} disabled={busy || (episode.content_type === "pdf" ? !episode.pdf_asset_id : !episode.page_ids.length)} onClick={() => void saveEpisode(true)}>회차 공개</button><Link className={button} href={`/webtoons/${work.id}/episodes/${episode.id}`} target="_blank">공개 뷰어 확인</Link></div>
-      {episode.content_type === "pdf" ? <div className="space-y-3">
-       <PdfUpload workId={work.id} disabled={busy} onBusy={setBusy} onComplete={asset => { setAssets(current => [...current.filter(a => a.id !== asset.id), asset]); setEpisode(current => current?.id === episode.id ? { ...current, pdf_asset_id: asset.id } : current); setNotice("PDF 업로드 완료. 미리보기 후 임시저장 또는 공개해주세요."); }} />
-       <label className="block text-sm">기존 PDF 재사용<select aria-label="기존 PDF 재사용" className={input} disabled={busy} value={episode.pdf_asset_id ?? ""} onChange={e => setEpisode({ ...episode, pdf_asset_id: e.target.value || null })}><option value="">PDF 없음</option>{assets.filter(a => a.mime === "application/pdf").map((a, i) => <option key={a.id} value={a.id}>PDF {i + 1} · {a.page_count}페이지 · {(a.bytes / 1048576).toFixed(1)}MiB</option>)}</select></label>
-       {episode.pdf_asset_id ? <button className={button} disabled={busy} onClick={() => setEpisode({ ...episode, pdf_asset_id: null })}>PDF 연결 해제</button> : null}
-       {assets.filter(a => a.id === episode.pdf_asset_id && a.page_count && a.page_sizes).map(a => <PdfViewer key={a.id} preview pdf={{ id: a.id, page_count: a.page_count!, page_sizes: a.page_sizes! }} />)}
-      </div> : <div className="space-y-3">
-      <UploadQueue workId={work.id} label="회차 이미지 선택" multiple available={100 - episode.page_ids.length} disabled={busy} onBusy={setBusy} onComplete={a => attach(a)} />
-      <p className="text-sm font-semibold">회차 이미지 {episode.page_ids.length}/100장 · 위에서 아래 순서로 표시됩니다.</p>
-      <ol aria-label="회차 이미지 순서" className="space-y-3">{episode.page_ids.map((id, i) => <li key={id} data-asset-id={id} className="rounded-lg border p-3"><p className="mb-2 font-bold">{i + 1}번째 이미지</p><AdminImage id={id} alt={`회차 이미지 ${i + 1} 미리보기`} /><div className="mt-2 flex flex-wrap gap-2"><button className={button} aria-label={`${i + 1}번째 이미지 위로`} disabled={busy || i === 0} onClick={() => move(i, -1)}>위로 ↑</button><button className={button} aria-label={`${i + 1}번째 이미지 아래로`} disabled={busy || i === episode.page_ids.length - 1} onClick={() => move(i, 1)}>아래로 ↓</button><button className={button} aria-label={`${i + 1}번째 이미지 제거`} disabled={busy} onClick={() => setEpisode({ ...episode, page_ids: episode.page_ids.filter(p => p !== id) })}>회차에서 제거</button></div></li>)}</ol>
-      <details open={libraryOpen} onToggle={e => setLibraryOpen(e.currentTarget.open)} className="rounded border p-3"><summary className="cursor-pointer font-bold">기존 이미지 재사용</summary>{libraryOpen ? <div className="mt-3 grid grid-cols-2 gap-3">{assets.filter(a => a.mime === "image/webp").slice(0, libraryLimit).map((asset, i) => <div key={asset.id} data-library-asset-id={asset.id} className="min-w-0 rounded border p-2"><AdminImage id={asset.id} alt={`기존 이미지 ${i + 1}`} /><button className={button + " mt-2 w-full"} disabled={busy || episode.page_ids.includes(asset.id) || episode.page_ids.length >= 100} onClick={() => setEpisode({ ...episode, page_ids: [...episode.page_ids, asset.id] })}>회차에 추가</button></div>)}{assets.length > libraryLimit ? <button className={button} onClick={() => setLibraryLimit(n => n + 60)}>이미지 더 보기</button> : null}</div> : null}</details>
-      </div>}
-     </div> : <p className="text-sm text-zinc-500">회차를 만들거나 선택해주세요.</p>}
-    </section>
-   </div> : null}
-  </div>
- </main>;
+}
+async function pdfCover(asset: WebtoonAsset) {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = "/api/webtoons/pdfjs/6.5.438/worker";
+  const { data } = supabase
+    ? await supabase.auth.getSession()
+    : { data: { session: null } };
+  const task = pdfjs.getDocument({
+    url: mediaUrl(asset.id),
+    httpHeaders: { Authorization: "Bearer " + data.session?.access_token },
+    cMapUrl: "/api/webtoons/pdfjs/6.5.438/cmaps/",
+    cMapPacked: true,
+    standardFontDataUrl: "/api/webtoons/pdfjs/6.5.438/standard_fonts/",
+    wasmUrl: "/api/webtoons/pdfjs/6.5.438/wasm/",
+    enableXfa: false,
+  });
+  const canvas = document.createElement("canvas");
+  try {
+    const doc = await task.promise,
+      page = await doc.getPage(1),
+      base = page.getViewport({ scale: 1 }),
+      viewport = page.getViewport({ scale: Math.min(1, 1200 / base.width) });
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    if (canvas.width * canvas.height > 4000000)
+      throw Error(
+        "표지 크기가 너무 큽니다. 추가 설정에서 표지를 선택해주세요.",
+      );
+    const context = canvas.getContext("2d");
+    if (!context) throw Error("표지를 생성할 수 없습니다.");
+    await page.render({
+      canvas,
+      canvasContext: context,
+      viewport,
+      annotationMode: 0,
+    }).promise;
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(Error("표지 생성 실패"))),
+        "image/webp",
+        0.92,
+      ),
+    );
+    return new File([blob], "cover.webp", { type: "image/webp" });
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+    await task.destroy();
+  }
+}
+function DraftFileList({
+  jobs,
+  busy,
+  onMove,
+}: {
+  jobs: DraftFile[];
+  busy: boolean;
+  onMove: (index: number, direction: number) => Promise<void>;
+}) {
+  return (
+    <ol className="space-y-2" aria-label="업로드 파일 순서">
+      {jobs.map((job, i) => (
+        <li
+          key={job.id}
+          className="flex flex-wrap items-center gap-2 rounded border bg-white p-3"
+        >
+          <span className="min-w-0 flex-1 break-all">
+            {i + 1}. {job.name} · {job.asset ? "완료" : "대기"}
+          </span>
+          {job.type !== "application/pdf"
+            ? [-1, 1].map((direction) => (
+                <button
+                  className={button}
+                  key={direction}
+                  disabled={
+                    busy || i + direction < 0 || i + direction >= jobs.length
+                  }
+                  aria-label={`${i + 1}번째 이미지 ${direction < 0 ? "위로" : "아래로"}`}
+                  onClick={() => void onMove(i, direction)}
+                >
+                  {direction < 0 ? "↑" : "↓"}
+                </button>
+              ))
+            : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+export default function WebtoonAdminEditor() {
+  const auth = useAuth();
+  return <FileFirstComposer key={`${auth.user?.id ?? "anonymous"}:${auth.isAdmin}`} auth={auth} />;
+}
+function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
+  const { isAdmin, isAuthReady, isProfileReady, user } = auth;
+  const router = useRouter();
+  const storageKey = `${storagePrefix}:${user?.id ?? "anonymous"}`;
+  const [draft, setDraft] = useState<WebtoonUploadDraft | null>(null),
+    [data, setData] = useState<DraftData | null>(null),
+    [works, setWorks] = useState<WebtoonWork[]>([]),
+    [series, setSeries] = useState(""),
+    [number, setNumber] = useState("");
+  const [busy, setBusy] = useState(false),
+    [stage, setStage] = useState("파일을 선택해주세요"),
+    [progress, setProgress] = useState(0),
+    [error, setError] = useState(""),
+    [legacy, setLegacy] = useState(false);
+  const files = useRef(new Map<string, File>()),
+    current = useRef<WebtoonUploadDraft | null>(null);
+  const apply = (d: WebtoonUploadDraft) => {
+    current.current = d;
+    setDraft(d);
+    const value = draftData(d);
+    setData(value);
+  };
+  const edit = (changes: Partial<DraftData>) => {
+    setData((value) => {
+      if (!value) return value;
+      const next = { ...value, ...changes };
+      return next;
+    });
+  };
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    webtoonRequest<{ works: WebtoonWork[] }>("/api/admin/webtoons")
+      .then((r) => {
+        if (alive)
+          setWorks(r.works.filter((w) => w.published && w.cover_asset_id));
+      })
+      .catch(() => {});
+    const id = localStorage.getItem(storageKey);
+    if (id)
+      webtoonRequest<WebtoonUploadDraft>(
+        endpoint + "?id=" + encodeURIComponent(id),
+      )
+        .then((d) => {
+          if (alive && d.status === "editing") {
+            current.current = d;
+            setDraft(d);
+            const value = draftData(d);
+            setData(value);
+            setStage(
+              value.ready
+                ? "미리보기 준비 완료"
+                : "임시 업로드를 복구했습니다. 미완료 파일은 다시 선택해주세요.",
+            );
+          }
+        })
+        .catch(() => {
+          if (alive)
+            setError(
+              "이전 임시 업로드를 불러오지 못했습니다. 연결 상태를 확인해주세요.",
+            );
+        });
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, storageKey]);
+  async function save(value: DraftData) {
+    const d = current.current;
+    if (!d) throw Error("임시 업로드가 없습니다.");
+    const saved = await webtoonRequest<WebtoonUploadDraft>(endpoint, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: d.id, version: d.version, data: value }),
+    });
+    apply(saved);
+    return saved;
+  }
+  async function select(inputFiles: File[]) {
+    if (busy) return;
+    setError("");
+    setBusy(true);
+    try {
+      const selected = inputFiles.sort((a, b) =>
+        a.name.localeCompare(b.name, "ko", { numeric: true }),
+      );
+      if (!selected.length) return;
+      const pdf = selected.some(
+        (f) => /\.pdf$/i.test(f.name) || f.type === "application/pdf",
+      );
+      if ((pdf && selected.length !== 1) || selected.length > 100)
+        throw Error("PDF 한 개 또는 이미지 최대 100장을 선택해주세요.");
+      for (const file of selected)
+        if (
+          !file.size ||
+          file.size > (pdf ? 50 : 10) * 1048576 ||
+          (!pdf && !/^image\/(png|jpeg|webp)$/.test(file.type))
+        )
+          throw Error(
+            "PDF는 50MiB, PNG·JPEG·WebP 이미지는 장당 10MiB 이하입니다.",
+          );
+      let d = current.current,
+        value = data;
+      if (!d) {
+        const id = localStorage.getItem(storageKey) || crypto.randomUUID();
+        localStorage.setItem(storageKey, id);
+        d = await webtoonRequest<WebtoonUploadDraft>(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            workId: series || null,
+            number: number ? Number(number) : null,
+          }),
+        });
+        current.current = d;
+        value = emptyData();
+      }
+      if (!value) value = emptyData();
+      const jobs: DraftFile[] = [];
+      for (const file of selected) {
+        const sha256 = Array.from(
+          new Uint8Array(
+            await crypto.subtle.digest("SHA-256", await file.arrayBuffer()),
+          ),
+        )
+          .map((n) => n.toString(16).padStart(2, "0"))
+          .join("");
+        const old = value.jobs.find((j) => j.sha256 === sha256);
+        const job = old ?? {
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          sha256,
+          type: pdf ? "application/pdf" : file.type,
+        };
+        files.current.set(
+          job.id,
+          pdf && file.type !== "application/pdf"
+            ? new File([file], file.name, { type: "application/pdf" })
+            : file,
+        );
+        jobs.push(job);
+      }
+      if (new Set(jobs.map((j) => j.id)).size !== jobs.length)
+        throw Error("같은 파일을 중복 선택했습니다. 중복 파일을 제외해주세요.");
+      if (
+        value.jobs.length &&
+        jobs.some((j) => !value!.jobs.some((old) => old.id === j.id))
+      )
+        throw Error(
+          "기존 임시 업로드와 다른 파일입니다. 먼저 취소하고 새로 시작해주세요.",
+        );
+      await save({ ...value, jobs: value.jobs.length ? value.jobs : jobs });
+      setStage("파일 선택 완료 · 업로드를 시작해주세요");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "파일 선택 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function process() {
+    if (!current.current || !data) return;
+    setBusy(true);
+    setError("");
+    try {
+      let value = { ...data, jobs: data.jobs.map((j) => ({ ...j })) };
+      for (let i = 0; i < value.jobs.length; i++) {
+        const job = value.jobs[i];
+        if (job.asset) continue;
+        const file = files.current.get(job.id);
+        if (!file)
+          throw Error(
+            `${job.name} 파일을 다시 선택해주세요. 완료된 파일은 다시 업로드하지 않습니다.`,
+          );
+        setStage(`업로드 중 · ${i + 1}/${value.jobs.length}`);
+        setProgress(0);
+        job.asset = await upload(
+          current.current!.work_id,
+          job.id,
+          file,
+          setProgress,
+          () => setStage(`최적화 중 · ${i + 1}/${value.jobs.length}`),
+        );
+        value = {
+          ...value,
+          pdfAssetId: job.type === "application/pdf" ? job.asset.id : null,
+          pageIds: value.jobs
+            .filter((j) => j.type !== "application/pdf" && j.asset)
+            .map((j) => j.asset!.id),
+        };
+        await save(value);
+      }
+      if (!value.coverAssetId) {
+        setStage("최적화 중 · 첫 페이지 표지 생성");
+        const first = value.jobs[0];
+        const cover =
+          first.type === "application/pdf"
+            ? await pdfCover(first.asset!)
+            : files.current.get(first.id);
+        if (!cover)
+          throw Error("표지를 생성하려면 첫 이미지 파일을 다시 선택해주세요.");
+        const asset = await upload(
+          current.current!.work_id,
+          value.coverUploadId,
+          cover,
+          setProgress,
+          () => setStage("최적화 중 · 표지 저장"),
+        );
+        value = { ...value, coverAssetId: asset.id };
+        await save(value);
+      }
+      setProgress(100);
+      setStage("미리보기 준비 완료");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "처리 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function move(index: number, direction: number) {
+    if (!data || busy) return;
+    const jobs = [...data.jobs];
+    [jobs[index], jobs[index + direction]] = [
+      jobs[index + direction],
+      jobs[index],
+    ];
+    setBusy(true);
+    try {
+      await save({
+        ...data,
+        jobs,
+        pageIds: jobs.filter((j) => j.asset).map((j) => j.asset!.id),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "순서 저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function publish() {
+    if (!data || !draft) return;
+    setBusy(true);
+    setStage("게시 중");
+    setError("");
+    try {
+      const saved = await save(data),
+        promotion = data.popup
+          ? await webtoonRequest<{ settings: { version: number } }>(
+              "/api/admin/webtoons/promotion",
+            )
+          : null;
+      const published = await webtoonRequest<WebtoonUploadDraft>(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: saved.id,
+          version: saved.version,
+          publish: true,
+          title: data.title,
+          popup: data.popup,
+          message: data.message,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt,
+          promotionVersion: promotion?.settings.version,
+        }),
+      });
+      localStorage.removeItem(storageKey);
+      router.push(
+        `/webtoons/${published.work_id}/episodes/${published.episode_id}`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "게시 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!isAuthReady || !isProfileReady)
+    return <main className="p-8">관리자 권한을 확인하고 있습니다.</main>;
+  if (!isAdmin || !user)
+    return <main className="p-8">관리자 로그인이 필요합니다.</main>;
+  const pdf = data?.jobs.find((j) => j.type === "application/pdf")?.asset;
+  return (
+    <main className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-950">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <header>
+          <h1 className="text-3xl font-black">웹툰 업로드</h1>
+          <p className="mt-2">
+            파일 선택 → 업로드·최적화 → 미리보기 → 제목 입력 → 게시하기
+          </p>
+          <Link href="/admin" className="underline">
+            관리자 홈
+          </Link>
+        </header>
+        <section
+          aria-label="파일 업로드"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            void select(Array.from(e.dataTransfer.files));
+          }}
+          className="rounded-2xl border-2 border-dashed border-blue-400 bg-white p-8 text-center"
+        >
+          <label className="block font-bold">
+            PDF 한 개 또는 이미지 여러 장 선택
+            <input
+              className="mt-4 block w-full"
+              type="file"
+              accept="application/pdf,.pdf,image/png,image/jpeg,image/webp"
+              multiple
+              disabled={busy}
+              onChange={(e) => {
+                void select(Array.from(e.target.files ?? []));
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <p className="mt-3 text-sm">
+            여기에 파일을 끌어 놓으세요. PDF 최대 50MiB · 200페이지 · 암호화 PDF
+            미지원
+            <br />
+            이미지 최대 100장 · 장당 10MiB · 파일명 자연 정렬
+          </p>
+        </section>
+        {error ? (
+          <p
+            role="alert"
+            className="rounded border border-red-400 p-4 text-red-800"
+          >
+            {stage} 단계: {error}
+          </p>
+        ) : null}
+        <div role="status" aria-live="polite">
+          {stage}
+          {busy ? (
+            <progress
+              className="block w-full"
+              max={100}
+              value={stage.startsWith("업로드 중") ? progress : undefined}
+            />
+          ) : null}
+        </div>
+        {data ? (
+          <>
+            <DraftFileList jobs={data.jobs} busy={busy} onMove={move} />
+            <button
+              className={button + " bg-blue-700 text-white"}
+              disabled={busy || !data.jobs.length}
+              onClick={() => void process()}
+            >
+              {error ? "실패 단계 재시도" : "업로드·최적화"}
+            </button>
+          </>
+        ) : null}
+        {data?.ready ? (
+          <section className="space-y-4 rounded-2xl bg-white p-5">
+            <h2 className="text-xl font-bold">미리보기</h2>
+            <p className="text-sm">
+              게시 전에는 관리자만 볼 수 있습니다. PDF는 원본을 보관하고
+              글자·그림을 다시 압축하지 않는 별도 열람용 PDF를 생성합니다.
+            </p>
+            {pdf?.page_count && pdf.page_sizes ? (
+              <PdfViewer
+                preview
+                pdf={{
+                  id: pdf.id,
+                  page_count: pdf.page_count,
+                  page_sizes: pdf.page_sizes,
+                }}
+              />
+            ) : (
+              <div className="mx-auto w-full max-w-3xl">
+                {data.pageIds.map((id, i) => (
+                  <AdminImage
+                    fullSize
+                    key={id}
+                    id={id}
+                    alt={`${i + 1}페이지 미리보기`}
+                  />
+                ))}
+              </div>
+            )}
+            <label className="block font-bold">
+              게시물 제목
+              <input
+                className={input}
+                maxLength={120}
+                value={data.title}
+                onChange={(e) => edit({ title: e.target.value })}
+                disabled={busy}
+              />
+            </label>
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={data.popup}
+                onChange={(e) => edit({ popup: e.target.checked })}
+                disabled={busy}
+              />
+              이 웹툰을 팝업으로 알리기
+            </label>
+            <p className="text-sm">
+              팝업을 선택하면 현재 팝업을 이 게시물로 교체합니다. 기본 노출
+              기간은 게시 후 7일입니다.
+            </p>
+            <button
+              className={button}
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void save(data)
+                  .then(() => setStage("임시저장 완료"))
+                  .catch((e) => setError(e.message))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              임시저장
+            </button>
+            <button
+              className={button + " ml-2 bg-zinc-950 text-white"}
+              disabled={busy || !data.title.trim() || !data.ready}
+              onClick={() => void publish()}
+            >
+              게시하기
+            </button>
+          </section>
+        ) : null}
+        {draft ? (
+          <button
+            className={button}
+            disabled={busy}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  "임시 업로드를 취소할까요? 기존 게시물은 유지됩니다.",
+                )
+              )
+                return;
+              setBusy(true);
+              void webtoonRequest(endpoint, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: draft.id }),
+              })
+                .then(() => {
+                  localStorage.removeItem(storageKey);
+                  current.current = null;
+                  setDraft(null);
+                  setData(null);
+                  files.current.clear();
+                  setStage("임시 업로드를 취소했습니다.");
+                })
+                .catch((e) => setError(e.message))
+                .finally(() => setBusy(false));
+            }}
+          >
+            취소 및 임시 파일 정리
+          </button>
+        ) : null}
+        <details className="rounded-xl border bg-white p-4">
+          <summary className="cursor-pointer font-bold">추가 설정</summary>
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              연재 선택
+              <select
+                className={input}
+                value={series}
+                disabled={busy || !!draft}
+                onChange={(e) => setSeries(e.target.value)}
+              >
+                <option value="">새 게시물로 만들기</option>
+                {works.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              회차 번호
+              <input
+                className={input}
+                type="number"
+                min={1}
+                max={99999}
+                value={number}
+                disabled={busy || !!draft}
+                onChange={(e) => setNumber(e.target.value)}
+              />
+            </label>
+            {data ? (
+              <>
+                <label>
+                  팝업 안내 문구
+                  <input
+                    className={input}
+                    maxLength={280}
+                    value={data.message}
+                    onChange={(e) => edit({ message: e.target.value })}
+                  />
+                </label>
+                <label>
+                  시작 시간
+                  <input
+                    type="datetime-local"
+                    className={input}
+                    value={data.startsAt}
+                    onChange={(e) => edit({ startsAt: e.target.value })}
+                  />
+                </label>
+                <label>
+                  종료 시간
+                  <input
+                    type="datetime-local"
+                    className={input}
+                    value={data.endsAt}
+                    onChange={(e) => edit({ endsAt: e.target.value })}
+                  />
+                </label>
+                <label>
+                  표지 교체 (선택)
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !draft) return;
+                      setBusy(true);
+                      const id = crypto.randomUUID();
+                      void upload(draft.work_id, id, file, setProgress, () =>
+                        setStage("최적화 중 · 표지"),
+                      )
+                        .then((asset) =>
+                          save({ ...data, coverAssetId: asset.id }),
+                        )
+                        .catch((e) => setError(e.message))
+                        .finally(() => setBusy(false));
+                    }}
+                  />
+                </label>
+              </>
+            ) : null}
+          </div>
+        </details>
+        <details
+          onToggle={(e) => setLegacy(e.currentTarget.open)}
+          className="rounded-xl border p-4"
+        >
+          <summary className="cursor-pointer font-bold">
+            기존 작품·회차 관리 및 홍보 설정
+          </summary>
+          {legacy ? <LegacyEditor /> : null}
+        </details>
+      </div>
+    </main>
+  );
 }

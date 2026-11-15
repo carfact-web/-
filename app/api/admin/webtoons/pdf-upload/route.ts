@@ -20,9 +20,22 @@ export async function POST(request: Request) {
   if (form.getAll("file").length !== 1 || !(file instanceof File) || file.type !== "application/pdf" || !file.name.toLowerCase().endsWith(".pdf")) throw new WebtoonError("PDF 파일 한 개를 선택해주세요.", 415);
   if (!file.size || file.size > PDF_MAX_BYTES) throw new WebtoonError("PDF는 50MiB 이하여야 합니다.", 413);
   const work = await db.from("webtoon_works").select("id").eq("id", workId).maybeSingle(); dbError(work.error); if (!work.data) throw new WebtoonError("작품을 먼저 저장해주세요.", 404);
-  const bytes = Buffer.from(await file.arrayBuffer()), meta = await validatePdf(bytes), id = randomUUID(), key = `${workId}/${id}.pdf`;
-  const inserted = await db.from("webtoon_assets").insert({ id, work_id: workId, object_key: key, mime: "application/pdf", width: null, height: null, bytes: bytes.length, state: "uploading", page_count: meta.count, page_sizes: meta.sizes }); dbError(inserted.error);
-  const uploaded = await db.storage.from(WEBTOON_BUCKET).upload(key, bytes, { contentType: "application/pdf", cacheControl: "0", upsert: false });
+  const requestedId = request.headers.get("x-upload-id");
+  const id = requestedId ? uuid(requestedId) : randomUUID(), key = `${workId}/${id}.pdf`;
+  if (requestedId) {
+   const previous = await db.from("webtoon_assets").select("*").eq("id",id).eq("work_id",workId).maybeSingle(); dbError(previous.error);
+   if (previous.data?.state === "ready") return Response.json(previous.data,{headers:NO_STORE});
+   if (previous.data) throw new WebtoonError("이전 업로드 처리 중입니다. 잠시 후 다시 시도해주세요.",409);
+  }
+  const bytes = Buffer.from(await file.arrayBuffer()), meta = await validatePdf(bytes, Boolean(requestedId));
+  // Preserve the source privately; only the separate derivative gets a public asset ID.
+  const optimized = meta.optimized && meta.optimized.length < bytes.length ? Buffer.from(meta.optimized) : bytes;
+  if (requestedId) {
+   const original = await db.storage.from(WEBTOON_BUCKET).upload(`${workId}/${id}.original.pdf`,bytes,{contentType:"application/pdf",cacheControl:"0",upsert:false});
+   if (original.error && original.error.message !== "The resource already exists") throw new WebtoonError("원본 PDF 보관 단계에 실패했습니다. 다시 시도해주세요.",502);
+  }
+  const inserted = await db.from("webtoon_assets").insert({ id, work_id: workId, object_key: key, mime: "application/pdf", width: null, height: null, bytes: optimized.length, state: "uploading", page_count: meta.count, page_sizes: meta.sizes }); dbError(inserted.error);
+  const uploaded = await db.storage.from(WEBTOON_BUCKET).upload(key, optimized, { contentType: "application/pdf", cacheControl: "0", upsert: false });
   if (uploaded.error) { const removed = await db.storage.from(WEBTOON_BUCKET).remove([key]); if (!removed.error) await db.from("webtoon_assets").delete().eq("id", id); throw new WebtoonError("PDF 업로드에 실패했습니다. 선택한 파일로 다시 시도해주세요.", 502); }
   const saved = await db.from("webtoon_assets").update({ state: "ready" }).eq("id", id).select().single(); dbError(saved.error);
   return Response.json({ ...saved.data, validation_ms: meta.elapsedMs, validation_heap_bytes: meta.heapBytes }, { status: 201, headers: NO_STORE });

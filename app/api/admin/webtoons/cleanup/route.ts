@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   const claimed = await db.rpc("webtoon_claim_orphans", { p_work: uuid(workId) }); dbError(claimed.error);
   let removed = 0, failed = 0;
   for (const asset of claimed.data ?? []) {
-   const result = await db.storage.from(WEBTOON_BUCKET).remove([asset.object_key]);
+   const result = await db.storage.from(WEBTOON_BUCKET).remove(asset.mime === "application/pdf" ? [asset.object_key, asset.object_key.replace(/\.pdf$/, ".original.pdf")] : [asset.object_key]);
    if (result.error) { failed++; continue; }
    const deleted = await db.from("webtoon_assets").delete().eq("id", asset.id).eq("state", "deleting");
    if (deleted.error) failed++; else removed++;

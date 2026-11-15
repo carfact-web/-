@@ -3,8 +3,8 @@ import { Worker } from "node:worker_threads";
 import path from "node:path";
 import { PDF_MAX_PAGES, PDF_VALIDATION_TIMEOUT_MS, PDF_WORKER_HEAP_MB } from "@/lib/webtoons/pdf-limits";
 import { WebtoonError } from "./core";
-interface Metadata { count: number; sizes: { width: number; height: number }[]; elapsedMs: number; heapBytes: number; }
-export async function validatePdf(input: Buffer): Promise<Metadata> {
+interface Metadata { optimized?: Uint8Array; count: number; sizes: { width: number; height: number }[]; elapsedMs: number; heapBytes: number; }
+export async function validatePdf(input: Buffer, optimize = false): Promise<Metadata> {
  return new Promise((resolve, reject) => {
   const worker = new Worker(path.join(process.cwd(), "lib/server/webtoons/pdf-validate-worker.cjs"), { resourceLimits: { maxOldGenerationSizeMb: PDF_WORKER_HEAP_MB } });
   let finished = false;
@@ -16,6 +16,6 @@ export async function validatePdf(input: Buffer): Promise<Metadata> {
    if (data.ok) done(undefined, data);
    else done(new WebtoonError(data.code === "ENCRYPTED" ? "암호화된 PDF는 지원하지 않습니다. 암호화를 해제한 사본을 업로드해주세요." : data.code === "PAGES" ? `PDF는 1~${PDF_MAX_PAGES}페이지까지 가능합니다. 30~40페이지는 일반적인 권장 분량입니다.` : data.code === "DIMENSIONS" ? "PDF 페이지 크기나 가로세로 비율이 처리 범위를 벗어났습니다." : "손상되었거나 올바른 PDF가 아닙니다. PDF로 다시 내보내어 업로드해주세요.", 422));
   });
-  const copy = Uint8Array.from(input); worker.postMessage({ bytes: copy, maxPages: PDF_MAX_PAGES }, [copy.buffer]);
+  const copy = Uint8Array.from(input); worker.postMessage({ bytes: copy, maxPages: PDF_MAX_PAGES, optimize }, [copy.buffer]);
  });
 }

@@ -10,6 +10,7 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      webtoon_upload_drafts: WebtoonTables["webtoon_upload_drafts"];
       webtoon_promotion: WebtoonTables["webtoon_promotion"];
       webtoon_works: WebtoonTables["webtoon_works"];
       webtoon_episodes: WebtoonTables["webtoon_episodes"];
@@ -1050,6 +1051,9 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
+      webtoon_cancel_upload: WebtoonFunctions["webtoon_cancel_upload"];
+      webtoon_start_upload: WebtoonFunctions["webtoon_start_upload"];
+      webtoon_publish_upload: WebtoonFunctions["webtoon_publish_upload"];
       webtoon_promotion_payload: WebtoonFunctions["webtoon_promotion_payload"];
       webtoon_promotion_card: WebtoonFunctions["webtoon_promotion_card"];
       webtoon_save_work: WebtoonFunctions["webtoon_save_work"];

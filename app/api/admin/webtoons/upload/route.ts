@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   if (!(file instanceof File) || !file.size || file.size > MAX_BYTES) throw new WebtoonError("이미지는 한 장에 10MB 이하여야 합니다.", 413);
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new WebtoonError("PNG·JPEG·WebP 이미지만 업로드할 수 있습니다.", 415);
   const work = await db.from("webtoon_works").select("id").eq("id", workId).maybeSingle(); dbError(work.error); if (!work.data) throw new WebtoonError("작품을 먼저 저장해주세요.", 404);
+  const requestedId=request.headers.get("x-upload-id"), id=requestedId?uuid(requestedId):randomUUID();
+  if(requestedId){const previous=await db.from("webtoon_assets").select("*").eq("id",id).eq("work_id",workId).maybeSingle();dbError(previous.error);if(previous.data?.state==="ready")return Response.json(previous.data,{headers:NO_STORE});if(previous.data)throw new WebtoonError("이전 업로드 처리 중입니다. 잠시 후 다시 시도해주세요.",409);}
   let buffer: Buffer, width: number, height: number;
   try {
    const input = Buffer.from(await file.arrayBuffer());
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
    buffer = output.data; width = output.info.width; height = output.info.height;
    if (buffer.length > MAX_BYTES || width > 4096 || height > 30000) throw new Error("invalid dimensions");
   } catch { throw new WebtoonError("이미지를 읽을 수 없습니다. 정적 PNG·JPEG·WebP, 폭 4096px·높이 30000px·4천만 화소 이하인지 확인해주세요.", 415); }
-  const id = randomUUID(), key = `${workId}/${id}.webp`;
+  const key = `${workId}/${id}.webp`;
   const inserted = await db.from("webtoon_assets").insert({ id, work_id: workId, object_key: key, mime: "image/webp", width, height, bytes: buffer.length, state: "uploading" }); dbError(inserted.error);
   const uploaded = await db.storage.from(WEBTOON_BUCKET).upload(key, buffer, { contentType: "image/webp", upsert: false, cacheControl: "0" });
   if (uploaded.error) {
