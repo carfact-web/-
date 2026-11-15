@@ -4,11 +4,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function visibleCover(id: string) {
  const db = publicDb();
- const episode = await db.from("webtoon_episodes").select("work_id").eq("id", id).eq("published", true).maybeSingle(); dbError(episode.error);
+ const episode = await db.from("webtoon_episodes").select("work_id,cover_asset_id").eq("id", id).eq("published", true).maybeSingle(); dbError(episode.error);
  if (!episode.data) return null;
  const work = await db.from("webtoon_works").select("cover_asset_id").eq("id", episode.data.work_id).eq("published", true).maybeSingle(); dbError(work.error);
- if (!work.data?.cover_asset_id) return null;
- const asset = await db.from("webtoon_assets").select("id,object_key").eq("id", work.data.cover_asset_id).eq("mime", "image/webp").eq("state", "ready").maybeSingle(); dbError(asset.error);
+ const coverId=episode.data.cover_asset_id??work.data?.cover_asset_id;
+ if (!work.data || !coverId) return null;
+ const asset = await db.from("webtoon_assets").select("id,object_key").eq("id", coverId).eq("mime", "image/webp").eq("state", "ready").maybeSingle(); dbError(asset.error);
  return asset.data;
 }
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

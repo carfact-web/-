@@ -8,6 +8,7 @@ export interface DraftFile {
   asset?: WebtoonAsset;
 }
 export interface DraftData {
+  published?: boolean;
   jobs: DraftFile[];
   pageIds: string[];
   pdfAssetId: string | null;

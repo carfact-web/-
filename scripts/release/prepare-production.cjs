@@ -21,7 +21,7 @@ replace('app/layout.tsx',serverImport,'');replace('app/layout.tsx','import { Web
 const layout=path.join(destination,'app/layout.tsx'),source=fs.readFileSync(layout,'utf8');const start=source.indexOf('        {isLocalSandboxServer() ? (');const end=source.indexOf('        ) : null}\n',start);if(start<0||end<start)throw Error('Banner boundary changed');fs.writeFileSync(layout,source.slice(0,start)+source.slice(end+'        ) : null}\n'.length));
 replace('components/GoogleAnalytics.tsx',clientImport,'');replace('components/GoogleAnalytics.tsx','isLocalSandbox() || !gaMeasurementId','!gaMeasurementId');
 replace('lib/indexNowClient.ts',clientImport,'');replace('lib/indexNowClient.ts','  if (isLocalSandbox()) return;\n','');
-replace('components/webtoons/WebtoonAdminEditor.tsx',clientImport,'');replace('components/webtoons/WebtoonAdminEditor.tsx','isLocalSandbox() ? "/local-test" : "/login?redirectTo=/admin/webtoons"','"/login?redirectTo=/admin/webtoons"');
+replace('components/webtoons/LegacyWebtoonEditor.tsx',clientImport,'');replace('components/webtoons/LegacyWebtoonEditor.tsx','isLocalSandbox() ? "/local-test" : "/login?redirectTo=/admin/webtoons"','"/login?redirectTo=/admin/webtoons"');
 replace('components/webtoons/WebtoonPromotion.tsx','admin|login|auth|local-test','admin|login|auth');
 replace('next.config.ts','const nextConfig: NextConfig = {','const nextConfig: NextConfig = {\n  output: "standalone",');
 const manifest={schema:1,sourceCommit:cp.execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),sourceDirty:dirty,files:[]};

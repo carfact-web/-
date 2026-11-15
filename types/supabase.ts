@@ -1052,6 +1052,8 @@ export interface Database {
     Views: { [_ in never]: never };
     Functions: {
       webtoon_cancel_upload: WebtoonFunctions["webtoon_cancel_upload"];
+      webtoon_start_edit: WebtoonFunctions["webtoon_start_edit"];
+      webtoon_commit_edit: WebtoonFunctions["webtoon_commit_edit"];
       webtoon_start_upload: WebtoonFunctions["webtoon_start_upload"];
       webtoon_publish_upload: WebtoonFunctions["webtoon_publish_upload"];
       webtoon_promotion_payload: WebtoonFunctions["webtoon_promotion_payload"];

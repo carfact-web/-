@@ -1,4 +1,5 @@
 import {
+  bool,
   dbError,
   failure,
   integer,
@@ -33,8 +34,29 @@ async function context(request: Request) {
 }
 export async function GET(request: Request) {
   try {
-    const { db, owner } = await context(request),
-      id = uuid(new URL(request.url).searchParams.get("id"));
+    const { db, owner } = await context(request);
+    if (new URL(request.url).searchParams.has("list")) {
+      const [episodes, works] = await Promise.all([
+        db
+          .from("webtoon_episodes")
+          .select("*")
+          .order("updated_at", { ascending: false })
+          .limit(500),
+        db.from("webtoon_works").select("id,title,published").limit(500),
+      ]);
+      dbError(episodes.error);
+      dbError(works.error);
+      return Response.json(
+        {
+          posts: (episodes.data ?? []).map((e) => ({
+            ...e,
+            work: (works.data ?? []).find((w) => w.id === e.work_id),
+          })),
+        },
+        { headers: NO_STORE },
+      );
+    }
+    const id = uuid(new URL(request.url).searchParams.get("id"));
     const result = await db
       .from("webtoon_upload_drafts")
       .select("*")
@@ -53,6 +75,15 @@ export async function POST(request: Request) {
   try {
     const { db, owner } = await context(request),
       body = await request.json();
+    if (body.episodeId) {
+      const result = await db.rpc("webtoon_start_edit", {
+        p_id: uuid(body.id),
+        p_owner: owner,
+        p_episode: uuid(body.episodeId),
+      });
+      dbError(result.error);
+      return Response.json(result.data, { headers: NO_STORE });
+    }
     const result = await db.rpc("webtoon_start_upload", {
       p_id: uuid(body.id),
       p_owner: owner,
@@ -91,6 +122,22 @@ export async function PATCH(request: Request) {
           : new Date(now.getTime() + 7 * 86400000);
       if (!Number.isFinite(+start) || !Number.isFinite(+end))
         throw new WebtoonError("팝업 일정을 확인해주세요.");
+      if (current.data.mode === "edit") {
+        const result = await db.rpc("webtoon_commit_edit", {
+          p_id: id,
+          p_owner: owner,
+          p_version: version,
+          p_title: title(body.title),
+          p_published: bool(body.published),
+          p_popup: popup,
+          p_message:
+            typeof body.message === "string" ? body.message.trim() : "",
+          p_start: popup ? start.toISOString() : null,
+          p_end: popup ? end.toISOString() : null,
+        });
+        dbError(result.error);
+        return Response.json(result.data, { headers: NO_STORE });
+      }
       const result = await db.rpc("webtoon_publish_upload", {
         p_id: id,
         p_owner: owner,

@@ -12,6 +12,7 @@ import type {
   WebtoonUploadDraft,
   WebtoonAsset,
   WebtoonWork,
+  WebtoonEpisode,
 } from "@/types/webtoon";
 import type { DraftData, DraftFile } from "@/lib/webtoons/draft";
 const LegacyEditor = dynamic(() => import("./LegacyWebtoonEditor"));
@@ -147,14 +148,24 @@ async function pdfCover(asset: WebtoonAsset) {
     await task.destroy();
   }
 }
+function localInput(value: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (!Number.isFinite(+d)) return "";
+  return new Date(+d - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
 function DraftFileList({
   jobs,
   busy,
   onMove,
+  onRemove,
 }: {
   jobs: DraftFile[];
   busy: boolean;
   onMove: (index: number, direction: number) => Promise<void>;
+  onRemove: (index: number) => Promise<void>;
 }) {
   return (
     <ol className="space-y-2" aria-label="업로드 파일 순서">
@@ -181,6 +192,14 @@ function DraftFileList({
                 </button>
               ))
             : null}
+          <button
+            className={button}
+            disabled={busy}
+            aria-label={`${i + 1}번째 파일 제거`}
+            onClick={() => void onRemove(i)}
+          >
+            제거
+          </button>
         </li>
       ))}
     </ol>
@@ -188,9 +207,14 @@ function DraftFileList({
 }
 export default function WebtoonAdminEditor() {
   const auth = useAuth();
-  return <FileFirstComposer key={`${auth.user?.id ?? "anonymous"}:${auth.isAdmin}`} auth={auth} />;
+  return (
+    <FileFirstComposer
+      key={`${auth.user?.id ?? "anonymous"}:${auth.isAdmin}`}
+      auth={auth}
+    />
+  );
 }
-function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
+function FileFirstComposer({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const { isAdmin, isAuthReady, isProfileReady, user } = auth;
   const router = useRouter();
   const storageKey = `${storagePrefix}:${user?.id ?? "anonymous"}`;
@@ -204,6 +228,9 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
     [progress, setProgress] = useState(0),
     [error, setError] = useState(""),
     [legacy, setLegacy] = useState(false);
+  const [posts, setPosts] = useState<
+    (WebtoonEpisode & { work?: { title: string; published: boolean } })[]
+  >([]);
   const files = useRef(new Map<string, File>()),
     current = useRef<WebtoonUploadDraft | null>(null);
   const apply = (d: WebtoonUploadDraft) => {
@@ -226,6 +253,11 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
       .then((r) => {
         if (alive)
           setWorks(r.works.filter((w) => w.published && w.cover_asset_id));
+      })
+      .catch(() => {});
+    webtoonRequest<{ posts: typeof posts }>(endpoint + "?list=1")
+      .then((r) => {
+        if (alive) setPosts(r.posts);
       })
       .catch(() => {});
     const id = localStorage.getItem(storageKey);
@@ -336,13 +368,36 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
       if (new Set(jobs.map((j) => j.id)).size !== jobs.length)
         throw Error("같은 파일을 중복 선택했습니다. 중복 파일을 제외해주세요.");
       if (
+        d.mode !== "edit" &&
         value.jobs.length &&
         jobs.some((j) => !value!.jobs.some((old) => old.id === j.id))
       )
         throw Error(
           "기존 임시 업로드와 다른 파일입니다. 먼저 취소하고 새로 시작해주세요.",
         );
-      await save({ ...value, jobs: value.jobs.length ? value.jobs : jobs });
+      const nextJobs =
+        d.mode === "edit"
+          ? pdf || value.pdfAssetId
+            ? jobs
+            : [
+                ...value.jobs,
+                ...jobs.filter(
+                  (j) => !value!.jobs.some((old) => old.id === j.id),
+                ),
+              ]
+          : value.jobs.length
+            ? value.jobs
+            : jobs;
+      if (nextJobs.length > 100)
+        throw Error(
+          "이미지는 최대 100장입니다. 먼저 불필요한 이미지를 제거해주세요.",
+        );
+      await save({
+        ...value,
+        jobs: nextJobs,
+        pdfAssetId: pdf ? (nextJobs[0].asset?.id ?? null) : null,
+        pageIds: pdf ? [] : nextJobs.filter((j) => j.asset).map((j) => j.id),
+      });
       setStage("파일 선택 완료 · 업로드를 시작해주세요");
     } catch (e) {
       setError(e instanceof Error ? e.message : "파일 선택 실패");
@@ -429,6 +484,52 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
       setBusy(false);
     }
   }
+  async function beginEdit(episodeId: string) {
+    if (busy) return;
+    if (draft) {
+      setError("현재 임시 작업을 먼저 게시하거나 취소해주세요.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const id = crypto.randomUUID(),
+        d = await webtoonRequest<WebtoonUploadDraft>(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, episodeId }),
+        });
+      localStorage.setItem(storageKey, id);
+      apply(d);
+      setStage(
+        "기존 게시물을 불러왔습니다. 변경사항 저장 전에는 원본이 유지됩니다.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "수정본 불러오기 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(index: number) {
+    if (!data || busy) return;
+    setBusy(true);
+    try {
+      const jobs = data.jobs.filter((_, i) => i !== index);
+      await save({
+        ...data,
+        jobs,
+        pageIds: jobs
+          .filter((j) => j.asset && j.type !== "application/pdf")
+          .map((j) => j.id),
+        pdfAssetId:
+          jobs.find((j) => j.type === "application/pdf")?.asset?.id ?? null,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "제거 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function publish() {
     if (!data || !draft) return;
     setBusy(true);
@@ -450,6 +551,7 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
           publish: true,
           title: data.title,
           popup: data.popup,
+          published: data.published ?? true,
           message: data.message,
           startsAt: data.startsAt,
           endsAt: data.endsAt,
@@ -483,6 +585,40 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
             관리자 홈
           </Link>
         </header>
+        <section
+          aria-label="관리자 게시물 목록"
+          className="rounded-xl border bg-white p-4"
+        >
+          <h2 className="text-xl font-bold">게시물 목록</h2>
+          <ul className="mt-3 max-h-72 space-y-2 overflow-auto">
+            {posts.map((post) => (
+              <li
+                key={post.id}
+                className="flex items-center justify-between gap-3 border-b py-2"
+              >
+                <span>
+                  {post.title} ·{" "}
+                  {post.published && post.work?.published ? "공개" : "비공개"}
+                </span>
+                <button
+                  className={button}
+                  disabled={busy}
+                  aria-label={`${post.title} 수정`}
+                  onClick={() => void beginEdit(post.id)}
+                >
+                  수정
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+        {draft?.mode === "edit" ? (
+          <p className="rounded border border-blue-300 p-4">
+            수정 중 · 파일을 선택하지 않으면 기존 파일이 유지됩니다. 새 PDF는
+            교체하고 이미지는 추가합니다. 기존 게시물은 변경사항 저장 후
+            반영됩니다.
+          </p>
+        ) : null}
         <section
           aria-label="파일 업로드"
           onDragOver={(e) => e.preventDefault()}
@@ -533,7 +669,12 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
         </div>
         {data ? (
           <>
-            <DraftFileList jobs={data.jobs} busy={busy} onMove={move} />
+            <DraftFileList
+              jobs={data.jobs}
+              busy={busy}
+              onMove={move}
+              onRemove={remove}
+            />
             <button
               className={button + " bg-blue-700 text-white"}
               disabled={busy || !data.jobs.length}
@@ -581,6 +722,22 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
                 disabled={busy}
               />
             </label>
+            {draft?.mode === "edit" ? (
+              <label className="flex gap-2">
+                <input
+                  type="checkbox"
+                  checked={data.published ?? false}
+                  disabled={busy}
+                  onChange={(e) =>
+                    edit({
+                      published: e.target.checked,
+                      popup: e.target.checked ? data.popup : false,
+                    })
+                  }
+                />
+                게시물 공개
+              </label>
+            ) : null}
             <label className="flex gap-2">
               <input
                 type="checkbox"
@@ -591,8 +748,9 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
               이 웹툰을 팝업으로 알리기
             </label>
             <p className="text-sm">
-              팝업을 선택하면 현재 팝업을 이 게시물로 교체합니다. 기본 노출
-              기간은 게시 후 7일입니다.
+              수정 시 팝업 설정을 바꾸지 않으면 다시 표시하지 않습니다. 팝업을
+              선택하면 현재 팝업을 이 게시물로 교체합니다. 기본 노출 기간은 게시
+              후 7일입니다.
             </p>
             <button
               className={button}
@@ -612,7 +770,7 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
               disabled={busy || !data.title.trim() || !data.ready}
               onClick={() => void publish()}
             >
-              게시하기
+              {draft?.mode === "edit" ? "변경사항 저장" : "게시하기"}
             </button>
           </section>
         ) : null}
@@ -695,8 +853,14 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
                   <input
                     type="datetime-local"
                     className={input}
-                    value={data.startsAt}
-                    onChange={(e) => edit({ startsAt: e.target.value })}
+                    value={localInput(data.startsAt)}
+                    onChange={(e) =>
+                      edit({
+                        startsAt: e.target.value
+                          ? new Date(e.target.value).toISOString()
+                          : "",
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -704,8 +868,14 @@ function FileFirstComposer({auth}: {auth: ReturnType<typeof useAuth>}) {
                   <input
                     type="datetime-local"
                     className={input}
-                    value={data.endsAt}
-                    onChange={(e) => edit({ endsAt: e.target.value })}
+                    value={localInput(data.endsAt)}
+                    onChange={(e) =>
+                      edit({
+                        endsAt: e.target.value
+                          ? new Date(e.target.value).toISOString()
+                          : "",
+                      })
+                    }
                   />
                 </label>
                 <label>

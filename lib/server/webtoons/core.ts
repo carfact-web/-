@@ -21,6 +21,9 @@ export function integer(value: unknown, max = 99999) {
 export function bool(value: unknown) { if (typeof value !== "boolean") throw new WebtoonError("공개 여부를 선택해주세요."); return value; }
 export function dbError(error: { code?: string; message?: string } | null) {
  if (!error) return;
+ if (error.message?.includes("series_private")) throw new WebtoonError("비공개 연재입니다. 기존 작품 관리에서 연재 공개 상태를 먼저 확인해주세요.");
+ if (error.message?.includes("invalid_popup")) throw new WebtoonError("비공개 게시물은 팝업으로 알릴 수 없습니다. 팝업 문구와 기간도 확인해주세요.");
+ if (error.message?.includes("invalid_title")) throw new WebtoonError("제목은 1~120자로 입력해주세요.");
  if (error.code === "23505") throw new WebtoonError("이미 사용 중인 회차 번호입니다.", 409);
  if (error.message?.includes("edit_conflict")) throw new WebtoonError("다른 변경이 먼저 저장됐습니다. 새로고침 후 다시 편집해주세요.", 409);
  if (error.message?.includes("not_found")) throw new WebtoonError("항목을 찾을 수 없습니다.", 404);
