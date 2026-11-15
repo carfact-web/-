@@ -109,7 +109,7 @@ export default function RootLayout({
           <PageViewTracker />
         </Suspense>
         <MaintenanceModeGate />
-        <WebtoonPromotionProvider><div className="flex-1 pb-24">{children}</div><BottomTabNav /></WebtoonPromotionProvider>
+        <WebtoonPromotionProvider><div data-site-content className="flex-1 pb-24">{children}</div><BottomTabNav /></WebtoonPromotionProvider>
       </body>
     </html>
   );
