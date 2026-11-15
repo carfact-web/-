@@ -60,6 +60,10 @@ export default function WebtoonAdminEditor() {
  return <main className="min-h-screen bg-zinc-100 px-4 py-6 text-zinc-950">
   <div className="mx-auto max-w-6xl space-y-5">
    <header className="space-y-2"><h1 className="text-3xl font-black">웹툰 작품·회차 관리</h1><p className="text-sm text-zinc-600">임시저장한 이미지와 회차는 관리자만 볼 수 있습니다. 작품과 회차가 모두 공개되어야 공개 목록과 뷰어에 표시됩니다.</p><nav className="flex gap-4 text-sm underline"><Link href="/admin">관리자 홈</Link><Link href="/webtoons" target="_blank">공개 웹툰 목록 보기</Link></nav></header>
+   <aside aria-label="PDF 업로드 안내" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+    <p className="font-bold">작품을 먼저 만든 뒤 회차에 PDF를 업로드하세요</p>
+    <p className="mt-1">작품 선택 → 회차 만들기 또는 선택 → ‘회차 콘텐츠 방식’에서 ‘PDF 한 개’ 선택 → ‘회차 PDF 선택’ 후 ‘PDF 업로드’</p>
+   </aside>
    <PromotionSettingsPanel />
    {error ? <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">{error}</p> : null}
    <p role="status" className="text-sm font-semibold">{notice}</p>
